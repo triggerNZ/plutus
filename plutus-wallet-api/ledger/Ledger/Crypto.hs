@@ -47,6 +47,7 @@ import           Ledger.TxId
 import           LedgerBytes                (LedgerBytes)
 import qualified LedgerBytes                as KB
 import           Schema                     (ToSchema)
+import           Schema.IOTS                (HasReps)
 import           Servant.API                (FromHttpApiData (parseUrlPiece), ToHttpApiData (toUrlPiece))
 
 -- | A cryptographic public key.
@@ -56,6 +57,7 @@ newtype PubKey =
     }
   deriving  (Show, Eq, Ord, Generic)
   deriving anyclass ( ToSchema
+                    , HasReps
                     , ToJSON
                     , FromJSON
                     , Newtype

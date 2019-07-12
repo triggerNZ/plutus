@@ -3,6 +3,7 @@
 {-# LANGUAGE DerivingVia        #-}
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DataKinds          #-}
+
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE TemplateHaskell    #-}
@@ -45,6 +46,7 @@ module Ledger.Value(
 import qualified Prelude                      as Haskell
 
 import           Codec.Serialise.Class        (Serialise)
+import Data.Proxy(Proxy(Proxy))
 import           Data.Aeson                   (FromJSON, FromJSONKey, ToJSON, ToJSONKey, (.:))
 import qualified Data.Aeson                   as JSON
 import qualified Data.Aeson.Extras            as JSON
@@ -53,6 +55,8 @@ import qualified Data.ByteString.Lazy.Char8   as C8
 import           Data.Hashable                (Hashable)
 import           Data.String                  (IsString(fromString))
 import qualified Data.Text                    as Text
+import           Data.Typeable                (Typeable)
+import qualified Data.Map
 import           GHC.Generics                 (Generic)
 import qualified Language.PlutusTx.Builtins as Builtins
 import           Language.PlutusTx.Lift       (makeLift)
@@ -61,14 +65,15 @@ import qualified Language.PlutusTx.Prelude    as P
 import qualified Language.PlutusTx.AssocMap   as Map
 import           Language.PlutusTx.These
 import           LedgerBytes                  (LedgerBytes(LedgerBytes))
-import           Schema                       (ToSchema)
+import           Schema                       (ToSchema,toSchema)
+import           Schema.IOTS                  (HasReps(typeReps))
 import           Ledger.Orphans               ()
 
 newtype CurrencySymbol = CurrencySymbol { unCurrencySymbol :: Builtins.ByteString }
     deriving (IsString, Show, ToJSONKey, FromJSONKey, Serialise) via LedgerBytes
     deriving stock (Generic)
     deriving newtype (Haskell.Eq, Haskell.Ord, Eq, Ord)
-    deriving anyclass (Hashable, ToSchema)
+    deriving anyclass (Hashable, ToSchema, HasReps)
 
 instance ToJSON CurrencySymbol where
   toJSON currencySymbol =
@@ -97,7 +102,7 @@ newtype TokenName = TokenName { unTokenName :: Builtins.ByteString }
     deriving (Serialise) via LedgerBytes
     deriving stock (Generic)
     deriving newtype (Haskell.Eq, Haskell.Ord, Eq, Ord)
-    deriving anyclass (Hashable, ToSchema)
+    deriving anyclass (Hashable, ToSchema, HasReps)
 
 instance IsString TokenName where
   fromString = TokenName . C8.pack
@@ -142,7 +147,7 @@ tokenName = TokenName
 -- See note [Currencies] for more details.
 newtype Value = Value { getValue :: Map.Map CurrencySymbol (Map.Map TokenName Integer) }
     deriving stock (Show, Generic)
-    deriving anyclass (ToJSON, FromJSON, Hashable, ToSchema)
+    deriving anyclass (ToJSON, FromJSON, Hashable, ToSchema, HasReps)
     deriving newtype (Serialise)
 
 -- Orphan instances for 'Map' to make this work
@@ -151,6 +156,12 @@ instance (ToJSON v, ToJSON k) => ToJSON (Map.Map k v) where
 
 instance (FromJSON v, FromJSON k) => FromJSON (Map.Map k v) where
     parseJSON v = Map.fromList Haskell.<$> JSON.parseJSON v
+
+instance (Typeable k, Typeable v) => ToSchema (Map.Map k v) where
+  toSchema _ = toSchema (Proxy :: Proxy (Data.Map.Map k v))
+
+instance (Typeable k, Typeable v, HasReps k, HasReps v) => HasReps (Map.Map k v) where
+  typeReps _ = typeReps (Proxy :: Proxy (Data.Map.Map k v))
 
 deriving anyclass instance (Hashable k, Hashable v) => Hashable (Map.Map k v)
 deriving anyclass instance (Serialise k, Serialise v) => Serialise (Map.Map k v)

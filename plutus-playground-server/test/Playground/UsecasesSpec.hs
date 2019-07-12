@@ -64,7 +64,7 @@ vestingSpec =
     describe "vesting" $ do
         compilationChecks vesting
         it "should compile with the expected schema" $ do
-            Right (InterpreterResult _ (CompilationResult result _)) <-
+            Right (InterpreterResult _ (CompilationResult result _ _)) <-
                 compile vesting
             result `shouldBe`
                 [ FunctionSchema
@@ -1594,6 +1594,7 @@ knownCurrencySpec =
         SourceCode $
         Text.unlines
             [ "import Playground.Contract"
+            , "import Data.Text"
             , "import Data.List.NonEmpty (NonEmpty ((:|)))"
             , "import Ledger.Value (TokenName(TokenName))"
             , "import Ledger.Validation (ValidatorHash (..))"
@@ -1602,8 +1603,9 @@ knownCurrencySpec =
             , "myCurrency :: KnownCurrency"
             , "myCurrency = KnownCurrency (ValidatorHash \"\") \"MyCurrency\" (TokenName \"MyToken\" :| [])"
             , "$(mkKnownCurrencies ['myCurrency])"
+            , "iotsDefinitions = \"\""
             ]
-    hasKnownCurrency (Right (InterpreterResult _ (CompilationResult _ [cur1, cur2]))) =
+    hasKnownCurrency (Right (InterpreterResult _ (CompilationResult _ [cur1, cur2] _))) =
         cur1 == adaCurrency &&
         cur2 ==
         KnownCurrency

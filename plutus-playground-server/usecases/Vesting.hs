@@ -259,3 +259,7 @@ withdraw vst vl = do
     pure ()
 
 $(mkFunctions ['vestFunds, 'registerVestingScheme, 'withdraw])
+
+iotsDefinitions :: Text
+iotsDefinitions =
+  IOTS.render $ IOTS.export (vestFunds :: Vesting -> MockWallet ())

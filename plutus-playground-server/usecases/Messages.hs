@@ -41,3 +41,7 @@ throwWalletAPIError :: MonadWallet m => Text -> m ()
 throwWalletAPIError = throwOtherError
 
 $(mkFunctions ['logAMessage, 'submitInvalidTxn, 'throwWalletAPIError])
+
+iotsDefinitions :: Text
+iotsDefinitions =
+  IOTS.render $ IOTS.export (logAMessage :: MockWallet ())

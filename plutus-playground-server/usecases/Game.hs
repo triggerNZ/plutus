@@ -129,3 +129,7 @@ Playground then uses this schema to present an HTML form to the user where the
 parameters can be entered.
 
 -}
+
+iotsDefinitions :: Text
+iotsDefinitions =
+  IOTS.render $ IOTS.export (startGame :: MockWallet ())

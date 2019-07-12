@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
@@ -18,6 +19,7 @@ module CrowdFunding where
 -- Note [Transactions in the crowdfunding campaign] explains the structure of
 -- this contract on the blockchain.
 
+import           Data.Text                 (Text)
 import qualified Language.PlutusTx         as PlutusTx
 import           Language.PlutusTx.Prelude
 import           Ledger                    (Address, DataScript (DataScript), PendingTx, PubKey,
@@ -30,6 +32,7 @@ import qualified Ledger.Validation         as V
 import           Ledger.Value              (Value)
 import qualified Ledger.Value              as Value
 import           Playground.Contract
+import qualified Schema.IOTS               as IOTS
 import           Wallet                    (EventHandler (EventHandler), EventTrigger, MonadWallet, andT,
                                             collectFromScript, collectFromScriptTxn, fundsAtAddressGeqT, logMsg,
                                             ownPubKey, payToScript, register, slotRangeT)
@@ -255,3 +258,11 @@ This part of the API (the PendingTx argument) is experimental and subject
 to change.
 
 -}
+
+myCurrency :: KnownCurrency
+myCurrency = KnownCurrency "b0b0" "MyCurrency" ( "USDToken" :| ["EURToken"])
+$(mkKnownCurrencies ['myCurrency])
+
+iotsDefinitions :: Text
+iotsDefinitions =
+  IOTS.render $ IOTS.export (scheduleCollection :: Slot -> Value -> Slot -> Wallet -> MockWallet ())

@@ -1,6 +1,7 @@
 -- | Re-export functions that are needed when creating a Contract for use in the playground
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-missing-import-lists #-}
@@ -28,6 +29,7 @@ module Playground.Contract
     , TokenName(TokenName)
     , NonEmpty((:|))
     , adaCurrency
+    , module Schema.IOTS
     ) where
 
 import           Data.Aeson                  (FromJSON, ToJSON, encode)
@@ -37,6 +39,7 @@ import           Data.ByteString.Lazy        (ByteString)
 import qualified Data.ByteString.Lazy        as BSL
 import qualified Data.ByteString.Lazy.Char8  as LBC8
 import           Data.List.NonEmpty          (NonEmpty ((:|)))
+import           Data.Text                   (Text)
 import           GHC.Generics                (Generic)
 import           Ledger.Interval             (always)
 import           Ledger.Validation           (ValidatorHash (ValidatorHash))
@@ -46,9 +49,13 @@ import           Playground.Interpreter.Util
 import           Playground.TH               (mkFunction, mkFunctions, mkKnownCurrencies, mkSingleFunction)
 import           Schema                      (ToSchema)
 import qualified Schema
+import           Schema.IOTS                 (HasReps (typeReps), export, render)
 import           Wallet.API                  (WalletAPI, payToPublicKey_)
 import           Wallet.Emulator             (addBlocksAndNotify, runWalletActionAndProcessPending, walletPubKey)
 import           Wallet.Emulator.Types       (MockWallet, Wallet (..))
+
+{-# ANN module ("HLint: ignore Avoid restricted function" :: Text)
+        #-}
 
 payToWallet_ :: (Monad m, WalletAPI m) => Value -> Wallet -> m ()
 payToWallet_ v = payToPublicKey_ always v . walletPubKey
@@ -63,9 +70,19 @@ instance ByteArrayAccess ByteString where
 
 $(mkSingleFunction 'payToWallet_)
 
-printSchemas :: ([FunctionSchema Schema.DataType], [KnownCurrency]) -> IO ()
-printSchemas (schemas, currencies) =
-    LBC8.putStrLn . encode $ (schemas <> [payToWallet_Schema], currencies)
+printSchemas ::
+       ([FunctionSchema Schema.DataType], [KnownCurrency], Text) -> IO ()
+printSchemas (userSchemas, currencies, iotsDefinitions) =
+    LBC8.putStrLn . encode $ (allSchemas, currencies, iotsDefinitions)
+  where
+    allSchemas = userSchemas <> builtinSchemas
+    builtinSchemas = [payToWallet_Schema]
 
 printJson :: ToJSON a => a -> IO ()
 printJson = LBC8.putStrLn . encode
+
+-- | JavaScript has no effect system, so we basically have to throw
+-- away the monadic context and trust that things will magically work
+-- out.
+instance HasReps a => HasReps (MockWallet a) where
+    typeReps _ = typeReps (undefined :: a)
