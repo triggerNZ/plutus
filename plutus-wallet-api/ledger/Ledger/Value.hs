@@ -54,8 +54,6 @@ import qualified Data.ByteString.Lazy.Char8   as C8
 import           Data.Hashable                (Hashable)
 import           Data.String                  (IsString(fromString))
 import qualified Data.Text                    as Text
-import           Data.Typeable                (Typeable)
-import qualified Data.Map
 import           GHC.Generics                 (Generic)
 import qualified Language.PlutusTx.Builtins as Builtins
 import           Language.PlutusTx.Lift       (makeLift)
@@ -64,8 +62,8 @@ import qualified Language.PlutusTx.Prelude    as P
 import qualified Language.PlutusTx.AssocMap   as Map
 import           Language.PlutusTx.These
 import           LedgerBytes                  (LedgerBytes(LedgerBytes))
-import           Schema                       (ToSchema,toSchema)
-import           Schema.IOTS                  (HasReps(typeReps))
+import           Schema                       (ToSchema)
+import           Schema.IOTS                  (HasReps)
 import           Ledger.Orphans               ()
 
 newtype CurrencySymbol = CurrencySymbol { unCurrencySymbol :: Builtins.ByteString }
