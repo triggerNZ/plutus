@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DefaultSignatures     #-}
 {-# LANGUAGE DerivingStrategies    #-}
@@ -94,11 +95,11 @@ data Iots =
     deriving (Show)
 
 iotsReps :: forall a. MyTypeRep a -> State Visited (NonEmpty (Tree Iots))
-iotsReps Atom          = pure <$> typeReps (Proxy @a)
+iotsReps Atom          = pure <$> typeReps @a
 iotsReps (Fun from to) = (<>) <$> iotsReps from <*> iotsReps to
 
 treeWalk :: forall a. MyTypeRep a -> State Visited (Tree Iots)
-treeWalk Atom = typeReps (Proxy @a)
+treeWalk Atom = typeReps @a
 treeWalk rep@(Fun from to) = do
     lefts <- treeWalk from
     rights <- treeWalk to
@@ -165,46 +166,48 @@ instance {-# OVERLAPPING #-} forall a b. ( MyTypeable a
 
 ------------------------------------------------------------
 class HasReps a where
-    typeReps :: a -> State Visited (Tree Iots)
+    typeReps :: State Visited (Tree Iots)
     default typeReps :: (Typeable a, Generic a, GenericHasReps (Rep a)) =>
-        a -> State Visited (Tree Iots)
-    typeReps = genericTypeReps (someTypeRep (Proxy @a)) . Generics.from
+        State Visited (Tree Iots)
+    typeReps =
+        genericTypeReps (someTypeRep (Proxy @a)) $
+        Generics.from (undefined :: a)
 
 instance HasReps Text where
-    typeReps _ = pure $ Node (Iots {..}) []
+    typeReps = pure $ Node (Iots {..}) []
       where
         iotsRep = someTypeRep (Proxy @Text)
         iotsOutput = False
         iotsRef = "t.string"
 
 instance HasReps Char where
-    typeReps _ = pure $ Node (Iots {..}) []
+    typeReps = pure $ Node (Iots {..}) []
       where
         iotsRep = someTypeRep (Proxy @Char)
         iotsOutput = False
         iotsRef = "t.string"
 
 instance HasReps Integer where
-    typeReps _ = pure $ Node (Iots {..}) []
+    typeReps = pure $ Node (Iots {..}) []
       where
         iotsRep = someTypeRep (Proxy @Integer)
         iotsOutput = False
         iotsRef = "t.Int"
 
 instance HasReps Int where
-    typeReps _ = pure $ Node (Iots {..}) []
+    typeReps = pure $ Node (Iots {..}) []
       where
         iotsRep = someTypeRep (Proxy @Int)
         iotsOutput = False
         iotsRef = "t.Int"
 
 instance HasReps a => HasReps (Proxy a) where
-    typeReps _ = typeReps (undefined :: a)
+    typeReps = typeReps @a
 
 instance (HasReps a, HasReps b, Typeable a, Typeable b) => HasReps (a, b) where
-    typeReps _ = do
-        leftReps <- typeReps (Proxy @a)
-        rightReps <- typeReps (Proxy @b)
+    typeReps = do
+        leftReps <- typeReps @a
+        rightReps <- typeReps @b
         let children = [leftReps, rightReps]
             iotsRep = someTypeRep (Proxy @(a, b))
             iotsOutput = False
@@ -213,9 +216,9 @@ instance (HasReps a, HasReps b, Typeable a, Typeable b) => HasReps (a, b) where
 
 instance (HasReps k, HasReps v, Typeable k, Typeable v) =>
          HasReps (Map k v) where
-    typeReps _ = do
-        keyReps <- typeReps (Proxy @k)
-        valueReps <- typeReps (Proxy @v)
+    typeReps = do
+        keyReps <- typeReps @k
+        valueReps <- typeReps @v
         let children = [keyReps, valueReps]
             iotsRep = someTypeRep (Proxy @(Map k v))
             iotsOutput = False
@@ -223,16 +226,16 @@ instance (HasReps k, HasReps v, Typeable k, Typeable v) =>
         pure $ Node (Iots {..}) children
 
 instance HasReps () where
-    typeReps _ = do
+    typeReps = do
         let iotsRep = someTypeRep (Proxy @())
             iotsOutput = False
             iotsRef = "t.null"
         pure $ Node (Iots {..}) []
 
 instance (HasReps a, Typeable a) => HasReps (Maybe a) where
-    typeReps _ = do
-        aChildren <- typeReps (Proxy @a)
-        nothingChildren <- typeReps (Proxy @())
+    typeReps = do
+        aChildren <- typeReps @a
+        nothingChildren <- typeReps @()
         let children = [aChildren, nothingChildren]
             iotsRep = someTypeRep (Proxy @(Maybe a))
             iotsOutput = False
@@ -246,21 +249,21 @@ type family IsSpecialListElement a where
 
 instance (ListTypeReps flag a, flag ~ IsSpecialListElement a) =>
          HasReps [a] where
-    typeReps _ = listTypeReps (Proxy @flag) (Proxy @a)
+    typeReps = listTypeReps @flag @a
 
 class ListTypeReps flag a where
-    listTypeReps :: Proxy flag -> Proxy a -> State Visited (Tree Iots)
+    listTypeReps :: State Visited (Tree Iots)
 
 instance ListTypeReps 'True Char where
-    listTypeReps _ _ = pure $ Node (Iots {..}) []
+    listTypeReps = pure $ Node (Iots {..}) []
       where
         iotsRep = someTypeRep (Proxy @String)
         iotsOutput = False
         iotsRef = "t.string"
 
 instance (HasReps a, Typeable a) => ListTypeReps 'False a where
-    listTypeReps _ _ = do
-        child <- typeReps (Proxy @a)
+    listTypeReps = do
+        child <- typeReps @a
         let iotsRep = someTypeRep (Proxy @[a])
             iotsOutput = False
             iotsRef = "t.array" <> parens (toRef child)
@@ -349,7 +352,7 @@ instance (Selector s, HasReps p, Typeable p) =>
         let childRep = someTypeRep (Proxy @p)
         seen <- gets (Set.member childRep)
         modify (Set.insert childRep)
-        child <- typeReps (Proxy @p)
+        child <- typeReps @p
         let fieldRef = toRef child
             def =
                 case selName selector of

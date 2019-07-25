@@ -1,5 +1,6 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE TypeApplications  #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Ledger.Orphans where
@@ -17,7 +18,7 @@ instance ToSchema P.ByteString where
   toSchema _ = toSchema (Proxy :: Proxy String)
 
 instance HasReps (Digest SHA256) where
-  typeReps _ = typeReps (Proxy :: Proxy String)
+  typeReps = typeReps @String
 
 instance HasReps P.ByteString where
-  typeReps _ = typeReps (Proxy :: Proxy String)
+  typeReps = typeReps @String

@@ -161,7 +161,7 @@ instance (Typeable k, Typeable v) => ToSchema (Map.Map k v) where
   toSchema _ = toSchema (Proxy :: Proxy (Data.Map.Map k v))
 
 instance (Typeable k, Typeable v, HasReps k, HasReps v) => HasReps (Map.Map k v) where
-  typeReps _ = typeReps (Proxy :: Proxy (Data.Map.Map k v))
+  typeReps = typeReps @(Data.Map.Map k v)
 
 deriving anyclass instance (Hashable k, Hashable v) => Hashable (Map.Map k v)
 deriving anyclass instance (Serialise k, Serialise v) => Serialise (Map.Map k v)

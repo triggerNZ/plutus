@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 -- | Re-export functions that are needed when creating a Contract for use in the playground
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -54,9 +55,6 @@ import           Wallet.API                  (WalletAPI, payToPublicKey_)
 import           Wallet.Emulator             (addBlocksAndNotify, runWalletActionAndProcessPending, walletPubKey)
 import           Wallet.Emulator.Types       (MockWallet, Wallet (..))
 
-{-# ANN module ("HLint: ignore Avoid restricted function" :: Text)
-        #-}
-
 payToWallet_ :: (Monad m, WalletAPI m) => Value -> Wallet -> m ()
 payToWallet_ v = payToPublicKey_ always v . walletPubKey
 
@@ -85,4 +83,4 @@ printJson = LBC8.putStrLn . encode
 -- away the monadic context and trust that things will magically work
 -- out.
 instance HasReps a => HasReps (MockWallet a) where
-    typeReps _ = typeReps (undefined :: a)
+    typeReps = typeReps @a
