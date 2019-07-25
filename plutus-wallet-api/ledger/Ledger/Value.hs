@@ -46,7 +46,6 @@ module Ledger.Value(
 import qualified Prelude                      as Haskell
 
 import           Codec.Serialise.Class        (Serialise)
-import Data.Proxy(Proxy(Proxy))
 import           Data.Aeson                   (FromJSON, FromJSONKey, ToJSON, ToJSONKey, (.:))
 import qualified Data.Aeson                   as JSON
 import qualified Data.Aeson.Extras            as JSON
@@ -156,12 +155,6 @@ instance (ToJSON v, ToJSON k) => ToJSON (Map.Map k v) where
 
 instance (FromJSON v, FromJSON k) => FromJSON (Map.Map k v) where
     parseJSON v = Map.fromList Haskell.<$> JSON.parseJSON v
-
-instance (Typeable k, Typeable v) => ToSchema (Map.Map k v) where
-  toSchema _ = toSchema (Proxy :: Proxy (Data.Map.Map k v))
-
-instance (Typeable k, Typeable v, HasReps k, HasReps v) => HasReps (Map.Map k v) where
-  typeReps = typeReps @(Data.Map.Map k v)
 
 deriving anyclass instance (Hashable k, Hashable v) => Hashable (Map.Map k v)
 deriving anyclass instance (Serialise k, Serialise v) => Serialise (Map.Map k v)

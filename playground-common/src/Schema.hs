@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes        #-}
 {-# LANGUAGE DefaultSignatures          #-}
 {-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -18,7 +19,7 @@ module Schema
     , toSchema
     , TypeSignature(..)
     , toTypeSignature
-    , typeSignatureOf
+    , typeSignature
     , DataType(..)
     , Constructor(..)
     , ConstructorName(..)
@@ -32,10 +33,11 @@ import           Data.Proxy               (Proxy (Proxy))
 import           Data.String              (IsString)
 import           Data.Text                (Text)
 import qualified Data.Text                as Text
-import           Data.Typeable            (Typeable, splitTyConApp, tyConModule, tyConName, typeRep)
+import           Data.Typeable            (splitTyConApp)
 import           GHC.Generics             ((:*:) ((:*:)), (:+:), C1, D1, Generic, M1 (M1), Rec0, Rep, S1, Selector, U1,
                                            V1, conIsRecord, conName, from, selName)
 import qualified GHC.Generics             as GHC
+import           Type.Reflection          (SomeTypeRep, Typeable, someTypeRep, tyConModule, tyConName)
 
 {-# ANN module ("HLint: ignore Avoid restricted function" :: Text)
         #-}
@@ -67,12 +69,17 @@ newtype ConstructorName =
     deriving newtype (IsString)
 
 ------------------------------------------------------------
-asPrimitive :: Typeable a => Proxy a -> DataType
-asPrimitive x = DataType (typeSignatureOf x) []
+asPrimitive ::
+       forall a. Typeable a
+    => DataType
+asPrimitive = DataType (typeSignature @a) []
 
-typeSignatureOf :: Typeable a => Proxy a -> TypeSignature
-typeSignatureOf = fromTypeRep . typeRep
+typeSignature ::
+       forall a. Typeable a
+    => TypeSignature
+typeSignature = fromTypeRep $ someTypeRep (Proxy @a)
   where
+    fromTypeRep :: SomeTypeRep -> TypeSignature
     fromTypeRep rep = postProcess TypeSignature {..}
       where
         (constructor, arguments) = splitTyConApp rep
@@ -100,41 +107,39 @@ toTypeSignature (DataType sig _) = sig
 
 ------------------------------------------------------------
 class ToSchema a where
-    toSchema :: a -> DataType
+    toSchema :: DataType
     default toSchema :: (Generic a, Typeable a, GenericToSchema (Rep a)) =>
-        a -> DataType
-    toSchema = DataType (typeSignatureOf (Proxy @a)) . genericToSchema . from
+        DataType
+    toSchema =
+        DataType (typeSignature @a) . genericToSchema $ from (undefined :: a)
 
 instance ToSchema Bool where
-    toSchema _ = asPrimitive (Proxy @Bool)
+    toSchema = asPrimitive @Bool
 
 instance ToSchema Int where
-    toSchema _ = asPrimitive (Proxy @Int)
+    toSchema = asPrimitive @Int
 
 instance ToSchema Integer where
-    toSchema _ = asPrimitive (Proxy @Integer)
+    toSchema = asPrimitive @Integer
 
 instance ToSchema Text where
-    toSchema _ = asPrimitive (Proxy @Text)
+    toSchema = asPrimitive @Text
 
 instance ToSchema a => ToSchema (Proxy a) where
-    toSchema _ = toSchema (undefined :: a)
+    toSchema = toSchema @a
 
 instance (Typeable a, Typeable b, ToSchema a, ToSchema b) =>
          ToSchema (a, b) where
-    toSchema _ =
+    toSchema =
         DataType
-            (typeSignatureOf (Proxy @(a, b)))
-            [ Constructor
-                  (ConstructorName "Tuple")
-                  [toSchema (Proxy @a), toSchema (Proxy @b)]
-            ]
+            (typeSignature @(a, b))
+            [Constructor (ConstructorName "Tuple") [toSchema @a, toSchema @b]]
 
 instance (Typeable k, Typeable v) => ToSchema (Map k v) where
-    toSchema _ = asPrimitive (Proxy @(Map k v))
+    toSchema = asPrimitive @(Map k v)
 
 instance (Typeable a) => ToSchema [a] where
-    toSchema _ = asPrimitive (Proxy @[a])
+    toSchema = asPrimitive @[a]
 
 ------------------------------------------------------------
 class GenericToSchema f where
@@ -210,4 +215,4 @@ instance (ToSchema f, Selector s) => GenericToFields (S1 s (Rec0 f)) where
             ""   -> [(Nothing, reference)]
             name -> [(Just (Text.pack name), reference)]
       where
-        reference = toSchema (Proxy @f)
+        reference = toSchema @f

@@ -44,4 +44,4 @@ $(mkFunctions ['logAMessage, 'submitInvalidTxn, 'throwWalletAPIError])
 
 iotsDefinitions :: Text
 iotsDefinitions =
-  IOTS.render $ IOTS.export (logAMessage :: MockWallet ())
+  render $ export (logAMessage :: MockWallet ())

@@ -1,8 +1,8 @@
-{-# LANGUAGE TypeApplications #-}
 -- | Re-export functions that are needed when creating a Contract for use in the playground
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-missing-import-lists #-}

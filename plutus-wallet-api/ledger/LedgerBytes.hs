@@ -6,6 +6,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# OPTIONS_GHC -Wno-orphans            #-}
 
 module LedgerBytes
@@ -21,7 +22,6 @@ import qualified Data.Aeson                 as JSON
 import qualified Data.Aeson.Extras          as JSON
 import           Data.Bifunctor             (bimap)
 import qualified Data.ByteString.Lazy       as BSL
-import           Data.Proxy                 (Proxy (Proxy))
 import           Data.String                (IsString (..))
 import qualified Data.Text                  as Text
 import           Data.Word                  (Word8)
@@ -78,7 +78,7 @@ instance Show LedgerBytes where
   show = Text.unpack . JSON.encodeByteString . BSL.toStrict . bytes
 
 instance ToSchema LedgerBytes where
-  toSchema _ = toSchema (Proxy :: Proxy String)
+  toSchema = toSchema @String
 
 instance HasReps LedgerBytes where
   typeReps = typeReps @String

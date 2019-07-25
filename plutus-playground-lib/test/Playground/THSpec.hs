@@ -8,7 +8,6 @@
 module Playground.THSpec where
 
 import           Data.Aeson            (FromJSON, ToJSON)
-import           Data.Proxy            (Proxy (Proxy))
 import           Data.Text             (Text)
 import           GHC.Generics          (Generic)
 import           Playground.API        (Fn (Fn), FunctionSchema (FunctionSchema))
@@ -50,20 +49,20 @@ spec =
         it
             "f2"
             (f2Schema `shouldBe`
-             FunctionSchema (Fn "f2") [toSchema (Proxy @String)])
+             FunctionSchema (Fn "f2") [toSchema @String])
         it
             "f3"
             (f3Schema `shouldBe`
              FunctionSchema
                  (Fn "f3")
-                 [toSchema (Proxy @String), toSchema (Proxy @Value)])
+                 [toSchema @String, toSchema @Value])
         it
             "f4"
             (f4Schema `shouldBe`
              FunctionSchema
                  (Fn "f4")
-                 [ toSchema (Proxy @Text)
-                 , toSchema (Proxy @Text)
-                 , toSchema (Proxy @(Int, Int))
-                 , toSchema (Proxy @[Text])
+                 [ toSchema @Text
+                 , toSchema @Text
+                 , toSchema @(Int, Int)
+                 , toSchema @[Text]
                  ])

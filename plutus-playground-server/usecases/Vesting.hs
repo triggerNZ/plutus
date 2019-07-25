@@ -15,6 +15,7 @@ module Vesting where
 import qualified Prelude                   as Haskell
 import           Language.PlutusTx.Prelude
 import qualified Data.Map                  as Map
+import           Data.Text                 (Text)
 import qualified Data.Set                  as Set
 
 import qualified Language.PlutusTx         as PlutusTx
@@ -58,7 +59,7 @@ data VestingTranche = VestingTranche {
     -- ^ When this tranche is released
     vestingTrancheAmount :: Value
     -- ^ How much money is locked in this tranche
-    } deriving (Generic, ToJSON, FromJSON, ToSchema)
+    } deriving (Generic, ToJSON, FromJSON, ToSchema, HasReps)
 
 PlutusTx.makeLift ''VestingTranche
 
@@ -74,7 +75,7 @@ data Vesting = Vesting {
     vestingOwner    :: PubKey
     -- ^ The recipient of the scheme (who is authorised to take out money once
     --   it has been released)
-    } deriving (Generic, ToJSON, FromJSON, ToSchema)
+    } deriving (Generic, ToJSON, FromJSON, ToSchema, HasReps)
 
 PlutusTx.makeLift ''Vesting
 
@@ -262,4 +263,4 @@ $(mkFunctions ['vestFunds, 'registerVestingScheme, 'withdraw])
 
 iotsDefinitions :: Text
 iotsDefinitions =
-  IOTS.render $ IOTS.export (vestFunds :: Vesting -> MockWallet ())
+  render $ export (vestFunds :: Vesting -> MockWallet ())

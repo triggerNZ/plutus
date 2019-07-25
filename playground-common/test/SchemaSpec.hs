@@ -7,7 +7,6 @@
 
 module SchemaSpec where
 
-import           Data.Proxy   (Proxy (Proxy))
 import           Data.Text    (Text)
 import           GHC.Generics (Generic)
 import           Schema       (Constructor (Constructor, Record), ConstructorName (ConstructorName),
@@ -21,11 +20,11 @@ spec = toSchemaSpec
 toSchemaSpec :: Spec
 toSchemaSpec =
     describe "toSchema" $ do
-        it "Int" $ toSchema (Proxy @Int) `shouldBe` intType
-        it "Integer" $ toSchema (Proxy @Integer) `shouldBe` integerType
-        it "String" $ toSchema (Proxy @String) `shouldBe` stringType
+        it "Int" $ toSchema @Int `shouldBe` intType
+        it "Integer" $ toSchema @Integer `shouldBe` integerType
+        it "String" $ toSchema @String `shouldBe` stringType
         it "Text" $
-            toSchema (Proxy @Text) `shouldBe`
+            toSchema @Text `shouldBe`
             DataType
                 (TypeSignature
                      { moduleName = "Data.Text.Internal"
@@ -34,7 +33,7 @@ toSchemaSpec =
                      })
                 []
         it "[Int]" $
-            toSchema (Proxy @[Int]) `shouldBe`
+            toSchema @[Int] `shouldBe`
             DataType
                 (TypeSignature
                      { moduleName = "GHC.Types"
@@ -43,7 +42,7 @@ toSchemaSpec =
                      })
                 []
         it "(Int, String)" $
-            toSchema (Proxy @(Int, String)) `shouldBe`
+            toSchema @(Int, String) `shouldBe`
             DataType
                 (TypeSignature
                      { moduleName = "GHC.Tuple"
@@ -53,7 +52,7 @@ toSchemaSpec =
                      })
                 [Constructor (ConstructorName "Tuple") [intType, stringType]]
         it "Maybe String" $
-            toSchema (Proxy @(Maybe String)) `shouldBe`
+            toSchema @(Maybe String) `shouldBe`
             DataType
                 (TypeSignature
                      { moduleName = "GHC.Maybe"
@@ -64,7 +63,7 @@ toSchemaSpec =
                 , Constructor (ConstructorName "Just") [stringType]
                 ]
         it "User" $
-            toSchema (Proxy @User) `shouldBe`
+            toSchema @User `shouldBe`
             DataType
                 (TypeSignature
                      { moduleName = "SchemaSpec"

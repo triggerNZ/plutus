@@ -1,6 +1,7 @@
-{-# LANGUAGE DeriveAnyClass  #-}
-{-# LANGUAGE DeriveGeneric   #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveAnyClass   #-}
+{-# LANGUAGE DeriveGeneric    #-}
+{-# LANGUAGE TemplateHaskell  #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Playground.TH
     ( mkFunction
@@ -9,7 +10,6 @@ module Playground.TH
     , mkKnownCurrencies
     ) where
 
-import           Data.Proxy          (Proxy (Proxy))
 import           Data.Text           (pack)
 import           Language.Haskell.TH (Body (NormalB), Clause (Clause), Dec (FunD, SigD, ValD), Exp (ListE, VarE),
                                       Info (VarI), Name, Pat (VarP), Q,
@@ -67,9 +67,11 @@ mkFunctionExp name fn = do
              in toSchemas fn ts
         _ -> error "Incorrect Name type provided to mkFunction"
 
+{-# ANN toSchemas ("HLint: ignore Redundant bracket" :: String) #-}
+
 toSchemas :: Fn -> [Type] -> Q Exp
 toSchemas fn ts = do
-    es <- foldr (\t e -> [|toSchema (Proxy :: Proxy $(pure t)) : $e|]) [|[]|] ts
+    es <- foldr (\t e -> [|toSchema @($(pure t)) : $e|]) [|[]|] ts
     [|FunctionSchema fn $(pure es)|]
 
 {-# ANN args ("HLint: ignore" :: String) #-}
