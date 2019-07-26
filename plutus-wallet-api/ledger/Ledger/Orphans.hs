@@ -6,10 +6,10 @@
 module Ledger.Orphans where
 
 import           Crypto.Hash                (Digest, SHA256)
+import           IOTS                       (HasReps (typeReps))
 import qualified Language.PlutusTx.AssocMap as Map
 import qualified Language.PlutusTx.Prelude  as P
 import           Schema                     (ToSchema, toSchema)
-import           Schema.IOTS                (HasReps (typeReps))
 import           Type.Reflection            (Typeable)
 
 instance ToSchema (Digest SHA256) where

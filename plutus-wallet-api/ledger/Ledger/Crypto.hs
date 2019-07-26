@@ -39,6 +39,7 @@ import qualified Data.ByteArray             as BA
 import qualified Data.ByteString            as BS
 import qualified Data.ByteString.Lazy       as BSL
 import           GHC.Generics               (Generic)
+import           IOTS                       (HasReps)
 import qualified Language.PlutusTx.Builtins as Builtins
 import           Language.PlutusTx.Lift     (makeLift)
 import qualified Language.PlutusTx.Prelude  as P
@@ -47,7 +48,6 @@ import           Ledger.TxId
 import           LedgerBytes                (LedgerBytes)
 import qualified LedgerBytes                as KB
 import           Schema                     (ToSchema)
-import           Schema.IOTS                (HasReps)
 import           Servant.API                (FromHttpApiData (parseUrlPiece), ToHttpApiData (toUrlPiece))
 
 -- | A cryptographic public key.

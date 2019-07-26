@@ -26,11 +26,11 @@ import           Data.String                (IsString (..))
 import qualified Data.Text                  as Text
 import           Data.Word                  (Word8)
 import           GHC.Generics               (Generic)
+import           IOTS                       (HasReps (typeReps))
 import qualified Language.PlutusTx.Builtins as Builtins
 import           Language.PlutusTx.Lift
 import qualified Language.PlutusTx.Prelude  as P
 import           Schema                     (ToSchema (toSchema))
-import           Schema.IOTS                (HasReps (typeReps))
 import           Web.HttpApiData            (FromHttpApiData (..), ToHttpApiData (..))
 
 fromHex :: BSL.ByteString -> LedgerBytes

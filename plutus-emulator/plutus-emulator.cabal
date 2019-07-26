@@ -63,6 +63,7 @@ library
         cryptonite >=0.25,
         hashable -any,
         hedgehog -any,
+        iots-export,
         language-plutus-core -any,
         memory -any,
         mtl -any,

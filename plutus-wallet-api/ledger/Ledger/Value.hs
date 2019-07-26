@@ -63,7 +63,7 @@ import qualified Language.PlutusTx.AssocMap   as Map
 import           Language.PlutusTx.These
 import           LedgerBytes                  (LedgerBytes(LedgerBytes))
 import           Schema                       (ToSchema)
-import           Schema.IOTS                  (HasReps)
+import           IOTS                         (HasReps)
 import           Ledger.Orphans               ()
 
 newtype CurrencySymbol = CurrencySymbol { unCurrencySymbol :: Builtins.ByteString }

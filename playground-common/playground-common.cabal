@@ -9,14 +9,6 @@ author: David Smith
 category: Web
 build-type: Simple
 data-files:
-    test/Schema/IOTS/functionTuple.ts
-    test/Schema/IOTS/functionMaybe.ts
-    test/Schema/IOTS/functionList.ts
-    test/Schema/IOTS/response.ts
-    test/Schema/IOTS/simpleSum.ts
-    test/Schema/IOTS/singleFieldless.ts
-    test/Schema/IOTS/user.ts
-    test/Schema/IOTS/vestingTranche.ts
     test/oAuthToken1.json
 
 library
@@ -31,7 +23,6 @@ library
         Git
         Language.Haskell.Interpreter
         Schema
-        Schema.IOTS
         Servant.Extra
         Servant.Prometheus
         System.IO.Extras
@@ -93,7 +84,6 @@ test-suite playground-common-test
         Paths_playground_common
         Auth.TypesSpec
         SchemaSpec
-        Schema.IOTSSpec
     default-language: Haskell2010
     ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Wcompat
                  -Wincomplete-uni-patterns -Wincomplete-record-updates

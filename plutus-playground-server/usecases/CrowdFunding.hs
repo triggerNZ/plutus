@@ -32,7 +32,7 @@ import qualified Ledger.Validation         as V
 import           Ledger.Value              (Value)
 import qualified Ledger.Value              as Value
 import           Playground.Contract
-import qualified Schema.IOTS               as IOTS
+import qualified IOTS
 import           Wallet                    (EventHandler (EventHandler), EventTrigger, MonadWallet, andT,
                                             collectFromScript, collectFromScriptTxn, fundsAtAddressGeqT, logMsg,
                                             ownPubKey, payToScript, register, slotRangeT)

@@ -61,6 +61,8 @@ extra-deps:
 # Need https://github.com/phadej/github/pull/387 and to be added back in to stackage
 - git: https://github.com/shmish111/github.git
   commit: cc27b9de4d5d0939235fa9a8b418de3ea4807bab
+- git: https://github.com/input-output-hk/iots-export.git
+  commit: 2546279df39d1de632a5321d4183ee14c4ed1db2
 flags:
   language-plutus-core:
     development: true

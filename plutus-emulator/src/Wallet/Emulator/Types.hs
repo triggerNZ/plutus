@@ -101,10 +101,10 @@ import qualified Data.Set                  as Set
 import qualified Data.Text                 as T
 import           Data.Traversable          (for)
 import           GHC.Generics              (Generic)
+import           IOTS                      (HasReps)
 import qualified Ledger.Crypto             as Crypto
 import           Prelude                   as P
 import           Schema                    (ToSchema)
-import           Schema.IOTS               (HasReps)
 import           Servant.API               (FromHttpApiData (..), ToHttpApiData (..))
 
 import           Ledger                    (Address, Block, Blockchain, PrivateKey (..), PubKey (..), Slot, Tx (..),

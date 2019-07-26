@@ -30,7 +30,7 @@ module Playground.Contract
     , TokenName(TokenName)
     , NonEmpty((:|))
     , adaCurrency
-    , module Schema.IOTS
+    , module IOTS
     ) where
 
 import           Data.Aeson                  (FromJSON, ToJSON, encode)
@@ -42,6 +42,7 @@ import qualified Data.ByteString.Lazy.Char8  as LBC8
 import           Data.List.NonEmpty          (NonEmpty ((:|)))
 import           Data.Text                   (Text)
 import           GHC.Generics                (Generic)
+import           IOTS                        (HasReps (typeReps), export, render)
 import           Ledger.Interval             (always)
 import           Ledger.Validation           (ValidatorHash (ValidatorHash))
 import           Ledger.Value                (TokenName (TokenName), Value)
@@ -50,7 +51,6 @@ import           Playground.Interpreter.Util
 import           Playground.TH               (mkFunction, mkFunctions, mkKnownCurrencies, mkSingleFunction)
 import           Schema                      (ToSchema)
 import qualified Schema
-import           Schema.IOTS                 (HasReps (typeReps), export, render)
 import           Wallet.API                  (WalletAPI, payToPublicKey_)
 import           Wallet.Emulator             (addBlocksAndNotify, runWalletActionAndProcessPending, walletPubKey)
 import           Wallet.Emulator.Types       (MockWallet, Wallet (..))

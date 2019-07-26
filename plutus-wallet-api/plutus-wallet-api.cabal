@@ -129,6 +129,7 @@ library plutus-ledger
         cryptonite >=0.25,
         hashable -any,
         hedgehog -any,
+        iots-export -any,
         language-plutus-core -any,
         memory -any,
         mtl -any,

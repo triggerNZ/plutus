@@ -23,9 +23,9 @@ import           Codec.Serialise.Class     (Serialise)
 import           Data.Aeson                (FromJSON, ToJSON)
 import           Data.Hashable             (Hashable)
 import           GHC.Generics              (Generic)
+import           IOTS                      (HasReps)
 import qualified Prelude                   as Haskell
 import           Schema                    (ToSchema)
-import           Schema.IOTS               (HasReps)
 
 import           Language.PlutusTx.Lift    (makeLift)
 import           Language.PlutusTx.Prelude
