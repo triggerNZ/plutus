@@ -2,6 +2,7 @@
   "Right": {
     "warnings": [],
     "result": {
+      "iotsSpec": "import * as t from 'io-ts'\n\n// Ledger.Slot.Slot\nconst Slot = t.type({\n    getSlot: t.Int\n});\n\n// Ledger.Value.CurrencySymbol\nconst CurrencySymbol = t.type({\n    unCurrencySymbol: t.string\n});\n\n// Ledger.Value.TokenName\nconst TokenName = t.type({\n    unTokenName: t.string\n});\n\n// Language.PlutusTx.AssocMap.Map\nconst MapTokenNameInteger = t.type({\n    unMap: t.array(t.tuple([\n        TokenName,\n        t.Int\n    ]))\n});\n\n// Language.PlutusTx.AssocMap.Map\nconst MapCurrencySymbolMapTokenNameInteger = t.type({\n    unMap: t.array(t.tuple([\n        CurrencySymbol,\n        MapTokenNameInteger\n    ]))\n});\n\n// Ledger.Value.Value\nconst Value = t.type({\n    getValue: MapCurrencySymbolMapTokenNameInteger\n});\n\n// Wallet.Emulator.Types.Wallet\nconst Wallet = t.type({\n    getWallet: t.Int\n});\n\nconst SomeFunctionArgA = Slot;\n\nconst SomeFunctionArgB = Value;\n\nconst SomeFunctionArgC = Slot;\n\nconst SomeFunctionArgD = Wallet;\n\nconst SomeFunctionArgReturn = t.null;\n\ntype SomeFunction = (\n    a: t.TypeOf<typeof SomeFunctionArgA>,\n    b: t.TypeOf<typeof SomeFunctionArgB>,\n    c: t.TypeOf<typeof SomeFunctionArgC>,\n    d: t.TypeOf<typeof SomeFunctionArgD>\n) => t.TypeOf<typeof SomeFunctionArgReturn>;",
       "knownCurrencies": [
         {
           "hash": "",
