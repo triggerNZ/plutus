@@ -19986,6 +19986,7 @@ license = stdenv.lib.licenses.publicDomain;
 , bytestring
 , containers
 , directory
+, github
 , github-webhooks
 , mtl
 , newtype-generics
@@ -20013,6 +20014,7 @@ aeson
 base
 bytestring
 directory
+github
 github-webhooks
 mtl
 newtype-generics
@@ -20020,7 +20022,6 @@ optparse-generic
 servant
 servant-github-webhook
 servant-server
-slack-web
 temporary
 text
 typed-process
@@ -39196,6 +39197,49 @@ description = "HAProxy protocol 1.5 support for io-streams";
 license = stdenv.lib.licenses.bsd3;
 
 }) {};
+"iots-export" = callPackage
+({
+  mkDerivation
+, base
+, containers
+, fetchgit
+, hpack
+, mtl
+, stdenv
+, text
+, wl-pprint-text
+}:
+mkDerivation {
+
+pname = "iots-export";
+version = "0.1.0.0";
+src = fetchgit {
+
+url = "https://github.com/input-output-hk/iots-export.git";
+sha256 = "1fvrb4vqdgiyjqpkfw93kl0yn50cwvmk24vdy7iknkbxcav15pi1";
+rev = "2546279df39d1de632a5321d4183ee14c4ed1db2";
+fetchSubmodules = true;
+
+};
+enableSeparateDataOutput = true;
+libraryHaskellDepends = [
+base
+containers
+mtl
+text
+wl-pprint-text
+];
+libraryToolDepends = [
+hpack
+];
+doHaddock = false;
+doCheck = false;
+preConfigure = "hpack";
+homepage = "https://github.com/iohk/iots-export#readme";
+description = "Tools to export Haskell to IOTS";
+license = stdenv.lib.licenses.bsd3;
+
+}) {};
 "ip" = callPackage
 ({
   mkDerivation
@@ -53611,6 +53655,7 @@ license = stdenv.lib.licenses.mit;
 , containers
 , hspec
 , language-plutus-core
+, mtl
 , plutus-emulator
 , plutus-playground-lib
 , plutus-tx
@@ -53631,6 +53676,7 @@ base
 bytestring
 containers
 language-plutus-core
+mtl
 plutus-emulator
 plutus-playground-lib
 plutus-tx
@@ -53768,6 +53814,7 @@ license = stdenv.lib.licenses.asl20;
 , hashable
 , hedgehog
 , http-api-data
+, iots-export
 , language-plutus-core
 , lens
 , memory
@@ -53814,6 +53861,7 @@ deriving-compat
 hashable
 hedgehog
 http-api-data
+iots-export
 language-plutus-core
 lens
 memory
@@ -53971,6 +54019,7 @@ license = stdenv.lib.licenses.asl20;
 , hspec
 , hspec-discover
 , insert-ordered-containers
+, iots-export
 , lens
 , memory
 , mtl
@@ -53987,6 +54036,7 @@ license = stdenv.lib.licenses.asl20;
 , template-haskell
 , text
 , transformers
+, wl-pprint-text
 }:
 mkDerivation {
 
@@ -53999,6 +54049,7 @@ base
 bytestring
 containers
 insert-ordered-containers
+iots-export
 lens
 memory
 mtl
@@ -54011,6 +54062,7 @@ servant
 template-haskell
 text
 transformers
+wl-pprint-text
 ];
 testHaskellDepends = [
 aeson
@@ -54055,6 +54107,7 @@ license = stdenv.lib.licenses.asl20;
 , http-conduit
 , http-types
 , insert-ordered-containers
+, iots-export
 , jwt
 , lens
 , monad-logger
@@ -54112,6 +54165,7 @@ http-client-tls
 http-conduit
 http-types
 insert-ordered-containers
+iots-export
 jwt
 lens
 monad-logger
@@ -54152,7 +54206,6 @@ optparse-applicative
 playground-common
 plutus-emulator
 plutus-playground-lib
-plutus-tx
 plutus-wallet-api
 prometheus
 purescript-bridge
@@ -54174,6 +54227,7 @@ base
 bytestring
 hspec
 insert-ordered-containers
+iots-export
 mtl
 playground-common
 plutus-emulator
@@ -54384,10 +54438,12 @@ license = stdenv.lib.licenses.asl20;
 , cborg
 , containers
 , cryptonite
+, deepseq
 , deriving-compat
 , hashable
 , hedgehog
 , http-api-data
+, iots-export
 , language-plutus-core
 , lens
 , memory
@@ -54397,6 +54453,7 @@ license = stdenv.lib.licenses.asl20;
 , operational
 , playground-common
 , plutus-tx
+, prettyprinter
 , recursion-schemes
 , serialise
 , servant
@@ -54422,10 +54479,12 @@ cardano-crypto
 cborg
 containers
 cryptonite
+deepseq
 deriving-compat
 hashable
 hedgehog
 http-api-data
+iots-export
 language-plutus-core
 lens
 memory
@@ -54435,6 +54494,7 @@ newtype-generics
 operational
 playground-common
 plutus-tx
+prettyprinter
 recursion-schemes
 serialise
 servant
