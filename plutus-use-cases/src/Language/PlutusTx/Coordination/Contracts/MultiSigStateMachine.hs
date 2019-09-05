@@ -15,16 +15,19 @@
 module Language.PlutusTx.Coordination.Contracts.MultiSigStateMachine(
       Params(..)
     , Payment(..)
-    , State
+    , State (..)
+    , Input (..)
     , mkValidator
     , scriptInstance
-    , initialise
-    , lock
-    , proposePayment
-    , cancelPayment
-    , addSignature
-    , makePayment
+    , machineInstance
+    , contract
     ) where
+
+import Control.Monad.Reader
+import Control.Monad.State hiding (State, state)
+
+import qualified Language.Plutus.Contract as Contract
+import qualified Language.Plutus.Contract.StateMachine as SMC
 
 import           Data.Functor                 (void)
 import           Control.Applicative          (Applicative (..))
@@ -39,11 +42,14 @@ import           Wallet
 import qualified Wallet                       as WAPI
 import qualified Wallet.Typed.API             as WAPITyped
 
+import qualified Prelude as Haskell
+
 import qualified Language.PlutusTx            as PlutusTx
 import           Language.PlutusTx.Prelude     hiding (check, Applicative (..))
 import           Language.PlutusTx.StateMachine (StateMachine(..))
 import qualified Language.PlutusTx.StateMachine as SM
 import qualified Wallet.Typed.StateMachine as SM
+
 
 --   $multisig
 --   The n-out-of-m multisig contract works like a joint account of
@@ -235,106 +241,19 @@ machineInstance params =
     (StateMachine step (check params) final)
     (scriptInstance params)
 
--- | Start watching the contract address
-initialise :: WalletAPI m => Params -> m ()
-initialise = WAPI.startWatching . Scripts.scriptAddress . scriptInstance
+stateChooser :: [SM.OnChainState s i] -> Either (SMC.SMContractError s i) (SM.OnChainState s i)
+stateChooser [s] = Right s
+stateChooser [] = Left $ SMC.ChooserError "No states"
+stateChooser _ = Left $ SMC.ChooserError "Multiple states"
 
--- | Lock some funds in a multisig contract.
-lock
-    :: (WalletAPI m, WalletDiagnostics m)
-    => Params
-    -- ^ Signatories and required signatures
-    -> Value
-    -- ^ The funds we want to lock
-    -> m State
-    -- ^ The initial state of the contract
-lock prms vl = do
-    (tx, state) <- SM.mkInitialise (machineInstance prms) (Holding vl) vl
+contract
+    :: SM.StateMachineInstance State Input
+    -> Contract.Contract (SMC.SMSchema State Input) (SMC.SMContractError State Input) ()
+contract machine = flip runReaderT (SMC.StateMachineClient machine stateChooser) $ r
+    where
+        r :: ReaderT (SMC.StateMachineClient State Input) (Contract.Contract (SMC.SMSchema State Input) (SMC.SMContractError State Input)) ()
+        r = SMC.run
 
-    void $ WAPITyped.signTxAndSubmit tx
-
-    pure state
-
--- | Propose a payment from funds that are locked up in a state-machine based
---   multisig contract.
-proposePayment
-    :: (WalletAPI m, WalletDiagnostics m)
-    => Params
-    -> State
-    -> Payment
-    -> m State
-proposePayment prms st = runStep prms st . ProposePayment
-
--- | Cancel a proposed payment
-cancelPayment
-    :: (WalletAPI m, WalletDiagnostics m)
-    => Params
-    -> State
-    -> m State
-cancelPayment prms st = runStep prms st Cancel
-
--- | Add a signature to a proposed payment
-addSignature
-    :: (WalletAPI m, WalletDiagnostics m)
-    => Params
-    -> State
-    -> m State
-addSignature prms st = WAPI.ownPubKey >>= runStep prms st . AddSignature
-
--- | Make a payment after enough signatures have been collected.
-makePayment
-    :: (WalletAPI m, WalletDiagnostics m)
-    => Params
-    -> State
-    -> m State
-makePayment prms currentState = do
-    -- we can't use 'runStep' because the outputs of the transaction are
-    -- different from the other transitions: We need two outputs, a public
-    -- key output with the payment, and the script output with the remaining
-    -- funds.
-    (currentValue, valuePaid', recipient) <- case currentState of
-        CollectingSignatures vl (Payment pd pk _) _ -> pure (vl, pd, pk)
-        _ -> WAPI.throwOtherError "Cannot make payment because no payment has been proposed. Run the 'proposePayment' action first."
-    let valueLeft = currentValue - valuePaid'
-        -- Need to match to get the existential type out
-        addOutAndPay (Typed.TypedTxSomeIns tx) = do
-            let pkOut = Typed.makePubKeyTxOut valuePaid' recipient
-                withPubKeyOut = tx { Typed.tyTxPubKeyTxOuts = [pkOut] }
-            void $ WAPITyped.signTxAndSubmit withPubKeyOut
-
-    if Value.isZero valueLeft
-    then do
-        (scriptTx, newState) <- SM.mkHalt (machineInstance prms) currentState Pay
-        addOutAndPay scriptTx
-        pure newState
-    else do
-        (scriptTx, newState) <- SM.mkStep (machineInstance prms) currentState Pay (const valueLeft)
-        addOutAndPay scriptTx
-        pure newState
-
--- | Advance a running multisig contract. This applies the transition function
---   'SM.transition' to the current contract state and uses the result to unlock
---   the funds currently in the contract, and lock them again with a data script
---   containing the new state.
---
-runStep
-    :: (WalletAPI m, WalletDiagnostics m)
-    => Params
-    -- ^ The parameters of the contract instance
-    -> State
-    -- ^ Current state of the instance
-    -> Input
-    -- ^ Input to be applied to the contract
-    -> m State
-    -- ^ New state after applying the input
-runStep prms currentState input = do
-    (scriptTx, newState) <- SM.mkStep (machineInstance prms) currentState input id
-
-    -- Need to match to get the existential type out
-    case scriptTx of
-        (Typed.TypedTxSomeIns tx) -> void $ WAPITyped.signTxAndSubmit tx
-
-    pure newState
 
 {- Note [Current state of the contract]
 

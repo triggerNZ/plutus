@@ -26,20 +26,38 @@ import qualified Wallet.Emulator                                               a
 
 import qualified Language.PlutusTx as PlutusTx
 
+import           Language.Plutus.Contract.Test
+import qualified Language.Plutus.Contract.Trace                  as Trace
+import qualified Language.Plutus.Contract.StateMachine                  as SM
+import qualified Language.PlutusTx.StateMachine                  as SM
+
 import           Language.PlutusTx.Coordination.Contracts.MultiSigStateMachine (Payment, State)
 import qualified Language.PlutusTx.Coordination.Contracts.MultiSigStateMachine as MS
 
+type MSTrace m a = ContractTrace (SM.SMSchema MS.State MS.Input) (SM.SMContractError MS.State MS.Input) m a
+
 tests :: TestTree
 tests = testGroup "multi sig state machine tests" [
-    HUnit.testCaseSteps "lock, propose, sign 3x, pay - SUCCESS" (runTrace (lockProposeSignPay 3 1) isRight),
-    HUnit.testCaseSteps "lock, propose, sign 2x, pay - FAILURE" (runTrace (lockProposeSignPay 2 1) isLeft),
-    HUnit.testCaseSteps "lock, propose, sign 3x, pay x2 - SUCCESS" (runTrace (lockProposeSignPay 3 2) isRight),
-    HUnit.testCaseSteps "lock, propose, sign 3x, pay x3 - FAILURE" (runTrace (lockProposeSignPay 3 3) isLeft),
+    checkPredicate "Expose 'initalise' endpoint"
+        (MS.contract machine)
+        (endpointAvailable @"initialise" w1)
+        $ pure ()
+    ,
+    checkPredicate "lock, propose, sign x3, pay"
+        (MS.contract machine)
+        (endpointAvailable @"step" w1)
+        $ lockProposeSignPay 3 1
+    ,
+    --HUnit.testCaseSteps "lock, propose, sign 3x, pay - SUCCESS" (runTrace (lockProposeSignPay 3 1) isRight),
+    --HUnit.testCaseSteps "lock, propose, sign 2x, pay - FAILURE" (runTrace (lockProposeSignPay 2 1) isLeft),
+    --HUnit.testCaseSteps "lock, propose, sign 3x, pay x2 - SUCCESS" (runTrace (lockProposeSignPay 3 2) isRight),
+    --HUnit.testCaseSteps "lock, propose, sign 3x, pay x3 - FAILURE" (runTrace (lockProposeSignPay 3 3) isLeft),
     Lib.goldenPir "test/Spec/multisigStateMachine.pir" $$(PlutusTx.compile [|| MS.mkValidator ||]),
     HUnit.testCase "script size is reasonable" (Lib.reasonable (Scripts.validatorScript $ MS.scriptInstance params) 350000)
     ]
 
-runTrace :: EM.EmulatorAction EM.AssertionError a -> (Either EM.AssertionError a -> Bool) -> (String -> IO ()) -> IO ()
+{-
+runTrace :: EM.EmulatorAction a -> (Either EM.AssertionError a -> Bool) -> (String -> IO ()) -> IO ()
 runTrace t f step = do
     let initialState = EM.emulatorStateInitialDist (Map.singleton (EM.walletPubKey (EM.Wallet 1)) (Ada.adaValueOf 10))
         (result, st) = EM.runEmulator initialState t
@@ -48,6 +66,7 @@ runTrace t f step = do
     else do
         step (show $ EM.emLog st)
         HUnit.assertFailure "transaction failed to validate"
+-}
 
 processAndNotify :: EM.Trace m ()
 processAndNotify = void (EM.addBlocksAndNotify [w1, w2, w3] 1)
@@ -62,6 +81,9 @@ params :: MS.Params
 params = MS.Params keys 3 where
     keys = EM.walletPubKey . EM.Wallet <$> [1..5]
 
+machine :: SM.StateMachineInstance MS.State MS.Input
+machine = MS.machineInstance params
+
 -- | A payment of 5 Ada to the public key address of wallet 2
 payment :: MS.Payment
 payment =
@@ -71,46 +93,32 @@ payment =
         , MS.paymentDeadline  = 20
         }
 
-initialise' :: WalletAPI m => m ()
-initialise' = MS.initialise params
-
--- State machine transitions partially applied to the 'payment' multisig contract
-
-lock' :: (WalletAPI m, WalletDiagnostics m) => Value -> m State
-lock' = MS.lock params
-
-proposePayment' :: (WalletAPI m, WalletDiagnostics m) => State -> Payment -> m State
-proposePayment' = MS.proposePayment params
-
-addSignature' :: (WalletAPI m, WalletDiagnostics m) => State -> m State
-addSignature' = MS.addSignature params
-
-makePayment' :: (WalletAPI m, WalletDiagnostics m) => State -> m State
-makePayment' = MS.makePayment params
-
-initialise'' :: WalletAPI m => EM.Trace m ()
-initialise'' =
-    -- instruct all three wallets to start watching the contract address
-    traverse_ (\w -> EM.walletAction w initialise') [w1, w2, w3]
-
-lock'' :: (WalletAPI m, WalletDiagnostics m) => Value -> EM.Trace m State
+lock' :: (MonadEmulator m) => Value -> MSTrace m a ()
 -- wallet 1 locks the funds
-lock'' value = processAndNotify >> fst <$> EM.walletAction w1 (lock' value)
+lock' value = Trace.callEndpoint @"initialise" w1 (MS.Holding value, value) >> Trace.handleBlockchainEvents w1
 
-proposePayment'' :: (WalletAPI m, WalletDiagnostics m) => State -> EM.Trace m State
-proposePayment'' st = processAndNotify >> fst <$> EM.walletAction w2 (proposePayment' st payment)
+proposePayment' :: (MonadEmulator m) => MSTrace m a ()
+proposePayment' = Trace.callEndpoint @"step" w2 (MS.ProposePayment payment) >> Trace.handleBlockchainEvents w2
 
-addSignature'' :: (WalletAPI m, WalletDiagnostics m) => Integer -> State -> EM.Trace m State
+addSignature' :: (MonadEmulator m) => Integer -> MSTrace m a ()
 -- i wallets add their signatures
-addSignature'' i inSt = foldM (\st w -> (processAndNotify >> fst <$> EM.walletAction w (addSignature' st))) inSt (take (fromIntegral i) [w1, w2, w3])
+addSignature' i = mapM_ (\w -> Trace.callEndpoint @"step" w (MS.AddSignature (Trace.walletPubKey w)) >> Trace.handleBlockchainEvents w) (take (fromIntegral i) [w1, w2, w3])
 
-makePayment'' :: (WalletAPI m, WalletDiagnostics m) => State -> EM.Trace m State
-makePayment'' st = processAndNotify >> fst <$> EM.walletAction w3 (makePayment' st)
+makePayment' :: (WalletAPI m, WalletDiagnostics m) => MSTrace m a ()
+makePayment' = Trace.callEndpoint @"step" w3 MS.Pay >> Trace.handleBlockchainEvents w3
 
-proposeSignPay :: (WalletAPI m, WalletDiagnostics m) => Integer -> State -> EM.Trace m State
-proposeSignPay i = proposePayment'' >=> addSignature'' i >=> makePayment''
+proposeSignPay :: (MonadEmulator m) => Integer -> MSTrace m a ()
+proposeSignPay i = proposePayment' >> addSignature' i >> makePayment'
 
-lockProposeSignPay :: forall e m . (EM.MonadEmulator e m) => Integer -> Integer -> m ()
+lockProposeSignPay :: (EM.MonadEmulator m) => Integer -> Integer -> MSTrace m a ()
+lockProposeSignPay i j = do
+    lock' (Ada.adaValueOf 10)
+    proposeSignPay i
+    Trace.handleBlockchainEvents w1
+    --EM.assertOwnFundsEq w2 (scale j (Ada.adaValueOf 5))
+
+{-
+lockProposeSignPay :: (EM.MonadEmulator m) => Integer -> Integer -> MSTrace m a ()
 lockProposeSignPay i j = EM.processEmulated $ do
 
     -- stX contain the state of the contract. See note [Current state of the
@@ -123,3 +131,14 @@ lockProposeSignPay i j = EM.processEmulated $ do
 
     processAndNotify
     EM.assertOwnFundsEq w2 (scale j (Ada.adaValueOf 5))
+
+lockTrace
+    :: ( MonadEmulator m )
+    => ContractTrace GameSchema m a ()
+lockTrace =
+    let w1 = Trace.Wallet 1
+        w2 = Trace.Wallet 2 in
+    Trace.callEndpoint @"lock" w1 (LockParams "secret" 10)
+        >> Trace.notifyInterestingAddresses w2
+        >> Trace.handleBlockchainEvents w1
+-}
