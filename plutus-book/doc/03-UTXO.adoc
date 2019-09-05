@@ -169,6 +169,13 @@ in a transaction without
 corresponding inputs - these are due to collecting rewards from reward
 addresses.
 
+Note that with this model, as with the classic UTXO
+model, a transaction which was not validated does not incur fees. Unlike
+the classic model, however, the extended model allows for spending from script
+addresses that do not belong to the wallet that generated the transaction.
+This is because instead of a private key, a validator script must be
+provided to spend from such an address, and scripts are publicly available.
+
 Now, in order to validate a transaction, there are a number of
 calculations performed involving the Ada in the transaction and the Ada
 in other accounts on the ledger to make sure Ada is neither created nor destroyed,
