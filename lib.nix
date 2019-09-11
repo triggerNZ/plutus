@@ -47,6 +47,7 @@ let
     "marlowe"
     "marlowe-playground-server"
     "deployment-server"
+    "marlowe-symbolic"
   ];
 
   isPlutus = name: builtins.elem name plutusPkgList;
