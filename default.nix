@@ -71,6 +71,7 @@ let
   localLib = import ./lib.nix { inherit config system; } ;
   src = localLib.iohkNix.cleanSourceHaskell ./.;
   latex = pkgs.callPackage ./nix/latex.nix {};
+  z3 = pkgs.callPackage ./nix/z3.nix {};
 
   pp2nSrc = nativePkgs.fetchFromGitHub {
     owner = "justinwoo";
