@@ -14,7 +14,7 @@ executable marlowe-symbolic
                         mtl,
                         containers,
                         text,
-                        sbv,
+                        sbv >= 8.4,
                         time,
                         QuickCheck,
                         tasty,
