@@ -25,6 +25,7 @@ import Data.Json.JsonEither (JsonEither(..))
 import Data.String as String
 import Data.Tuple (Tuple(Tuple))
 import Data.Tuple.Nested ((/\))
+import Debug.Trace (trace)
 import Editor (editorPane)
 import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
@@ -47,11 +48,11 @@ import Marlowe.Pretty (pretty)
 import Marlowe.Semantics (ChoiceId, Input(..), inBounds)
 import MonadApp (class MonadApp, applyTransactions, getGistByGistId, getOauthStatus, haskellEditorGetValue, haskellEditorGotoLine, haskellEditorSetAnnotations, haskellEditorSetValue, marloweEditorGetValue, marloweEditorSetValue, patchGistByGistId, postContractHaskell, postGist, preventDefault, readFileFromDragEvent, resetContract, resizeBlockly, runHalogenApp, saveBuffer, saveInitialState, saveMarloweBuffer, setBlocklyCode, updateContractInState, updateMarloweState)
 import Network.RemoteData (RemoteData(Success, Loading, NotAsked), _Success, isLoading, isSuccess)
-import Prelude (type (~>), Unit, Void, add, bind, const, discard, not, one, pure, show, unit, zero, ($), (-), (<$>), (<<<), (<>), (==), (||))
+import Prelude (type (~>), Unit, add, bind, const, discard, not, one, pure, show, unit, zero, ($), (-), (<$>), (<<<), (<>), (==), (||))
 import Servant.PureScript.Settings (SPSettings_)
 import Simulation (simulationPane)
 import StaticData as StaticData
-import Types (ActionInput(..), BlocklySlot(BlocklySlot), ChildQuery, ChildSlot, FrontendState(FrontendState), Query(..), View(..), _authStatus, _compilationResult, _createGistResult, _currentContract, _gistUrl, _marloweState, _oldContract, _pendingInputs, _possibleActions, _result, _slot, _view, cpBlockly, emptyMarloweState)
+import Types (ActionInput(..), BlocklySlot(BlocklySlot), ChildQuery, ChildSlot, FrontendState(FrontendState), Message, Query(..), View(..), _authStatus, _compilationResult, _createGistResult, _currentContract, _gistUrl, _marloweState, _oldContract, _pendingInputs, _possibleActions, _result, _slot, _view, cpBlockly, emptyMarloweState)
 
 initialState :: FrontendState
 initialState =
@@ -72,7 +73,7 @@ mainFrame ::
   forall m.
   MonadAff m =>
   MonadAsk (SPSettings_ SPParams_) m =>
-  Component HTML Query Unit Void m
+  Component HTML Query Unit Message m
 mainFrame =
   H.lifecycleParentComponent
     { initialState: const initialState
@@ -88,7 +89,7 @@ evalWithAnalyticsTracking ::
   MonadAff m =>
   MonadAsk (SPSettings_ SPParams_) m =>
   Query
-    ~> HalogenM FrontendState Query ChildQuery ChildSlot Void m
+    ~> HalogenM FrontendState Query ChildQuery ChildSlot Message m
 evalWithAnalyticsTracking query = do
   liftEffect $ analyticsTracking query
   runHalogenApp $ evalF query
@@ -157,6 +158,8 @@ toEvent (Undo _) = Just $ defaultEvent "Undo"
 toEvent (HandleBlocklyMessage _ _) = Nothing
 
 toEvent (SetBlocklyCode _) = Nothing
+
+toEvent (RecieveWebsocketMessage _ _) = Nothing
 
 evalF ::
   forall m.
@@ -380,6 +383,9 @@ evalF (SetBlocklyCode next) = runMaybeT f *> pure next
       setBlocklyCode source
       assign _view BlocklyEditor 
     MaybeT resizeBlockly
+
+-- TODO: placeholder for what we will do with the ws messages
+evalF (RecieveWebsocketMessage msg next) = trace msg \_ -> pure next
 
 ------------------------------------------------------------
 showCompilationErrorAnnotations ::

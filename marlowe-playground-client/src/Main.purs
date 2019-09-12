@@ -1,7 +1,8 @@
 module Main where
 
 import Prelude
-import Control.Coroutine (Consumer, Process, connect, consumer, runProcess)
+
+import Control.Coroutine (Consumer, Process, connect, consumer, runProcess, ($$))
 import Control.Monad.Reader.Trans (runReaderT)
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
@@ -18,6 +19,8 @@ import LocalStorage as LocalStorage
 import MainFrame (mainFrame)
 import Marlowe (SPParams_(SPParams_))
 import Servant.PureScript.Settings (SPSettingsDecodeJson_(..), SPSettingsEncodeJson_(..), SPSettings_(..), defaultSettings)
+import Web.Socket.WebSocket as WS
+import Websockets (wsConsumer, wsProducer, wsSender)
 
 ajaxSettings :: SPSettings_ SPParams_
 ajaxSettings = SPSettings_ $ (settings { decodeJson = decodeJson, encodeJson = encodeJson })
@@ -32,10 +35,13 @@ ajaxSettings = SPSettings_ $ (settings { decodeJson = decodeJson, encodeJson = e
 
 main ::
   Effect Unit
-main =
+main = do
+  socket <- WS.create "wss://echo.websocket.org" []
   runHalogenAff do
     body <- awaitBody
     driver <- runUI (hoist (flip runReaderT ajaxSettings) mainFrame) unit body
+    driver.subscribe $ wsSender socket
+    runProcess (wsProducer socket $$ wsConsumer driver.query)
     forkAff $ runProcess watchLocalStorageProcess
 
 watchLocalStorageProcess :: Process Aff Unit

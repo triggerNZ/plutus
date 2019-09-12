@@ -68,6 +68,10 @@ data Query a
   -- blockly
   | HandleBlocklyMessage BlocklyMessage a
   | SetBlocklyCode a
+  -- websocket
+  | RecieveWebsocketMessage String a
+
+data Message = WebsocketMessage String
 
 ------------------------------------------------------------
 type ChildQuery

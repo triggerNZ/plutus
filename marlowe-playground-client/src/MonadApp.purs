@@ -30,7 +30,7 @@ import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
 import FileEvents as FileEvents
 import Gist (Gist, GistId, NewGist)
-import Halogen (HalogenM, liftAff, liftEffect, query')
+import Halogen (HalogenM, liftAff, liftEffect, query', raise)
 import Halogen.Blockly (BlocklyQuery(..))
 import Language.Haskell.Interpreter (InterpreterError, InterpreterResult, SourceCode)
 import LocalStorage as LocalStorage
@@ -44,7 +44,7 @@ import Servant.PureScript.Settings (SPSettings_)
 import StaticData (bufferLocalStorageKey, marloweBufferLocalStorageKey)
 import Text.Parsing.Parser (ParseError(..), runParser)
 import Text.Parsing.Parser.Pos (Position(..))
-import Types (ActionInput(..), BlocklySlot(..), ChildQuery, ChildSlot, EditorSlot(EditorSlot), FrontendState, MarloweEditorSlot(MarloweEditorSlot), MarloweState, Query, WebData, _Head, _contract, _currentMarloweState, _editorErrors, _marloweState, _moneyInContract, _oldContract, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, actionToActionInput, cpBlockly, cpEditor, cpMarloweEditor, emptyMarloweState)
+import Types (ActionInput(..), BlocklySlot(..), ChildQuery, ChildSlot, EditorSlot(EditorSlot), FrontendState, MarloweEditorSlot(MarloweEditorSlot), MarloweState, Message(..), Query, WebData, _Head, _contract, _currentMarloweState, _editorErrors, _marloweState, _moneyInContract, _oldContract, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, actionToActionInput, cpBlockly, cpEditor, cpMarloweEditor, emptyMarloweState)
 import Web.HTML.Event.DragEvent (DragEvent)
 
 class
@@ -75,7 +75,7 @@ class
   setBlocklyCode :: String -> m Unit
 
 newtype HalogenApp m a
-  = HalogenApp (HalogenM FrontendState Query ChildQuery ChildSlot Void m a)
+  = HalogenApp (HalogenM FrontendState Query ChildQuery ChildSlot Message m a)
 
 derive instance newtypeHalogenApp :: Newtype (HalogenApp m a) _
 
@@ -129,6 +129,7 @@ instance monadAppHalogenApp ::
   updateMarloweState f = wrap $ modifying _marloweState (extendWith f)
   applyTransactions = wrap $ modifying _marloweState (extendWith updateStateP)
   resetContract = do
+    wrap $ raise (WebsocketMessage "hi")
     newContract <- marloweEditorGetValueImpl
     wrap $ assign _marloweState $ NEL.singleton (emptyMarloweState zero)
     wrap $ assign _oldContract Nothing
@@ -186,12 +187,12 @@ marloweEditorGetValueImpl = withMarloweEditor AceEditor.getValue
 updateContractInStateImpl :: forall m. String -> HalogenApp m Unit
 updateContractInStateImpl contract = modifying _currentMarloweState (updatePossibleActions <<< updateContractInStateP contract)
 
-runHalogenApp :: forall m a. HalogenApp m a -> HalogenM FrontendState Query ChildQuery ChildSlot Void m a
+runHalogenApp :: forall m a. HalogenApp m a -> HalogenM FrontendState Query ChildQuery ChildSlot Message m a
 runHalogenApp = unwrap
 
 runAjax ::
   forall m a.
-  ExceptT AjaxError (HalogenM FrontendState Query ChildQuery ChildSlot Void m) a ->
+  ExceptT AjaxError (HalogenM FrontendState Query ChildQuery ChildSlot Message m) a ->
   HalogenApp m (WebData a)
 runAjax action = wrap $ RemoteData.fromEither <$> runExceptT action
 
