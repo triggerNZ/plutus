@@ -11,11 +11,14 @@ import           Data.Aeson                   (FromJSON, ToJSON)
 import           Data.Text                    (Text)
 import           GHC.Generics                 (Generic)
 import           Language.Haskell.Interpreter (InterpreterError, InterpreterResult, SourceCode)
-import           Servant.API                  ((:<|>) ((:<|>)), (:>), Get, JSON, Post, ReqBody)
+import           Servant.API                  ((:<|>), (:>), Get, JSON, Post, ReqBody)
+import           Servant.API.WebSocket        (WebSocket)
 
 type API
    = "contract" :> "haskell" :> ReqBody '[ JSON] SourceCode :> Post '[ JSON] (Either InterpreterError (InterpreterResult RunResult))
      :<|> "health" :> Get '[ JSON] ()
+
+type WSAPI = "conduit" :> WebSocket
 
 
 newtype RunResult = RunResult Text

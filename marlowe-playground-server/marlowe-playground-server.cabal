@@ -57,11 +57,13 @@ library
         servant-client-core -any,
         servant-purescript -any,
         servant-server -any,
+        servant-websockets -any,
         temporary -any,
         text -any,
         time -any,
         time-units -any,
-        transformers -any
+        transformers -any,
+        websockets -any
 
 executable marlowe-playground-server
     main-is: Main.hs

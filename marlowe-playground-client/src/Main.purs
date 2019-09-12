@@ -36,7 +36,7 @@ ajaxSettings = SPSettings_ $ (settings { decodeJson = decodeJson, encodeJson = e
 main ::
   Effect Unit
 main = do
-  socket <- WS.create "wss://echo.websocket.org" []
+  socket <- WS.create "ws://localhost:8080/api/conduit" []
   runHalogenAff do
     body <- awaitBody
     driver <- runUI (hoist (flip runReaderT ajaxSettings) mainFrame) unit body

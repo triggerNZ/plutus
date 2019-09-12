@@ -42,6 +42,8 @@ import           Servant.API                                    ((:<|>), (:>), B
 import           Servant.API                                    (StreamBody')
 #endif
 import           Servant.API.BrowserHeader                      (BrowserHeader)
+import           Servant.API.WebSocket                          (WebSocket)
+import           Servant.API.WebSocketConduit                   (WebSocketConduit)
 import           System.Metrics.Prometheus.Concurrent.RegistryT (RegistryT, registerCounter, registerGauge,
                                                                  registerHistogram)
 import qualified System.Metrics.Prometheus.Metric.Counter       as Counter
@@ -256,6 +258,14 @@ instance ReflectMethod method => HasEndpoint (Stream method status framing ct a)
 instance HasEndpoint Raw where
     getEndpoint      _ _ = Just (APIEndpoint [] "RAW")
     enumerateEndpoints _ =      [APIEndpoint [] "RAW"]
+
+instance HasEndpoint (WebSocketConduit i o) where
+    getEndpoint      _ _ = Just (APIEndpoint [] "Websocket")
+    enumerateEndpoints _ =      [APIEndpoint [] "Websocket"]
+
+instance HasEndpoint WebSocket where
+    getEndpoint      _ _ = Just (APIEndpoint [] "Websocket")
+    enumerateEndpoints _ =      [APIEndpoint [] "Websocket"]
 
 instance HasEndpoint (sub :: *) => HasEndpoint (CaptureAll (h :: Symbol) a :> sub) where
     getEndpoint        _ = getEndpoint        (Proxy :: Proxy sub)
