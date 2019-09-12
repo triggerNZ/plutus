@@ -1,10 +1,10 @@
 module Language.Marlowe.Analysis.Numbering (Numbering, emptyNumbering, getNumbering, getLabel, numberOfLabels) where
 
-import Data.Map.Strict (Map)
+import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 
-data Numbering a = Numbering { numbering :: (Map a Integer)
-                             , label :: (Map Integer a)
+data Numbering a = Numbering { numbering     :: (Map a Integer)
+                             , label         :: (Map Integer a)
                              , lastNumbering :: Integer }
   deriving (Eq,Ord,Show,Read)
 
@@ -28,7 +28,7 @@ getNumbering x num =
 getLabel :: Ord a => Integer -> Numbering a -> a
 getLabel x num =
   case Map.lookup x (label num) of
-    Just y -> y
+    Just y  -> y
     Nothing -> error "Numbering not defined"
 
 numberOfLabels :: Ord a => Numbering a -> Integer

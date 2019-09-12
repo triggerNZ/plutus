@@ -2,34 +2,34 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Language.Marlowe.Analysis.FSSemantics where
 
-import           Data.List       (foldl')
-import           Data.Map.Strict (Map)
-import qualified Data.Map.Strict as M
-import           Data.Set        (Set)
-import qualified Data.Set        as S
+import           Data.List                              (foldl')
+import           Data.Map.Strict                        (Map)
+import qualified Data.Map.Strict                        as M
 import           Data.SBV
-import           Data.SBV.Internals (SMTModel(..))
-import qualified Data.SBV.Tuple as ST
-import qualified Data.SBV.Either as SE
-import qualified Data.SBV.Maybe as SM
-import qualified Data.SBV.List as SL
+import qualified Data.SBV.Either                        as SE
+import           Data.SBV.Internals                     (SMTModel (..))
+import qualified Data.SBV.List                          as SL
+import qualified Data.SBV.Maybe                         as SM
+import qualified Data.SBV.Tuple                         as ST
+import           Data.Set                               (Set)
+import qualified Data.Set                               as S
+import           Language.Marlowe.Analysis.IntegerArray (IntegerArray, NIntegerArray)
 import qualified Language.Marlowe.Analysis.IntegerArray as IntegerArray
-import           Language.Marlowe.Analysis.IntegerArray(IntegerArray, NIntegerArray)
+import           Language.Marlowe.Analysis.MkSymb       (mkSymbolicDatatype)
 import           Language.Marlowe.Analysis.Numbering
-import           Language.Marlowe.Analysis.MkSymb(mkSymbolicDatatype)
-import qualified Language.Marlowe.Semantics as MS
+import qualified Language.Marlowe.Semantics             as MS
 
-data Bounds = Bounds { numParties :: Integer
-                     , numChoices :: Integer
+data Bounds = Bounds { numParties  :: Integer
+                     , numChoices  :: Integer
                      , numAccounts :: Integer
-                     , numLets :: Integer
-                     , numActions :: Integer
+                     , numLets     :: Integer
+                     , numActions  :: Integer
                      }
 
-data Mappings = Mappings { partyM :: Numbering MS.Party
-                         , choiceM :: Numbering MS.ChoiceId
+data Mappings = Mappings { partyM   :: Numbering MS.Party
+                         , choiceM  :: Numbering MS.ChoiceId
                          , accountM :: Numbering MS.AccountId
-                         , valueM :: Numbering MS.ValueId }
+                         , valueM   :: Numbering MS.ValueId }
   deriving (Eq,Ord,Show)
 
 emptyMappings :: Mappings
@@ -43,7 +43,7 @@ convertParty party maps@(Mappings { partyM = partyNumberings }) = (newParty, new
   where (newParty, newPartyNumberings) = getNumbering party partyNumberings
         newMaps = maps { partyM = newPartyNumberings }
 
-revertAccId :: AccountId -> Mappings -> MS.AccountId 
+revertAccId :: AccountId -> Mappings -> MS.AccountId
 revertAccId (AccountId accId _) maps = getLabel accId (accountM maps)
 
 getOriginalOwner :: NumAccount -> Mappings -> Party
@@ -193,9 +193,9 @@ type SState = STuple4 (NIntegerArray)
                       (NIntegerArray)
                       (NIntegerArray)
                       SlotNumber
-type State = ( NIntegerArray 
-             , NIntegerArray 
-             , NIntegerArray 
+type State = ( NIntegerArray
+             , NIntegerArray
+             , NIntegerArray
              , SlotNumber)
 
 emptySState :: Bounds -> SSlotNumber -> SState
@@ -322,7 +322,7 @@ evalValue bnds env state value =
     AddValue lhs rhs         -> go lhs + go rhs
     SubValue lhs rhs         -> go lhs + go rhs
     ChoiceValue (ChoiceId c p) defVal -> SM.maybe (go defVal)
-                                                  id 
+                                                  id
                                                   (IntegerArray.lookup c $ choice state)
     SlotIntervalStart        -> inStart
     SlotIntervalEnd          -> inEnd
@@ -334,17 +334,17 @@ evalValue bnds env state value =
 evalObservation :: Bounds -> SEnvironment -> SState -> Observation -> SBool
 evalObservation bnds env state obs =
   case obs of
-    AndObs lhs rhs       -> goObs lhs .&& goObs rhs
-    OrObs lhs rhs        -> goObs lhs .|| goObs rhs
-    NotObs subObs        -> sNot $ goObs subObs
+    AndObs lhs rhs                -> goObs lhs .&& goObs rhs
+    OrObs lhs rhs                 -> goObs lhs .|| goObs rhs
+    NotObs subObs                 -> sNot $ goObs subObs
     ChoseSomething (ChoiceId c p) -> IntegerArray.member c (choice state)
-    ValueGE lhs rhs      -> goVal lhs .>= goVal rhs
-    ValueGT lhs rhs      -> goVal lhs .> goVal rhs
-    ValueLT lhs rhs      -> goVal lhs .< goVal rhs
-    ValueLE lhs rhs      -> goVal lhs .<= goVal rhs
-    ValueEQ lhs rhs      -> goVal lhs .== goVal rhs
-    TrueObs              -> sTrue
-    FalseObs             -> sFalse
+    ValueGE lhs rhs               -> goVal lhs .>= goVal rhs
+    ValueGT lhs rhs               -> goVal lhs .> goVal rhs
+    ValueLT lhs rhs               -> goVal lhs .< goVal rhs
+    ValueLE lhs rhs               -> goVal lhs .<= goVal rhs
+    ValueEQ lhs rhs               -> goVal lhs .== goVal rhs
+    TrueObs                       -> sTrue
+    FalseObs                      -> sFalse
   where
     goObs = evalObservation bnds env state
     goVal = evalValue bnds env state
@@ -392,7 +392,7 @@ mkSymbolicDatatype ''ReduceEffect
 -- Gives the given amount of money to the given payee
 -- Return the appropriate effect and updated Map
 giveMoney :: IntegerArray -> Payee -> SMoney
-          -> STuple2 NReduceEffect NIntegerArray 
+          -> STuple2 NReduceEffect NIntegerArray
 giveMoney accs (Party party) mon = ST.tuple ( sReduceNormalPay (literal party) mon
                                             , accs )
 giveMoney accs (Account accId) mon = ST.tuple ( sReduceNoEffect
@@ -492,17 +492,17 @@ splitReduceResultReduce :: Bounds -> SList NReduceWarning -> SList NReduceEffect
                         -> SSReduceResult
                         -> (SList NReduceWarning, SList NReduceEffect, SState,
                             SReduceError)
-splitReduceResultReduce _ wa ef (SSReduced twa tef tsta) = 
+splitReduceResultReduce _ wa ef (SSReduced twa tef tsta) =
   ( symCaseReduceWarning
        (\x -> case x of -- Do not add if ReduceNoWarning
                 SSReduceNoWarning -> wa
-                _ -> twa SL..: wa) twa
+                _                 -> twa SL..: wa) twa
   , symCaseReduceEffect
        (\x -> case x of -- Do not add if ReduceNoEffect
                 SSReduceNoEffect -> ef
-                _ -> tef SL..: ef) tef
+                _                -> tef SL..: ef) tef
   , tsta
-  , sReduceAmbiguousSlotInterval {- SNH -}) 
+  , sReduceAmbiguousSlotInterval {- SNH -})
 splitReduceResultReduce bnds _ _ SSNotReduced =
   ([] {- SNH -}, [] {- SNH -}, emptySState bnds 0 {- SNH -}, sReduceAmbiguousSlotInterval {- SNH -})
 splitReduceResultReduce bnds _ _ (SSReduceError terr) = ([] {- SNH -}, [] {- SNH -}, emptySState bnds 0{- SNH -}, terr)
@@ -559,7 +559,7 @@ splitReduceAllResult :: Bounds -> SList NTransactionWarning -> SList NReduceEffe
 splitReduceAllResult bnds wa ef (SSReducedAll twa tef tsta) = ST.tuple $
   (ite (SL.null twa)
        wa
-       (wa SL..++ (sTransactionReduceWarnings twa SL..: [])), tef SL..++ ef, tsta, sReduceAmbiguousSlotInterval {- SNH -}) 
+       (wa SL..++ (sTransactionReduceWarnings twa SL..: [])), tef SL..++ ef, tsta, sReduceAmbiguousSlotInterval {- SNH -})
 splitReduceAllResult bnds _ _ (SSReduceAllError terr) =
    ST.tuple $ ([] {- SNH -}, [] {- SNH -}, emptySState bnds 0{- SNH -}, terr)
 
@@ -617,7 +617,7 @@ mkSymbolicDatatype ''ApplyAllResult
 
 data DetApplyAllResult = DAARNormal Contract
                                     Integer -- num of Payments
-                                    Integer -- num of Inputs 
+                                    Integer -- num of Inputs
                        | DAARError
 
 addIfEffWa :: SList NTransactionWarning -> SSApplyWarning -> SList NTransactionWarning
@@ -650,7 +650,7 @@ applyAllAux n bnds numPays numInps env state c l wa ef f
         contFunApply _ _ _ _ sr DARError =
           f (symCaseApplyResult
                (\x -> case x of
-                        SSApplied _ _ -> sAAReduceError sReduceAmbiguousSlotInterval -- SNH 
+                        SSApplied _ _    -> sAAReduceError sReduceAmbiguousSlotInterval -- SNH
                         SSApplyError err -> sAAApplyError err) sr)
             DAARError
         contFunApply t nwa nef np sr (DARNormal nc ni) =
@@ -707,22 +707,22 @@ sFoldl inte f acc list
   | inte >= 0 = ite (SL.null list)
                    acc
                    (sFoldl (inte - 1) f (f acc (SL.head list)) (SL.tail list))
-  | otherwise = acc 
+  | otherwise = acc
 
 --getSignatures :: Bounds -> Integer -> SList NInput -> STransactionSignatures
 --getSignatures bnds numInps =
---  sFoldl numInps (\x y -> symCaseInput (addSig x) y) FSSet.empty 
+--  sFoldl numInps (\x y -> symCaseInput (addSig x) y) FSSet.empty
 --  where
 --    addSig acc (SSIDeposit _ p _) = FSSet.insert (numParties bnds) p acc
 --    addSig acc (SSIChoice t _) = let (_, p) = ST.untuple t in
 --                                 FSSet.insert (numParties bnds) p acc
 --    addSig acc SSINotify = acc
 --
---addIfPay :: Bounds -> SSReduceEffect -> STransactionOutcomes -> STransactionOutcomes 
+--addIfPay :: Bounds -> SSReduceEffect -> STransactionOutcomes -> STransactionOutcomes
 --addIfPay bnds (SSReduceNormalPay p m) to = addOutcome bnds p (-m) to
 --addIfPay _ _ to = to
 --
---addIfDep :: Bounds -> SSInput -> STransactionOutcomes -> STransactionOutcomes 
+--addIfDep :: Bounds -> SSInput -> STransactionOutcomes -> STransactionOutcomes
 --addIfDep bnds (SSIDeposit _ p m) to = addOutcome bnds p m to
 --addIfDep _ _ to = to
 --
@@ -738,19 +738,19 @@ sFoldl inte f acc list
 --                                         (\oneEff -> addIfPay bnds oneEff to)
 --                                         (SL.head eff)))
 --  | numInps >= 0 = ite (SL.null inp)
---                      to 
+--                      to
 --                      (getOutcomesAux bnds (-1) (numInps - 1)
 --                                      [] (SL.tail inp)
 --                                      (symCaseInput
 --                                         (\oneInp -> addIfDep bnds oneInp to)
 --                                         (SL.head inp)))
---                                      
---  | otherwise = to -- SNH 
+--
+--  | otherwise = to -- SNH
 --
 --getOutcomes :: Bounds -> Integer -> Integer -> SList NReduceEffect -> SList NInput
 --            -> STransactionOutcomes
 --getOutcomes bnds numPays numInps eff inp =
---  getOutcomesAux bnds numPays numInps eff inp emptyOutcome 
+--  getOutcomesAux bnds numPays numInps eff inp emptyOutcome
 
 data TransactionResult = TransactionProcessed [NTransactionWarning]
                                [NTransactionEffect]
@@ -768,9 +768,9 @@ data DetTransactionResult = DTProcessed Contract
 extractAppliedAll :: SymVal a => Bounds -> SSApplyAllResult
    -> (SBV [NTransactionWarning] -> SBV [NTransactionEffect] -> SBV State -> SBV a)
    -> SBV a
-extractAppliedAll _ (SSAppliedAll wa ef nsta) f = f (wa) ef nsta 
-extractAppliedAll bnds (SSAAApplyError _) f = f [] [] (emptySState bnds 0) -- SNH
-extractAppliedAll bnds (SSAAReduceError _) f = f [] [] (emptySState bnds 0) -- SNH
+extractAppliedAll _ (SSAppliedAll wa ef nsta) f = f (wa) ef nsta
+extractAppliedAll bnds (SSAAApplyError _) f     = f [] [] (emptySState bnds 0) -- SNH
+extractAppliedAll bnds (SSAAReduceError _) f    = f [] [] (emptySState bnds 0) -- SNH
 
 convertTransactionError :: SymVal a => SSApplyAllResult
                         -> (STransactionResult -> DetTransactionResult -> SBV a) -> SBV a
@@ -784,7 +784,7 @@ convertTransactionError (SSAAReduceError reerr) f =
 -- Try to process a transaction
 processApplyResult :: SymVal a => Bounds -> STransaction -> Contract
                    -> (STransactionResult -> DetTransactionResult -> SBV a)
-                   -> SApplyAllResult -> DetApplyAllResult 
+                   -> SApplyAllResult -> DetApplyAllResult
                    -> SBV a
 processApplyResult bnds tra c f saar (DAARNormal ncon numPays numInps) =
   symCaseApplyAllResult
@@ -827,7 +827,7 @@ extractTransactionResult :: Bounds ->
 extractTransactionResult bnds spr =
   ST.untuple (symCaseTransactionResult prCases spr)
   where prCases (SSTransactionProcessed wa ef {- ts to -} nst) = ST.tuple (wa, ef, {- ts, to, -} nst)
-        prCases (SSTransactionError _) = ST.tuple ([], [], {- [], [], -} emptySState bnds 0) -- SNH 
+        prCases (SSTransactionError _)                         = ST.tuple ([], [], {- [], [], -} emptySState bnds 0) -- SNH
 
 warningsTraceWBAux :: Integer -> Bounds -> SState -> SList NTransaction -> Contract
                    -> (SList NTransactionWarning)
@@ -835,7 +835,7 @@ warningsTraceWBAux inte bnds st transList con
   | inte >= 0 = ite (SL.null transList)
                     []
                     (process bnds (SL.head transList) st con cont)
-  | otherwise = [] -- SNH 
+  | otherwise = [] -- SNH
   where cont spr (DTProcessed ncon) = let (wa, _, {- _, _, -} nst) =
                                              extractTransactionResult bnds spr in
                                       ite (SL.null $ wa)
@@ -1004,7 +1004,7 @@ convertContract (MS.Let valId value cont) maps =
     (Let newValId newValue newCont, actionsWithCont, mapsWithContract)
   where (newValId, mapsWithValId) = convertValId valId maps
         (newValue, mapsWithValue) = convertValue value mapsWithValId
-        (newCont, actionsWithCont, mapsWithContract) = convertContract cont mapsWithValue 
+        (newCont, actionsWithCont, mapsWithContract) = convertContract cont mapsWithValue
 
 convertContractBase :: MS.Contract -> (Contract, MaxActions, Mappings)
 convertContractBase c = convertContract c emptyMappings
@@ -1029,11 +1029,11 @@ revertSlotNum sn = MS.Slot { MS.getSlot = sn }
 revertInterval :: SlotInterval -> MS.SlotInterval
 revertInterval (snl, snh) = MS.SlotInterval (revertSlotNum snl) (revertSlotNum snh)
 
-revertChoId :: ChoiceId -> Mappings -> MS.ChoiceId 
+revertChoId :: ChoiceId -> Mappings -> MS.ChoiceId
 revertChoId (ChoiceId choId _) maps = getLabel choId (choiceM maps)
 
-revertValId :: ValueId -> Mappings -> MS.ValueId 
-revertValId (ValueId valId) maps = getLabel valId (valueM maps) 
+revertValId :: ValueId -> Mappings -> MS.ValueId
+revertValId (ValueId valId) maps = getLabel valId (valueM maps)
 
 revertInput :: Input -> Mappings -> MS.Input
 revertInput (IDeposit accId party mon) maps = MS.IDeposit newAccId newParty newMon
@@ -1052,12 +1052,12 @@ revertTransactionList list maps =
 
 revertPayee :: Payee -> Mappings -> MS.Payee
 revertPayee (Account accId) maps = MS.Account (revertAccId (unNestAccountId accId) maps)
-revertPayee (Party party) maps = MS.Party (revertParty party maps)
+revertPayee (Party party) maps   = MS.Party (revertParty party maps)
 
 revertReduceWarningList :: ReduceWarning -> Mappings -> MS.ReduceWarning
 revertReduceWarningList ReduceNoWarning _ = MS.ReduceNoWarning
 revertReduceWarningList (ReduceNonPositivePay accId payee inte) maps =
-     MS.ReduceNonPositivePay newAccId newPayee inte 
+     MS.ReduceNonPositivePay newAccId newPayee inte
   where newAccId = revertAccId (unNestAccountId accId) maps
         newPayee = revertPayee (unNestPayee payee) maps
 revertReduceWarningList (ReducePartialPay accId payee mon1 mon2) maps =
@@ -1108,7 +1108,7 @@ warningsTrace :: MS.Contract
 warningsTrace con =
     do thmRes@(ThmResult result) <- satCommand
        return (case result of
-                 Unsatisfiable _ _ -> Right Nothing 
+                 Unsatisfiable _ _ -> Right Nothing
                  Satisfiable _ smtModel ->
                     Right (Just (extractCounterExample smtModel maps
                                    warningsFunc))

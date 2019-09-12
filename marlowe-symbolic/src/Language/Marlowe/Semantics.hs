@@ -2,8 +2,8 @@ module Language.Marlowe.Semantics where
 
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import           Data.Text (Text)
-import qualified Data.Text as T
+import           Data.Text       (Text)
+import qualified Data.Text       as T
 
 newtype Slot = Slot { getSlot :: Integer } deriving (Eq,Ord)
 
@@ -59,7 +59,7 @@ accountOwner (AccountId _ party) = party
 data ChoiceId = ChoiceId ChoiceName Party
   deriving (Eq,Ord,Show,Read)
 
-newtype ValueId = ValueId Text 
+newtype ValueId = ValueId Text
   deriving (Eq,Ord,Show,Read)
 
 data Value = AvailableMoney AccountId
@@ -119,10 +119,10 @@ data Contract = Refund
               | Let ValueId Value Contract
   deriving (Eq,Ord,Show,Read)
 
-data State = State { accounts :: Map AccountId Money
-                   , choices  :: Map ChoiceId ChosenNum
+data State = State { accounts    :: Map AccountId Money
+                   , choices     :: Map ChoiceId ChosenNum
                    , boundValues :: Map ValueId Integer
-                   , minSlot :: Slot }
+                   , minSlot     :: Slot }
   deriving (Eq,Ord,Show,Read)
 
 emptyState :: Slot -> State
@@ -191,17 +191,17 @@ evalObservation env state obs = let
     evalObs = evalObservation env state
     evalVal = evalValue env state
     in case obs of
-        AndObs lhs rhs       -> evalObs lhs && evalObs rhs
-        OrObs lhs rhs        -> evalObs lhs || evalObs rhs
-        NotObs subObs        -> not (evalObs subObs)
+        AndObs lhs rhs          -> evalObs lhs && evalObs rhs
+        OrObs lhs rhs           -> evalObs lhs || evalObs rhs
+        NotObs subObs           -> not (evalObs subObs)
         ChoseSomething choiceId -> choiceId `Map.member` choices state
-        ValueGE lhs rhs      -> evalVal lhs >= evalVal rhs
-        ValueGT lhs rhs      -> evalVal lhs > evalVal rhs
-        ValueLT lhs rhs      -> evalVal lhs < evalVal rhs
-        ValueLE lhs rhs      -> evalVal lhs <= evalVal rhs
-        ValueEQ lhs rhs      -> evalVal lhs == evalVal rhs
-        TrueObs              -> True
-        FalseObs             -> False
+        ValueGE lhs rhs         -> evalVal lhs >= evalVal rhs
+        ValueGT lhs rhs         -> evalVal lhs > evalVal rhs
+        ValueLT lhs rhs         -> evalVal lhs < evalVal rhs
+        ValueLE lhs rhs         -> evalVal lhs <= evalVal rhs
+        ValueEQ lhs rhs         -> evalVal lhs == evalVal rhs
+        TrueObs                 -> True
+        FalseObs                -> False
 
 
 -- | Pick the first account with money in it
@@ -316,7 +316,7 @@ reduceContractStep env state contract = case contract of
         newState = state { boundValues = Map.insert valId evaluatedValue boundVals }
         warn = case Map.lookup valId boundVals of
               Just oldVal -> ReduceShadowing valId oldVal evaluatedValue
-              Nothing -> ReduceNoWarning
+              Nothing     -> ReduceNoWarning
         in Reduced warn ReduceNoPayment newState cont
 
 
@@ -336,7 +336,7 @@ reduceContractUntilQuiescent env state contract = let
                               else warning : warnings
                 newPayments  = case effect of
                     ReduceWithPayment payment -> payment : payments
-                    ReduceNoPayment -> payments
+                    ReduceNoPayment           -> payments
                 in reductionLoop env newState cont newWarnings newPayments
             AmbiguousSlotIntervalReductionError -> RRAmbiguousSlotIntervalError
             -- this is the last invocation of reductionLoop, so we can reverse lists

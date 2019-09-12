@@ -1,10 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.Marlowe.Util where
-import           Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
+import           Data.Map.Strict            (Map)
+import qualified Data.Map.Strict            as Map
 import           Data.String
-import           Data.Text (Text)
-import qualified Data.Text as T
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
 
 import           Language.Marlowe.Semantics
 

@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedLists #-}
 module Language.Marlowe.Analysis.IntegerArray where
 
-import Prelude hiding (all, lookup)
-import Data.SBV
-import Data.SBV.Tuple as ST
-import Data.SBV.List as SL
-import Data.SBV.Maybe as SM
+import           Data.SBV
+import           Data.SBV.List  as SL
+import           Data.SBV.Maybe as SM
+import           Data.SBV.Tuple as ST
+import           Prelude        hiding (all, lookup)
 
 type NIntegerArray = [Maybe Integer]
 type IntegerArray = SList (Maybe Integer)
@@ -31,7 +31,7 @@ lookup k s = lookupAux 1 k s
 member :: Integer -> IntegerArray -> SBool
 member k s = SM.isJust $ lookup k s
 
-findWithDefault :: Integer -> Integer -> IntegerArray -> SInteger 
+findWithDefault :: Integer -> Integer -> IntegerArray -> SInteger
 findWithDefault def k s = SM.maybe (literal def) id (lookup k s)
 
 delete :: Integer -> IntegerArray -> IntegerArray
