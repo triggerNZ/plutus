@@ -53,6 +53,10 @@ checkHealth = do
         Left e  -> throwError $ err400 {errBody = BSL.pack . show $ e}
         Right _ -> pure ()
 
+-- TODO: Here we're going to recieve JSON and pass it through to the
+--       AWS API Gateway to be processed. We're also going to receive
+--       messages from the AWS Lambda (I think we need to provide another
+--       endpoint for the Lambda to reach) which we will push down this socket
 handleWS :: MonadIO m => Connection -> m ()
 handleWS c = liftIO $ forever $ do
     (m :: Text.Text) <- receiveData c

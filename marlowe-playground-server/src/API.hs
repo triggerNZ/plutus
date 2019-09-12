@@ -18,7 +18,7 @@ type API
    = "contract" :> "haskell" :> ReqBody '[ JSON] SourceCode :> Post '[ JSON] (Either InterpreterError (InterpreterResult RunResult))
      :<|> "health" :> Get '[ JSON] ()
 
-type WSAPI = "conduit" :> WebSocket
+type WSAPI = "ws" :> WebSocket
 
 
 newtype RunResult = RunResult Text
