@@ -52,7 +52,7 @@ let
 
   isPlutus = name: builtins.elem name plutusPkgList;
 
-  regeneratePackages = iohkNix.stack2nix.regeneratePackages { hackageSnapshot = "2019-05-28T09:58:14Z"; };
+  regeneratePackages = iohkNix.stack2nix.regeneratePackages { hackageSnapshot = "2019-09-12T00:02:45Z"; };
 
   unfreePredicate = pkg: (builtins.parseDrvName pkg.name).name == "kindlegen";
 

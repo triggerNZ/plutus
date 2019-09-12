@@ -9089,6 +9089,45 @@ description = "Parse aviation weather reports";
 license = stdenv.lib.licenses.mit;
 
 }) {};
+"aws-lambda-haskell-runtime" = callPackage
+({
+  mkDerivation
+, aeson
+, base
+, bytestring
+, http-client
+, http-types
+, path
+, path-io
+, safe-exceptions-checked
+, stdenv
+, template-haskell
+, text
+}:
+mkDerivation {
+
+pname = "aws-lambda-haskell-runtime";
+version = "2.0.1";
+sha256 = "3ebf921dd75ac4e1b53df73488413ce320a6a82031369b2a1f8050dcf12f1d61";
+libraryHaskellDepends = [
+aeson
+base
+bytestring
+http-client
+http-types
+path
+path-io
+safe-exceptions-checked
+template-haskell
+text
+];
+doHaddock = false;
+doCheck = false;
+homepage = "https://github.com/theam/aws-lambda-haskell-runtime#readme";
+description = "Haskell runtime for AWS Lambda";
+license = stdenv.lib.licenses.asl20;
+
+}) {};
 "axel" = callPackage
 ({
   mkDerivation
@@ -19813,8 +19852,8 @@ mkDerivation {
 pname = "deepseq-generics";
 version = "0.2.0.0";
 sha256 = "b0b3ef5546c0768ef9194519a90c629f8f2ba0348487e620bb89d512187c7c9d";
-revision = "3";
-editedCabalFile = "0734x6dm7ny1422n5ik4agzmjybvd3yybj1mnrc8z0kb89xdprcs";
+revision = "4";
+editedCabalFile = "0928s2qnbqsjzrm94x88rvmvbigfmhcyp4m73gw6asinp2qg1kii";
 libraryHaskellDepends = [
 base
 deepseq
@@ -25735,8 +25774,8 @@ mkDerivation {
 pname = "foldl";
 version = "1.4.5";
 sha256 = "0ba0bd8a8b4273feef61b66b6e251e70f70537c113f8b7f0e3aeab77d8af12a7";
-revision = "3";
-editedCabalFile = "0ci6wq1lqmz0i5rlb4my21ic6ziq87kg35mkp3f9la9y32zbq600";
+revision = "4";
+editedCabalFile = "12qrmlazijyz5dn73p50klyny7x4vx8yw2isfmjikmrr12nhc5g0";
 libraryHaskellDepends = [
 base
 bytestring
@@ -43898,6 +43937,8 @@ mkDerivation {
 pname = "lucid";
 version = "2.9.11";
 sha256 = "8ca524b9ca7984a83b18916b0c9dfb79002cb3bbe88f5139f68bfbe46010bf8f";
+revision = "1";
+editedCabalFile = "10k3x9cn4a23kqk909xiv8phkfgagf7p16qlfpr9swn1dn4xasgf";
 libraryHaskellDepends = [
 base
 blaze-builder
@@ -44590,6 +44631,8 @@ license = stdenv.lib.licenses.asl20;
 "marlowe-symbolic" = callPackage
 ({
   mkDerivation
+, aeson
+, aws-lambda-haskell-runtime
 , base
 , containers
 , mtl
@@ -44612,6 +44655,8 @@ src = .././marlowe-symbolic;
 isLibrary = false;
 isExecutable = true;
 executableHaskellDepends = [
+aeson
+aws-lambda-haskell-runtime
 base
 containers
 mtl
@@ -45830,8 +45875,8 @@ mkDerivation {
 pname = "microstache";
 version = "1.0.1.1";
 sha256 = "5de98542313eb75f84961366ff8a70ed632387ba6518215035b2dd1b32d6a120";
-revision = "4";
-editedCabalFile = "0rkc0zmwi2vx47l4ssjkxlyd54fxz0w3xrgdhn7baf66gr90nrc7";
+revision = "5";
+editedCabalFile = "1dr1yqn42j6im1x333rpsqj57nhmagmhwkdfwx832cdsw9ry2gjz";
 libraryHaskellDepends = [
 aeson
 base
@@ -52457,8 +52502,8 @@ mkDerivation {
 pname = "persistent";
 version = "2.9.1";
 sha256 = "6742fd0834463489343feeeddc171124197ebcaef42141e455ed5cd4c282daac";
-revision = "1";
-editedCabalFile = "1ing9cdpafmfx0mpvrl3xzfvmw5aw2lpiq69nnhrsmlhb9pi8ni0";
+revision = "2";
+editedCabalFile = "1c18zhq0bw86y34vdjnvpx3zv1l0sxylxf95jkbc6480p2k0m03m";
 libraryHaskellDepends = [
 aeson
 attoparsec
@@ -55067,6 +55112,8 @@ mkDerivation {
 pname = "postgresql-libpq";
 version = "0.9.4.2";
 sha256 = "cea053c79ef1505c30518db7b9fb2ee68c9e2915d48b22f01f8eb9a9b49f06f9";
+revision = "1";
+editedCabalFile = "0hilyfb2gjh471ia2g8mwjs56ykrgl0qd06vpigwhc493ia7a9mv";
 setupHaskellDepends = [
 base
 Cabal
@@ -55283,8 +55330,8 @@ mkDerivation {
 pname = "postgresql-simple-url";
 version = "0.2.1.0";
 sha256 = "1307f57cde2bd7f6d795a860deab53d3d64043f51af31e3114dee516ef7ee9c9";
-revision = "1";
-editedCabalFile = "0ck0vrlsyj3vm8sk59jnyyqpvnv1l9mciifdnrzwr981pha147qp";
+revision = "2";
+editedCabalFile = "1nb1ks6hdfn16389f2yhf37qhjqd2y5wjc1dcp9bjhzd787z7ypr";
 libraryHaskellDepends = [
 base
 network-uri
@@ -55672,6 +55719,8 @@ mkDerivation {
 pname = "prettyprinter";
 version = "1.2.1";
 sha256 = "e7653e0ba87cc06553a50e4780dde81c5dd156196c0199511d03d972e5517fcf";
+revision = "1";
+editedCabalFile = "133n28la2dxhpvm5zbarcf0yc9hpl97lkjds3wxzgl7irfyk9w7n";
 isLibrary = true;
 isExecutable = true;
 libraryHaskellDepends = [
@@ -66535,6 +66584,8 @@ mkDerivation {
 pname = "sqlite-simple";
 version = "0.4.16.0";
 sha256 = "60d2a188d1967ebc0d3ec9175776c45a6e1e6e7a4d44567548cb7fe6961d30de";
+revision = "1";
+editedCabalFile = "123bykwxl3p6918bjxv073ksf8k1hn6s0rlph934h18400n51fdf";
 libraryHaskellDepends = [
 attoparsec
 base
@@ -70593,8 +70644,8 @@ mkDerivation {
 pname = "test-framework";
 version = "0.8.2.0";
 sha256 = "f5aec7a15dbcb39e951bcf6502606fd99d751197b5510f41706899aa7e660ac2";
-revision = "3";
-editedCabalFile = "0qg8zr0ga2kq8qrs9vckxmk11zrp105cbybcb9ra3dk4linngjw3";
+revision = "4";
+editedCabalFile = "1g1z9h55ii55b44gzgrjgi1lpk85yfi4yhrynvfy0199ywpckpd5";
 libraryHaskellDepends = [
 ansi-terminal
 ansi-wl-pprint
@@ -74381,8 +74432,8 @@ mkDerivation {
 pname = "union";
 version = "0.1.2";
 sha256 = "63e9dc2901a7d857e278445ca2b03bb869ecb01264206a14319d073e39dd8ec4";
-revision = "3";
-editedCabalFile = "160jc4ykqvkzw79sb9j95mw7hsnknpfhkbbd75xmkpx08vnv4d76";
+revision = "4";
+editedCabalFile = "09b6wqnmv4g2pnjzl5k90yp78jcif8pk40c0spdrbr2vr5766clj";
 libraryHaskellDepends = [
 base
 deepseq
