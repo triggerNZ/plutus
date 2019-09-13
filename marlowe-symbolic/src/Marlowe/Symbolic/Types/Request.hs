@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
-module Types.Request where
+module Marlowe.Symbolic.Types.Request where
 
 import           Data.Aeson
 import           GHC.Generics

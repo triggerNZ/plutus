@@ -3,12 +3,12 @@ module Lib where
 import           Aws.Lambda
 import           Language.Marlowe.Semantics (Slot(Slot))
 import           Language.Marlowe.Analysis.FSSemantics (warningsTrace)
-import           Types.Error(Error(Error))
-import qualified Types.Error as Err
-import           Types.Request(Request(Request,contract))
-import qualified Types.Request as Req
-import           Types.Response(Response(Response,result),Result(..))
-import qualified Types.Response as Res
+import           Marlowe.Symbolic.Types.Error(Error(Error))
+import qualified Marlowe.Symbolic.Types.Error as Err
+import           Marlowe.Symbolic.Types.Request(Request(Request,contract))
+import qualified Marlowe.Symbolic.Types.Request as Req
+import           Marlowe.Symbolic.Types.Response(Response(Response,result),Result(..))
+import qualified Marlowe.Symbolic.Types.Response as Res
 
 handler :: Request -> Context -> IO (Either Error Response)
 handler (Request {Req.uuid = u, contract = c}) context =

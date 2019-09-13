@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
-module Types.Response where
+module Marlowe.Symbolic.Types.Response where
 
 import           Data.Aeson hiding (Result)
 import           GHC.Generics

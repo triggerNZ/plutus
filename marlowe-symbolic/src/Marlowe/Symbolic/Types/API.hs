@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds                  #-}
-module Types.API where
+module Marlowe.Symbolic.Types.API where
 
 import           Servant.API                    ( (:<|>)
                                                 , (:>)
@@ -9,6 +9,6 @@ import           Servant.API                    ( (:<|>)
                                                 , Post
                                                 , ReqBody
                                                 )
-import           Types.Response                 ( Response )
+import           Marlowe.Symbolic.Types.Response                 ( Response )
 
 type API = "notify" :> ReqBody '[JSON] Response :> Post '[JSON] ()

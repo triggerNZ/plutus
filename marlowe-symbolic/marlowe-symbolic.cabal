@@ -11,10 +11,10 @@ cabal-version:          >= 1.10
 library
     exposed-modules:
         Lib
-        Types.Error
-        Types.Request
-        Types.Response
-        Types.API
+        Marlowe.Symbolic.Types.Error
+        Marlowe.Symbolic.Types.Request
+        Marlowe.Symbolic.Types.Response
+        Marlowe.Symbolic.Types.API
         Language.Marlowe
         Language.Marlowe.Semantics
         Language.Marlowe.Util
