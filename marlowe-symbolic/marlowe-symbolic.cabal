@@ -15,6 +15,7 @@ library
         Marlowe.Symbolic.Types.Request
         Marlowe.Symbolic.Types.Response
         Marlowe.Symbolic.Types.API
+    other-modules:
         Language.Marlowe
         Language.Marlowe.Semantics
         Language.Marlowe.Util

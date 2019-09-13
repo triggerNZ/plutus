@@ -52,6 +52,7 @@ import qualified Swap
 import           System.Directory                           (createDirectoryIfMissing)
 import           System.FilePath                            ((</>))
 import qualified ZeroCouponBond
+import qualified Marlowe.Symbolic.Types.Response   as MS
 
 psNonEmpty :: MonadReader BridgeData m => m PSType
 psNonEmpty = TypeInfo "" "Data.Json.JsonNonEmptyList" "JsonNonEmptyList" <$> psTypeParameters
@@ -152,6 +153,8 @@ myTypes =
     , mkSumType (Proxy @Owner)
     , mkSumType (Proxy @Warning)
     , mkSumType (Proxy @(InterpreterResult A))
+    , mkSumType (Proxy @MS.Response)
+    , mkSumType (Proxy @MS.Result)
     ]
 
 mySettings :: Settings

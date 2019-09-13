@@ -96,6 +96,7 @@ executable marlowe-playground-server
         lens -any,
         marlowe -any,
         marlowe-playground-server -any,
+        marlowe-symbolic -any,
         monad-logger -any,
         mtl -any,
         prometheus >=2,

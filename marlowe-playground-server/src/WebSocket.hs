@@ -31,6 +31,9 @@ insertIntoRegistry uuid connection = over Registry (Map.insert uuid connection)
 deleteFromRegistry :: UUID -> Registry -> Registry
 deleteFromRegistry uuid = over Registry (Map.delete uuid)
 
+lookupInRegistry :: UUID -> Registry -> Maybe Connection
+lookupInRegistry uuid = Map.lookup uuid . unpack
+
 -- | Take a @PendingConnection@ and returns a @UUID@ and @Connection$ for the user
 initializeConnection :: PendingConnection -> IO (UUID, Connection)
 initializeConnection pending = do

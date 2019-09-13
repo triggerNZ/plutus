@@ -42,13 +42,14 @@ import           Server                                         (mkHandlers)
 import           System.Metrics.Prometheus.Concurrent.RegistryT (runRegistryT)
 import           System.Metrics.Prometheus.Http.Scrape          (serveHttpTextMetricsT)
 import           Types                                          (Config (Config, _authConfig))
+import qualified Marlowe.Symbolic.Types.API   as MS
 
 instance GenerateList NoContent (Method -> Req NoContent) where
   generateList _ = []
 
 type Web
    = "version" :> Get '[ PlainText, JSON] Text
-     :<|> "api" :> ((MA.API :<|> MA.WSAPI) :<|> Auth.API)
+     :<|> "api" :> ((MA.API :<|> MS.API :<|> MA.WSAPI) :<|> Auth.API)
      :<|> Raw
 
 liftedAuthServer :: Auth.GithubEndpoints -> Auth.Config -> Server Auth.API
@@ -62,7 +63,7 @@ liftedAuthServer githubEndpoints config =
       Handler . runStderrLoggingT . flip runReaderT (githubEndpoints, config)
 
 server ::
-     Server (MA.API :<|> MA.WSAPI) -> FilePath -> Auth.GithubEndpoints -> Config -> Server Web
+     Server (MA.API :<|> MS.API :<|> MA.WSAPI) -> FilePath -> Auth.GithubEndpoints -> Config -> Server Web
 server handlers _staticDir githubEndpoints Config {..} =
   version :<|> (handlers :<|> liftedAuthServer githubEndpoints _authConfig) :<|>
   serveDirectoryFileServer _staticDir
@@ -71,7 +72,7 @@ version :: Applicative m => m Text
 version = pure gitRev
 
 app ::
-     Server (MA.API :<|> MA.WSAPI) -> FilePath -> Auth.GithubEndpoints -> Config -> Application
+     Server (MA.API :<|> MS.API :<|> MA.WSAPI) -> FilePath -> Auth.GithubEndpoints -> Config -> Application
 app handlers _staticDir githubEndpoints config =
   gzip def . logStdout . cors (const $ Just policy) . serve (Proxy @Web) $
   server handlers _staticDir githubEndpoints config
