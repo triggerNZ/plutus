@@ -12,13 +12,13 @@ import           Data.Text                    (Text)
 import           GHC.Generics                 (Generic)
 import           Language.Haskell.Interpreter (InterpreterError, InterpreterResult, SourceCode)
 import           Servant.API                  ((:<|>), (:>), Get, JSON, Post, ReqBody)
-import           Servant.API.WebSocket        (WebSocket)
+import           Servant.API.WebSocket        (WebSocketPending)
 
 type API
    = "contract" :> "haskell" :> ReqBody '[ JSON] SourceCode :> Post '[ JSON] (Either InterpreterError (InterpreterResult RunResult))
      :<|> "health" :> Get '[ JSON] ()
 
-type WSAPI = "ws" :> WebSocket
+type WSAPI = "ws" :> WebSocketPending
 
 
 newtype RunResult = RunResult Text

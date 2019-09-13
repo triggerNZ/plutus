@@ -28,11 +28,14 @@ import           Language.Haskell.Interpreter  (InterpreterError (CompilationErr
                                                 SourceCode (SourceCode))
 import           Marlowe.Contracts             (escrow)
 import           Network.HTTP.Types            (hContentType)
-import           Network.WebSockets.Connection (Connection, receiveData, sendTextData)
+import           Network.WebSockets.Connection (PendingConnection, receiveData, sendTextData)
 import           Servant                       (ServantErr, err400, errBody, errHeaders)
 import           Servant.API                   ((:<|>) ((:<|>)), (:>), JSON, Post, ReqBody)
 import           Servant.Server                (Handler, Server)
 import           System.Timeout                (timeout)
+import Control.Concurrent.STM.TVar (TVar, modifyTVar)
+import Control.Concurrent.STM (atomically)
+import WebSocket (Registry, newRegistry, initializeConnection, runWithConnection, insertIntoRegistry, deleteFromRegistry)
 
 acceptSourceCode :: SourceCode -> Handler (Either InterpreterError (InterpreterResult RunResult))
 acceptSourceCode sourceCode = do
@@ -57,12 +60,17 @@ checkHealth = do
 --       AWS API Gateway to be processed. We're also going to receive
 --       messages from the AWS Lambda (I think we need to provide another
 --       endpoint for the Lambda to reach) which we will push down this socket
-handleWS :: MonadIO m => Connection -> m ()
-handleWS c = liftIO $ forever $ do
-    (m :: Text.Text) <- receiveData c
-    print m
-    sendTextData c ("hi" :: Text.Text)
-    pure ()
+handleWS :: TVar Registry -> PendingConnection -> Handler ()
+handleWS registry pending = liftIO $ do
+    (uuid, connection) <- initializeConnection pending
+    atomically . modifyTVar registry $ insertIntoRegistry uuid connection
+    runWithConnection connection f
+    atomically . modifyTVar registry $ deleteFromRegistry uuid
+    putStrLn "closed connection"
+    where
+        f :: Text.Text -> IO ()
+        f = putStrLn . Text.unpack
+
 
 {-# ANN mkHandlers
           ("HLint: ignore Avoid restricted function" :: String)
@@ -71,4 +79,5 @@ handleWS c = liftIO $ forever $ do
 mkHandlers :: (MonadLogger m, MonadIO m) => m (Server (API :<|> WSAPI))
 mkHandlers = do
     logInfoN "Interpreter ready"
-    pure $ (acceptSourceCode :<|> checkHealth) :<|> handleWS
+    registry <- liftIO $ atomically newRegistry
+    pure $ (acceptSourceCode :<|> checkHealth) :<|> (handleWS registry)

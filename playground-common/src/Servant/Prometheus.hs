@@ -42,8 +42,7 @@ import           Servant.API                                    ((:<|>), (:>), B
 import           Servant.API                                    (StreamBody')
 #endif
 import           Servant.API.BrowserHeader                      (BrowserHeader)
-import           Servant.API.WebSocket                          (WebSocket)
-import           Servant.API.WebSocketConduit                   (WebSocketConduit)
+import           Servant.API.WebSocket                          (WebSocket, WebSocketPending)
 import           System.Metrics.Prometheus.Concurrent.RegistryT (RegistryT, registerCounter, registerGauge,
                                                                  registerHistogram)
 import qualified System.Metrics.Prometheus.Metric.Counter       as Counter
@@ -259,7 +258,7 @@ instance HasEndpoint Raw where
     getEndpoint      _ _ = Just (APIEndpoint [] "RAW")
     enumerateEndpoints _ =      [APIEndpoint [] "RAW"]
 
-instance HasEndpoint (WebSocketConduit i o) where
+instance HasEndpoint WebSocketPending where
     getEndpoint      _ _ = Just (APIEndpoint [] "Websocket")
     enumerateEndpoints _ =      [APIEndpoint [] "Websocket"]
 

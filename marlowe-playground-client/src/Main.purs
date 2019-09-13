@@ -36,6 +36,7 @@ ajaxSettings = SPSettings_ $ (settings { decodeJson = decodeJson, encodeJson = e
 main ::
   Effect Unit
 main = do
+  -- TODO: need to get the proper url, same as the client
   socket <- WS.create "ws://localhost:8080/api/ws" []
   runHalogenAff do
     body <- awaitBody
