@@ -8,8 +8,23 @@ build-type:             Simple
 extra-source-files:     README.md
 cabal-version:          >= 1.10
 
-executable marlowe-symbolic
-    default-language:   Haskell2010
+library
+    exposed-modules:
+        Lib
+        Types.Error
+        Types.Request
+        Types.Response
+        Types.API
+        Language.Marlowe
+        Language.Marlowe.Semantics
+        Language.Marlowe.Util
+        Language.Marlowe.Analysis.FSSet
+        Language.Marlowe.Analysis.FSSemantics
+        Language.Marlowe.Analysis.IntegerArray
+        Language.Marlowe.Analysis.Numbering
+        Language.Marlowe.Analysis.MkSymb
+    hs-source-dirs: src
+    default-language: Haskell2010
     build-depends:      aeson >= 1.4.2.0,
                         aws-lambda-haskell-runtime >= 2.0.1,
                         base >=4.9,
@@ -19,23 +34,19 @@ executable marlowe-symbolic
                         sbv >= 8.4,
                         time,
                         QuickCheck,
+                        servant,
+                        servant-client -any,
                         tasty,
                         tasty-hunit,
                         tasty-smallcheck,
                         tasty-quickcheck,
                         template-haskell
-    other-modules:
-                        Lib
-                        Types.Error
-                        Types.Request
-                        Types.Response
-                        Language.Marlowe
-                        Language.Marlowe.Semantics
-                        Language.Marlowe.Util
-                        Language.Marlowe.Analysis.FSSet
-                        Language.Marlowe.Analysis.FSSemantics
-                        Language.Marlowe.Analysis.IntegerArray
-                        Language.Marlowe.Analysis.Numbering
-                        Language.Marlowe.Analysis.MkSymb
-    hs-source-dirs:     src
+
+
+executable marlowe-symbolic
+    default-language:   Haskell2010
+    build-depends:      aws-lambda-haskell-runtime >= 2.0.1,
+                        base >=4.9,
+                        marlowe-symbolic
+    hs-source-dirs:     app
     main-is:            Main.hs

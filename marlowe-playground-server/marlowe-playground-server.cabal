@@ -49,6 +49,7 @@ library
         jwt <0.10.0,
         lens -any,
         marlowe -any,
+        marlowe-symbolic -any,
         monad-logger -any,
         mtl -any,
         newtype-generics -any,
