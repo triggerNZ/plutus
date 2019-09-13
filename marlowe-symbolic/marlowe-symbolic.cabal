@@ -26,6 +26,9 @@ executable marlowe-symbolic
                         template-haskell
     other-modules:
                         Lib
+                        Types.Error
+                        Types.Request
+                        Types.Response
                         Language.Marlowe
                         Language.Marlowe.Semantics
                         Language.Marlowe.Util
