@@ -29,6 +29,7 @@ library
     build-depends:      aeson >= 1.4.2.0,
                         aws-lambda-haskell-runtime >= 2.0.1,
                         base >=4.9,
+                        bytestring,
                         mtl,
                         containers,
                         text,
@@ -41,7 +42,8 @@ library
                         tasty-hunit,
                         tasty-smallcheck,
                         tasty-quickcheck,
-                        template-haskell
+                        template-haskell,
+                        utf8-string
 
 
 executable marlowe-symbolic

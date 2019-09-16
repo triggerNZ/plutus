@@ -2,7 +2,15 @@
 module Marlowe.Symbolic.Types.Response where
 
 import           Data.Aeson hiding (Result)
+import           Data.ByteString
 import           GHC.Generics
+
+data APIGatewayResponse = APIGatewayResponse
+  { statusCode :: Int
+  , headers :: [(String, String)]
+  , body :: String
+  } deriving (Generic)
+instance ToJSON APIGatewayResponse 
 
 data Result = Valid
             | CounterExample
@@ -11,13 +19,11 @@ data Result = Valid
                 , transactionWarning :: String
                 }
   deriving (Generic)
-instance FromJSON Result
 instance ToJSON Result
 
 data Response = Response
   { uuid :: String
   , result :: Result 
   } deriving (Generic)
-instance FromJSON Response
 instance ToJSON Response
 
