@@ -44520,6 +44520,7 @@ license = stdenv.lib.licenses.asl20;
 , jwt
 , lens
 , marlowe
+, marlowe-symbolic
 , monad-logger
 , mtl
 , newtype-generics
@@ -44535,16 +44536,20 @@ license = stdenv.lib.licenses.asl20;
 , servant-foreign
 , servant-purescript
 , servant-server
+, servant-websockets
 , stdenv
+, stm
 , temporary
 , text
 , time
 , time-units
 , transformers
+, uuid
 , wai
 , wai-cors
 , wai-extra
 , warp
+, websockets
 , yaml
 }:
 mkDerivation {
@@ -44571,6 +44576,7 @@ http-types
 jwt
 lens
 marlowe
+marlowe-symbolic
 monad-logger
 mtl
 newtype-generics
@@ -44581,11 +44587,15 @@ servant-client
 servant-client-core
 servant-purescript
 servant-server
+servant-websockets
+stm
 temporary
 text
 time
 time-units
 transformers
+uuid
+websockets
 ];
 executableHaskellDepends = [
 aeson
@@ -44598,6 +44608,7 @@ filepath
 http-types
 lens
 marlowe
+marlowe-symbolic
 monad-logger
 mtl
 optparse-applicative
@@ -44638,6 +44649,8 @@ license = stdenv.lib.licenses.asl20;
 , mtl
 , QuickCheck
 , sbv
+, servant
+, servant-client
 , stdenv
 , tasty
 , tasty-hunit
@@ -44652,9 +44665,9 @@ mkDerivation {
 pname = "marlowe-symbolic";
 version = "0.3.0.0";
 src = .././marlowe-symbolic;
-isLibrary = false;
+isLibrary = true;
 isExecutable = true;
-executableHaskellDepends = [
+libraryHaskellDepends = [
 aeson
 aws-lambda-haskell-runtime
 base
@@ -44662,6 +44675,8 @@ containers
 mtl
 QuickCheck
 sbv
+servant
+servant-client
 tasty
 tasty-hunit
 tasty-quickcheck
@@ -44669,6 +44684,10 @@ tasty-smallcheck
 template-haskell
 text
 time
+];
+executableHaskellDepends = [
+aws-lambda-haskell-runtime
+base
 ];
 doHaddock = false;
 license = stdenv.lib.licenses.bsd3;
@@ -53701,6 +53720,7 @@ license = stdenv.lib.licenses.bsd3;
 , servant-client
 , servant-purescript
 , servant-server
+, servant-websockets
 , stdenv
 , tasty
 , tasty-hunit
@@ -53751,6 +53771,7 @@ servant
 servant-client
 servant-purescript
 servant-server
+servant-websockets
 template-haskell
 temporary
 text
@@ -57285,8 +57306,8 @@ version = "0.13.1.0";
 src = fetchgit {
 
 url = "https://github.com/shmish111/purescript-bridge.git";
-sha256 = "1vl88g41f4vvgw9iyn7zd7i52qshpnk02z0y6czg4zy7wk3q12gz";
-rev = "0042602f8a195b1fe185138f9ccca02020b8dd62";
+sha256 = "029kax11r4jqqsp9xgnfn913nd8zfwynghyiwl53v1ivjyvcz1pl";
+rev = "77e23946b94fbecf1ff3dd3469faa12c5f410e37";
 fetchSubmodules = true;
 
 };
@@ -58132,6 +58153,34 @@ doCheck = false;
 homepage = "https://github.com/mokus0/random-fu";
 description = "Generic basis for random number generators";
 license = stdenv.lib.licenses.publicDomain;
+
+}) {};
+"random-strings" = callPackage
+({
+  mkDerivation
+, base
+, random
+, stdenv
+}:
+mkDerivation {
+
+pname = "random-strings";
+version = "0.1.1.0";
+sha256 = "9b7342fdcb37250a45a14825754ed8ba3fd1a45468c78aaa4ef3671342e59452";
+isLibrary = true;
+isExecutable = true;
+libraryHaskellDepends = [
+base
+random
+];
+executableHaskellDepends = [
+base
+];
+doHaddock = false;
+doCheck = false;
+homepage = "https://github.com/mikehat/random-strings";
+description = "Generate random strings with specific qualities";
+license = stdenv.lib.licenses.bsd3;
 
 }) {};
 "random-tree" = callPackage
