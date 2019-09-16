@@ -61,7 +61,7 @@ handler apiGatewayRequest context =
                        return (case acr of
                                  Right resp -> Right $ mkResponse 200 "application/json"
                                                      $ toString $ encode $ resp
-                                 Left err -> Left $ mkInternalError err u)
-          Nothing -> return $ Left $ mkWrongRequest "Could not parse contract" (Just u))
-     Left str -> return $ Left $ mkWrongRequest "Could not parse request body" Nothing)
+                                 Left err -> Right $ mkInternalError err u)
+          Nothing -> return $ Right $ mkWrongRequest "Could not parse contract" (Just u))
+     Left str -> return $ Right $ mkWrongRequest ("Could not parse request body: \"" ++ str ++ "\"") Nothing)
 
