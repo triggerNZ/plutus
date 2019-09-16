@@ -10,7 +10,7 @@ import           Marlowe.Symbolic.Types.Error(Error(Error))
 import qualified Marlowe.Symbolic.Types.Error as Err
 import           Marlowe.Symbolic.Types.Request(Request(Request,contract),APIGatewayRequest(..))
 import qualified Marlowe.Symbolic.Types.Request as Req
-import           Marlowe.Symbolic.Types.Response(Response(Response,result),Result(..),APIGatewayResponse(..))
+import           Marlowe.Symbolic.Types.Response(Response(Response,result),Result(..),APIGatewayResponse(..), Headers(..))
 import qualified Marlowe.Symbolic.Types.Response as Res
 
 maybeRead :: Read a => String -> Maybe a
@@ -40,7 +40,7 @@ analyseContract u c =
 mkResponse :: Int -> String -> String -> APIGatewayResponse
 mkResponse sc ct bodyStr =
   APIGatewayResponse { statusCode = sc
-                     , headers = [("Content-Type", ct)]
+                     , headers = Headers [("Content-Type", ct)]
                      , Res.body = bodyStr }
 
 mkWrongRequest :: String -> Maybe String -> APIGatewayResponse
