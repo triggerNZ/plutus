@@ -27,6 +27,7 @@ library
                         aws-lambda-haskell-runtime >= 2.0.1,
                         base >=4.9,
                         bytestring,
+                        HTTP,
                         marlowe,
                         mtl,
                         containers,

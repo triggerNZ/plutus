@@ -44605,6 +44605,8 @@ containers
 data-default-class
 directory
 filepath
+http-client
+http-client-tls
 http-types
 lens
 marlowe
@@ -44615,6 +44617,7 @@ optparse-applicative
 playground-common
 prometheus
 purescript-bridge
+servant-client
 servant-foreign
 servant-purescript
 servant-server
@@ -44647,6 +44650,7 @@ license = stdenv.lib.licenses.asl20;
 , base
 , bytestring
 , containers
+, HTTP
 , marlowe
 , mtl
 , QuickCheck
@@ -44676,6 +44680,7 @@ aws-lambda-haskell-runtime
 base
 bytestring
 containers
+HTTP
 marlowe
 mtl
 QuickCheck

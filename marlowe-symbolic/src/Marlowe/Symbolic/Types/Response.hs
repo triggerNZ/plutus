@@ -18,6 +18,9 @@ data APIGatewayResponse = APIGatewayResponse
   } deriving (Generic)
 instance ToJSON APIGatewayResponse 
 
+getHeaders :: APIGatewayResponse -> [(String, String)]
+getHeaders (APIGatewayResponse {headers = (Headers x)}) = x
+
 data Result = Valid
             | CounterExample
                 { initialSlot :: Integer
