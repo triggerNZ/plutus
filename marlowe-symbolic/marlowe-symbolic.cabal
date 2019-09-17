@@ -16,9 +16,6 @@ library
         Marlowe.Symbolic.Types.Response
         Marlowe.Symbolic.Types.API
     other-modules:
-        Language.Marlowe
-        Language.Marlowe.Semantics
-        Language.Marlowe.Util
         Language.Marlowe.Analysis.FSSet
         Language.Marlowe.Analysis.FSSemantics
         Language.Marlowe.Analysis.IntegerArray
@@ -30,6 +27,7 @@ library
                         aws-lambda-haskell-runtime >= 2.0.1,
                         base >=4.9,
                         bytestring,
+                        marlowe,
                         mtl,
                         containers,
                         text,

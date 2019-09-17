@@ -44645,7 +44645,9 @@ license = stdenv.lib.licenses.asl20;
 , aeson
 , aws-lambda-haskell-runtime
 , base
+, bytestring
 , containers
+, marlowe
 , mtl
 , QuickCheck
 , sbv
@@ -44659,6 +44661,7 @@ license = stdenv.lib.licenses.asl20;
 , template-haskell
 , text
 , time
+, utf8-string
 }:
 mkDerivation {
 
@@ -44671,7 +44674,9 @@ libraryHaskellDepends = [
 aeson
 aws-lambda-haskell-runtime
 base
+bytestring
 containers
+marlowe
 mtl
 QuickCheck
 sbv
@@ -44684,6 +44689,7 @@ tasty-smallcheck
 template-haskell
 text
 time
+utf8-string
 ];
 executableHaskellDepends = [
 aws-lambda-haskell-runtime

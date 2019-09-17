@@ -15,4 +15,5 @@ data Request = Request
   , contract :: String
   } deriving (Generic)
 instance FromJSON Request
+instance ToJSON APIGatewayRequest
 
