@@ -129,7 +129,7 @@ instance monadAppHalogenApp ::
   updateMarloweState f = wrap $ modifying _marloweState (extendWith f)
   applyTransactions = wrap $ modifying _marloweState (extendWith updateStateP)
   resetContract = do
-    wrap $ raise (WebsocketMessage "hi")
+    wrap $ raise (WebsocketMessage "\"Refund\"")
     newContract <- marloweEditorGetValueImpl
     wrap $ assign _marloweState $ NEL.singleton (emptyMarloweState zero)
     wrap $ assign _oldContract Nothing

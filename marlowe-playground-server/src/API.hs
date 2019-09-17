@@ -11,8 +11,10 @@ import           Data.Aeson                   (FromJSON, ToJSON)
 import           Data.Text                    (Text)
 import           GHC.Generics                 (Generic)
 import           Language.Haskell.Interpreter (InterpreterError, InterpreterResult, SourceCode)
-import           Servant.API                  ((:<|>), (:>), Get, JSON, Post, ReqBody)
+import           Servant.API                  ((:<|>), (:>), Get, JSON, Post, ReqBody, Header)
 import           Servant.API.WebSocket        (WebSocketPending)
+import qualified Marlowe.Symbolic.Types.Request as MSReq
+import qualified Marlowe.Symbolic.Types.Response as MSRes
 
 type API
    = "contract" :> "haskell" :> ReqBody '[ JSON] SourceCode :> Post '[ JSON] (Either InterpreterError (InterpreterResult RunResult))
@@ -20,6 +22,7 @@ type API
 
 type WSAPI = "ws" :> WebSocketPending
 
+type MarloweSymbolicAPI = "" :> Header "x-api-key" Text :> ReqBody '[JSON] MSReq.Request :> Post '[JSON] MSRes.Response
 
 newtype RunResult = RunResult Text
    deriving stock (Show, Eq, Generic)

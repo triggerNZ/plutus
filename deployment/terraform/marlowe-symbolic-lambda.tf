@@ -1,0 +1,176 @@
+# Security Group
+resource "aws_security_group" "marlowe_symbolic_lambda" {
+  vpc_id = "${aws_vpc.plutus.id}"
+
+  ## inbound (world): ICMP 3:4 "Fragmentation Needed and Don't Fragment was Set"
+  ingress {
+    from_port   = "3"
+    to_port     = "4"
+    protocol    = "ICMP"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ## outgoing: private subnet
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["${var.private_subnet_cidrs}"]
+  }
+
+  tags = {
+    Name        = "${var.project}_${var.env}_marlowe_symbolic_lambda"
+    Project     = "${var.project}"
+    Environment = "${var.env}"
+  }
+}
+
+resource "aws_iam_role" "marlowe_symbolic_lambda" {
+  name = "marlowe_symbolic_lambda"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_role_policy_attachment" "marlowe_symbolic_lambda" {
+  role = "${aws_iam_role.marlowe_symbolic_lambda.name}"
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+resource "aws_lambda_function" "marlowe_symbolic" {
+  function_name = "marlowe_symbolic"
+  role          = "${aws_iam_role.marlowe_symbolic_lambda.arn}"
+  handler       = "src/Lib.handler"
+
+  runtime = "provided"
+
+  layers = ["arn:aws:lambda:${var.aws_region}:785355572843:layer:aws-haskell-runtime:2"]
+
+  s3_bucket = "plutus-playground-tf"
+  s3_key = "marlowe-symbolic-lambda/function.zip"
+  s3_object_version = "GHakCRdQntXAok3sKEj2lPzUPFCpg8qG"
+
+  vpc_config = {
+      subnet_ids = ["${aws_subnet.private.*.id}"]
+      security_group_ids = ["${aws_security_group.marlowe_symbolic_lambda.id}"]
+  }
+  
+  memory_size = 512
+  timeout = 30
+
+  environment {
+    variables = {
+      PATH = "."
+    }
+  }
+}
+
+
+## API Gateway
+
+resource "aws_api_gateway_rest_api" "marlowe_symbolic_lambda" {
+  name        = "marlowe_symbolic_lambda"
+  description = "API Gateway for the Marlowe Symbolic Lambda"
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
+}
+
+resource "aws_api_gateway_resource" "marlowe_symbolic_proxy" {
+  rest_api_id = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.id}"
+  parent_id   = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.root_resource_id}"
+  path_part   = "{proxy+}"
+}
+
+resource "aws_api_gateway_method" "marlowe_symbolic_proxy" {
+  rest_api_id   = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.id}"
+  resource_id   = "${aws_api_gateway_resource.marlowe_symbolic_proxy.id}"
+  http_method   = "ANY"
+  authorization = "NONE"
+  api_key_required = true
+}
+
+resource "aws_api_gateway_integration" "marlowe_symbolic_lambda" {
+  rest_api_id = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.id}"
+  resource_id = "${aws_api_gateway_method.marlowe_symbolic_proxy.resource_id}"
+  http_method = "${aws_api_gateway_method.marlowe_symbolic_proxy.http_method}"
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = "${aws_lambda_function.marlowe_symbolic.invoke_arn}"
+}
+
+resource "aws_api_gateway_method" "marlowe_symbolic_proxy_root" {
+  rest_api_id   = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.id}"
+  resource_id   = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.root_resource_id}"
+  http_method   = "ANY"
+  authorization = "NONE"
+  api_key_required = true
+}
+
+resource "aws_api_gateway_integration" "marlowe_symbolic_lambda_root" {
+  rest_api_id = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.id}"
+  resource_id = "${aws_api_gateway_method.marlowe_symbolic_proxy_root.resource_id}"
+  http_method = "${aws_api_gateway_method.marlowe_symbolic_proxy_root.http_method}"
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = "${aws_lambda_function.marlowe_symbolic.invoke_arn}"
+}
+
+resource "aws_api_gateway_deployment" "marlowe_symbolic_lambda" {
+  depends_on = [
+    "aws_api_gateway_integration.marlowe_symbolic_lambda",
+    "aws_api_gateway_integration.marlowe_symbolic_lambda_root",
+  ]
+
+  rest_api_id = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.id}"
+  stage_name  = "${var.env}"
+
+  variables {
+    version = "1"
+  }
+}
+
+resource "aws_lambda_permission" "marlowe_symbolic_lambda_api_gw" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = "${aws_lambda_function.marlowe_symbolic.function_name}"
+  principal     = "apigateway.amazonaws.com"
+
+  # The "/*/*" portion grants access from any method on any resource
+  # within the API Gateway REST API.
+  source_arn = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.execution_arn}/*/*"
+}
+
+resource "aws_api_gateway_usage_plan" "marlowe_symbolic_lambda" {
+  name = "marlowe_symbolic_lambda"
+
+  api_stages {
+    api_id = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.id}"
+    stage  = "${aws_api_gateway_deployment.marlowe_symbolic_lambda.stage_name}"
+  }
+}
+
+resource "aws_api_gateway_api_key" "marlowe_symbolic_lambda" {
+  name = "marlowe_symbolic_lambda"
+}
+
+resource "aws_api_gateway_usage_plan_key" "marlowe_symbolic_lambda" {
+  key_id        = "${aws_api_gateway_api_key.marlowe_symbolic_lambda.id}"
+  key_type      = "API_KEY"
+  usage_plan_id = "${aws_api_gateway_usage_plan.marlowe_symbolic_lambda.id}"
+}

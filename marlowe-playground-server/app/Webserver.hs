@@ -25,6 +25,7 @@ import           Control.Monad.Reader                           (ReaderT, runRea
 import           Data.Default.Class                             (def)
 import           Data.Proxy                                     (Proxy (Proxy))
 import           Data.Text                                      (Text)
+import qualified Data.Text as Text
 import           Git                                            (gitRev)
 import           Network.HTTP.Types                             (Method)
 import           Network.Wai                                    (Application)
@@ -41,8 +42,12 @@ import           Servant.Server                                 (Server)
 import           Server                                         (mkHandlers)
 import           System.Metrics.Prometheus.Concurrent.RegistryT (runRegistryT)
 import           System.Metrics.Prometheus.Http.Scrape          (serveHttpTextMetricsT)
-import           Types                                          (Config (Config, _authConfig))
+import           Types                                          (Config (Config, _authConfig, _marloweConfig))
 import qualified Marlowe.Symbolic.Types.API   as MS
+import Marlowe.Config (_symbolicUrl, _apiKey)
+import Servant.Client (ClientEnv, mkClientEnv, parseBaseUrl)
+import Network.HTTP.Client (newManager)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
 
 instance GenerateList NoContent (Method -> Req NoContent) where
   generateList _ = []
@@ -81,10 +86,18 @@ app handlers _staticDir githubEndpoints config =
       simpleCorsResourcePolicy
         {corsRequestHeaders = ["content-type", "set-cookie"]}
 
+mkMarloweSymbolicClientEnv :: Config -> IO ClientEnv
+mkMarloweSymbolicClientEnv config = do
+  baseUrl <- parseBaseUrl $ (Text.unpack . _symbolicUrl . _marloweConfig) config
+  manager <- newManager tlsManagerSettings
+  pure $ mkClientEnv manager baseUrl
+
 run :: (MonadLogger m, MonadIO m) => Settings -> FilePath -> Config -> m ()
 run settings _staticDir config = runRegistryT $ do
   githubEndpoints <- liftIO Auth.mkGithubEndpoints
-  handlers <- mkHandlers
+  marloweSymbolicClientEnv <- liftIO $ mkMarloweSymbolicClientEnv config
+  let apiKey = _apiKey . _marloweConfig $ config
+  handlers <- mkHandlers apiKey marloweSymbolicClientEnv
   appMonitor <- monitorEndpoints (Proxy @Web)
   logInfoN "Starting webserver."
   void . liftIO . forkIO . runSettings settings . appMonitor $ app handlers _staticDir githubEndpoints config
