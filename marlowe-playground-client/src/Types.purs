@@ -27,6 +27,7 @@ import Halogen.Blockly (BlocklyQuery, BlocklyMessage)
 import Halogen.Component.ChildPath (ChildPath, cp1, cp2, cp3)
 import Language.Haskell.Interpreter (InterpreterError, InterpreterResult)
 import Marlowe.Semantics (AccountId, Action(..), Ada, Bound, ChoiceId, ChosenNum, Contract, Environment(..), Input, Observation, Party, Payment, PubKey, Slot, SlotInterval(..), State, TransactionError, _minSlot, emptyState, evalValue)
+import Marlowe.Symbolic.Types.Response (Result)
 import Network.RemoteData (RemoteData)
 import Prelude (class Eq, class Ord, class Show, Unit, mempty, zero, (<<<))
 import Servant.PureScript.Ajax (AjaxError)
@@ -69,6 +70,7 @@ data Query a
   | HandleBlocklyMessage BlocklyMessage a
   | SetBlocklyCode a
   -- websocket
+  | AnalyseContract a
   | RecieveWebsocketMessage String a
 
 data Message = WebsocketMessage String
@@ -134,6 +136,7 @@ newtype FrontendState
   , marloweState :: NonEmptyList MarloweState
   , oldContract :: Maybe String
   , blocklyState :: Maybe BlocklyState
+  , analysisState :: RemoteData String Result
   }
 
 derive instance newtypeFrontendState :: Newtype FrontendState _
@@ -167,6 +170,9 @@ _oldContract = _Newtype <<< prop (SProxy :: SProxy "oldContract")
 
 _blocklyState :: Lens' FrontendState (Maybe BlocklyState)
 _blocklyState = _Newtype <<< prop (SProxy :: SProxy "blocklyState")
+
+_analysisState :: Lens' FrontendState (RemoteData String Result)
+_analysisState = _Newtype <<< prop (SProxy :: SProxy "analysisState")
 
 -- editable
 _timestamp ::

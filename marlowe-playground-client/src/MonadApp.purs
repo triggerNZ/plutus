@@ -29,7 +29,9 @@ import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
 import FileEvents as FileEvents
+import Foreign.Class (encode)
 import Gist (Gist, GistId, NewGist)
+import Global.Unsafe (unsafeStringify)
 import Halogen (HalogenM, liftAff, liftEffect, query', raise)
 import Halogen.Blockly (BlocklyQuery(..))
 import Language.Haskell.Interpreter (InterpreterError, InterpreterResult, SourceCode)
@@ -46,6 +48,7 @@ import Text.Parsing.Parser (ParseError(..), runParser)
 import Text.Parsing.Parser.Pos (Position(..))
 import Types (ActionInput(..), BlocklySlot(..), ChildQuery, ChildSlot, EditorSlot(EditorSlot), FrontendState, MarloweEditorSlot(MarloweEditorSlot), MarloweState, Message(..), Query, WebData, _Head, _contract, _currentMarloweState, _editorErrors, _marloweState, _moneyInContract, _oldContract, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, actionToActionInput, cpBlockly, cpEditor, cpMarloweEditor, emptyMarloweState)
 import Web.HTML.Event.DragEvent (DragEvent)
+import WebSocket (WebSocketRequestMessage(CheckForWarnings))
 
 class
   Monad m <= MonadApp m where
@@ -73,6 +76,7 @@ class
   postContractHaskell :: SourceCode -> m (WebData (JsonEither InterpreterError (InterpreterResult RunResult)))
   resizeBlockly :: m (Maybe Unit)
   setBlocklyCode :: String -> m Unit
+  checkContractForWarnings :: String -> m Unit
 
 newtype HalogenApp m a
   = HalogenApp (HalogenM FrontendState Query ChildQuery ChildSlot Message m a)
@@ -129,7 +133,6 @@ instance monadAppHalogenApp ::
   updateMarloweState f = wrap $ modifying _marloweState (extendWith f)
   applyTransactions = wrap $ modifying _marloweState (extendWith updateStateP)
   resetContract = do
-    wrap $ raise (WebsocketMessage "\"Refund\"")
     newContract <- marloweEditorGetValueImpl
     wrap $ assign _marloweState $ NEL.singleton (emptyMarloweState zero)
     wrap $ assign _oldContract Nothing
@@ -143,6 +146,9 @@ instance monadAppHalogenApp ::
   postContractHaskell source = runAjax $ Server.postContractHaskell source
   resizeBlockly = wrap $ query' cpBlockly BlocklySlot (Resize unit)
   setBlocklyCode source = wrap $ void $ query' cpBlockly BlocklySlot (SetCode source unit)
+  checkContractForWarnings contract = do
+    let msgString = unsafeStringify <<< encode $ CheckForWarnings contract
+    wrap $ raise (WebsocketMessage msgString)
 
 -- I don't quite understand why but if you try to use MonadApp methods in HalogenApp methods you
 -- blow the stack so we have 3 methods pulled out here. I think this just ensures they are run

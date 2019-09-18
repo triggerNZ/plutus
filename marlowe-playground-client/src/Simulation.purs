@@ -15,7 +15,8 @@ import Data.BigInteger (BigInteger, fromString, fromInt)
 import Data.Either (Either(..))
 import Data.Eq ((==), (/=))
 import Data.Foldable (intercalate)
-import Data.HeytingAlgebra ((&&), (||))
+import Data.Generic.Rep.Show (genericShow)
+import Data.HeytingAlgebra (not, (&&), (||))
 import Data.Lens (to, view, (^.))
 import Data.List.NonEmpty as NEL
 import Data.Map (Map)
@@ -26,17 +27,19 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
-import Halogen (HTML, action)
+import Halogen (HTML, PropName(..), action)
 import Halogen.Component (ParentHTML)
-import Halogen.HTML (ClassName(ClassName), b_, br_, button, code_, col, colgroup, div, div_, h2, h3_, input, li_, pre_, slot', span, strong_, table_, tbody_, td, td_, text, th, th_, thead_, tr, ul_)
+import Halogen.HTML (ClassName(ClassName), b_, br_, button, code_, col, colgroup, div, div_, h2, h3_, input, li_, pre, pre_, prop, slot', span, strong_, table_, tbody_, td, td_, text, th, th_, thead_, tr, ul_)
 import Halogen.HTML.Events (input_, onClick, onDragOver, onDrop, onValueChange)
 import Halogen.HTML.Events as Events
 import Halogen.HTML.Properties (InputType(InputNumber), class_, classes, enabled, placeholder, type_, value)
 import Halogen.Query as HQ
+import Halogen.VDom.DOM.Prop (propFromString)
 import LocalStorage as LocalStorage
+import Network.RemoteData (RemoteData(..), isLoading)
 import Prelude (class Show, Unit, bind, const, discard, flip, identity, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>), (+))
 import StaticData as StaticData
-import Types (ActionInput(..), ChildQuery, ChildSlot, FrontendState, MarloweEditorSlot(MarloweEditorSlot), MarloweError(MarloweError), MarloweState, Query(..), _Head, _contract, _editorErrors, _marloweCompileResult, _marloweState, _moneyInContract, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, cpMarloweEditor)
+import Types (ActionInput(..), ChildQuery, ChildSlot, FrontendState, MarloweEditorSlot(MarloweEditorSlot), MarloweError(MarloweError), MarloweState, Query(..), _Head, _analysisState, _contract, _editorErrors, _marloweCompileResult, _marloweState, _moneyInContract, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, cpMarloweEditor)
 
 paneHeader :: forall p. String -> HTML p Query
 paneHeader s = h2 [class_ $ ClassName "pane-header"] [text s]
@@ -81,6 +84,7 @@ simulationPane state =
             ]
         , br_
         , errorList
+        , row_ [analysisPane state]
         ]
       ]
     )
@@ -680,3 +684,63 @@ renderPayment (Payment party money) =
         [ text (show money)
         ]
     ]
+
+analysisPane :: forall p. FrontendState -> HTML p Query
+analysisPane state =
+  div
+    [ class_ $ ClassName "col"
+    ]
+    [ button
+      [ classes
+          [ btn
+          , btnPrimary
+          , ClassName "transaction-btn"
+          ]
+      , onClick $ Just <<< HQ.action <<< const AnalyseContract
+      , enabled $ state ^. _analysisState <<< to (not isLoading)
+      ] [ loading
+        , text btnText
+        ]
+    , analysisResultPane state
+    ]
+  where
+    btnText = case state ^. _analysisState of
+            Loading -> "  Analysing..."
+            _ -> "Analyse Contract"
+    loading = case state ^. _analysisState of
+            Loading -> span [ classes [ ClassName "spinner-border"
+                                      , ClassName "spinner-border-sm"
+                                      ]
+                            , prop (PropName "role") "status" 
+                            , prop (PropName "aria-hidden") "true" 
+                            ] 
+                            []
+            _ -> empty
+
+analysisResultPane :: forall p. FrontendState -> HTML p Query
+analysisResultPane state =
+  let
+    result = state ^. _analysisState
+  in
+    case result of
+      Success success ->
+        listGroup_
+          [ listGroupItem_
+              [ div_
+                  [ code_
+                      [ pre [class_ $ ClassName "success-code"] [text (genericShow success)]
+                      ]
+                  ]
+              ]
+          ]
+      Failure failure ->
+        listGroup_
+          [ listGroupItem_
+              [ div_
+                  [ code_
+                      [ pre [class_ $ ClassName "compilation-warnings"] [text (show failure)]
+                      ]
+                  ]
+              ]
+          ]
+      _ -> empty

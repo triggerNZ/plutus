@@ -9,6 +9,7 @@ import Analytics (Event, defaultEvent, trackEvent)
 import Bootstrap (active, btn, btnGroup, btnInfo, btnPrimary, btnSmall, colXs12, colSm6, colSm5, container, container_, empty, hidden, listGroupItem_, listGroup_, navItem_, navLink, navTabs_, noGutters, pullRight, row, justifyContentBetween)
 import Control.Bind (bindFlipped, map, void, when)
 import Control.Monad ((*>))
+import Control.Monad.Except (runExceptT)
 import Control.Monad.Maybe.Trans (MaybeT(..), lift, runMaybeT)
 import Control.Monad.Reader.Class (class MonadAsk)
 import Control.Monad.State.Trans (class MonadState)
@@ -25,11 +26,12 @@ import Data.Json.JsonEither (JsonEither(..))
 import Data.String as String
 import Data.Tuple (Tuple(Tuple))
 import Data.Tuple.Nested ((/\))
-import Debug.Trace (trace)
 import Editor (editorPane)
 import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
+import Foreign (unsafeToForeign)
+import Foreign.Class (decode)
 import Gist (gistFileContent, gistId)
 import Gists (parseGistUrl, gistControls)
 import Halogen (Component, action)
@@ -46,13 +48,14 @@ import Marlowe.Blockly as MB
 import Marlowe.Gists (mkNewGist, playgroundGistFile)
 import Marlowe.Pretty (pretty)
 import Marlowe.Semantics (ChoiceId, Input(..), inBounds)
-import MonadApp (class MonadApp, applyTransactions, getGistByGistId, getOauthStatus, haskellEditorGetValue, haskellEditorGotoLine, haskellEditorSetAnnotations, haskellEditorSetValue, marloweEditorGetValue, marloweEditorSetValue, patchGistByGistId, postContractHaskell, postGist, preventDefault, readFileFromDragEvent, resetContract, resizeBlockly, runHalogenApp, saveBuffer, saveInitialState, saveMarloweBuffer, setBlocklyCode, updateContractInState, updateMarloweState)
-import Network.RemoteData (RemoteData(Success, Loading, NotAsked), _Success, isLoading, isSuccess)
+import MonadApp (class MonadApp, applyTransactions, checkContractForWarnings, getGistByGistId, getOauthStatus, haskellEditorGetValue, haskellEditorGotoLine, haskellEditorSetAnnotations, haskellEditorSetValue, marloweEditorGetValue, marloweEditorSetValue, patchGistByGistId, postContractHaskell, postGist, preventDefault, readFileFromDragEvent, resetContract, resizeBlockly, runHalogenApp, saveBuffer, saveInitialState, saveMarloweBuffer, setBlocklyCode, updateContractInState, updateMarloweState)
+import Network.RemoteData (RemoteData(..), _Success, isLoading, isSuccess)
 import Prelude (type (~>), Unit, add, bind, const, discard, not, one, pure, show, unit, zero, ($), (-), (<$>), (<<<), (<>), (==), (||))
 import Servant.PureScript.Settings (SPSettings_)
 import Simulation (simulationPane)
 import StaticData as StaticData
-import Types (ActionInput(..), BlocklySlot(BlocklySlot), ChildQuery, ChildSlot, FrontendState(FrontendState), Message, Query(..), View(..), _authStatus, _compilationResult, _createGistResult, _currentContract, _gistUrl, _marloweState, _oldContract, _pendingInputs, _possibleActions, _result, _slot, _view, cpBlockly, emptyMarloweState)
+import Types (ActionInput(..), BlocklySlot(BlocklySlot), ChildQuery, ChildSlot, FrontendState(FrontendState), Message, Query(..), View(..), _analysisState, _authStatus, _compilationResult, _createGistResult, _currentContract, _gistUrl, _marloweState, _oldContract, _pendingInputs, _possibleActions, _result, _slot, _view, cpBlockly, emptyMarloweState)
+import WebSocket (WebSocketResponseMessage(..))
 
 initialState :: FrontendState
 initialState =
@@ -66,6 +69,7 @@ initialState =
     , oldContract: Nothing
     , gistUrl: Nothing
     , blocklyState: Nothing
+    , analysisState: NotAsked
     }
 
 ------------------------------------------------------------
@@ -158,6 +162,8 @@ toEvent (Undo _) = Just $ defaultEvent "Undo"
 toEvent (HandleBlocklyMessage _ _) = Nothing
 
 toEvent (SetBlocklyCode _) = Nothing
+
+toEvent (AnalyseContract _) = Nothing
 
 toEvent (RecieveWebsocketMessage _ _) = Nothing
 
@@ -350,6 +356,7 @@ evalF (ResetSimulator next) = do
         Just y -> y
   marloweEditorSetValue newContract (Just 1)
   resetContract
+  assign _analysisState Loading
   pure next
 
 evalF (Undo next) = do
@@ -384,8 +391,22 @@ evalF (SetBlocklyCode next) = runMaybeT f *> pure next
       assign _view BlocklyEditor 
     MaybeT resizeBlockly
 
--- TODO: placeholder for what we will do with the ws messages
-evalF (RecieveWebsocketMessage msg next) = trace msg \_ -> pure next
+evalF (AnalyseContract next) = do
+  currContract <- marloweEditorGetValue
+  case currContract of
+    Nothing -> pure unit
+    Just contract -> do
+      checkContractForWarnings contract
+      assign _analysisState Loading
+  pure next
+
+evalF (RecieveWebsocketMessage msg next) = do
+  let msgDecoded = unwrap <<< runExceptT <<< decode $ unsafeToForeign msg
+  case msgDecoded of
+    Left err -> assign _analysisState <<< Failure $ show err
+    Right (OtherError err) -> assign _analysisState $ Failure err
+    Right (CheckForWarningsResult result) -> assign _analysisState $ Success result
+  pure next
 
 ------------------------------------------------------------
 showCompilationErrorAnnotations ::

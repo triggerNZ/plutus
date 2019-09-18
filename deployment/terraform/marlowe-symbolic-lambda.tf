@@ -60,13 +60,8 @@ resource "aws_lambda_function" "marlowe_symbolic" {
   layers = ["arn:aws:lambda:${var.aws_region}:785355572843:layer:aws-haskell-runtime:2"]
 
   s3_bucket = "plutus-playground-tf"
-  s3_key = "marlowe-symbolic-lambda/function.zip"
-  s3_object_version = "GHakCRdQntXAok3sKEj2lPzUPFCpg8qG"
-
-  vpc_config = {
-      subnet_ids = ["${aws_subnet.private.*.id}"]
-      security_group_ids = ["${aws_security_group.marlowe_symbolic_lambda.id}"]
-  }
+  s3_key = "marlowe-symbolic-lambda/async.zip"
+  s3_object_version = "gzWOyLvZRL5Rn.5QVGmSB3P4eeI5axw2"
   
   memory_size = 512
   timeout = 30
@@ -92,13 +87,13 @@ resource "aws_api_gateway_rest_api" "marlowe_symbolic_lambda" {
 resource "aws_api_gateway_resource" "marlowe_symbolic_proxy" {
   rest_api_id = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.id}"
   parent_id   = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.root_resource_id}"
-  path_part   = "{proxy+}"
+  path_part   = "marlowe-analysis"
 }
 
 resource "aws_api_gateway_method" "marlowe_symbolic_proxy" {
   rest_api_id   = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.id}"
   resource_id   = "${aws_api_gateway_resource.marlowe_symbolic_proxy.id}"
-  http_method   = "ANY"
+  http_method   = "POST"
   authorization = "NONE"
   api_key_required = true
 }
@@ -109,32 +104,31 @@ resource "aws_api_gateway_integration" "marlowe_symbolic_lambda" {
   http_method = "${aws_api_gateway_method.marlowe_symbolic_proxy.http_method}"
 
   integration_http_method = "POST"
-  type                    = "AWS_PROXY"
+  type                    = "AWS"
   uri                     = "${aws_lambda_function.marlowe_symbolic.invoke_arn}"
+
+  request_parameters = {
+    "integration.request.header.X-Amz-Invocation-Type" = "'Event'"
+  }
 }
 
-resource "aws_api_gateway_method" "marlowe_symbolic_proxy_root" {
-  rest_api_id   = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.id}"
-  resource_id   = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.root_resource_id}"
-  http_method   = "ANY"
-  authorization = "NONE"
-  api_key_required = true
-}
-
-resource "aws_api_gateway_integration" "marlowe_symbolic_lambda_root" {
+resource "aws_api_gateway_method_response" "marlowe_symbolic_lambda" {
   rest_api_id = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.id}"
-  resource_id = "${aws_api_gateway_method.marlowe_symbolic_proxy_root.resource_id}"
-  http_method = "${aws_api_gateway_method.marlowe_symbolic_proxy_root.http_method}"
+  resource_id = "${aws_api_gateway_resource.marlowe_symbolic_proxy.id}"
+  http_method = "${aws_api_gateway_method.marlowe_symbolic_proxy.http_method}"
+  status_code = "200"
+}
 
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = "${aws_lambda_function.marlowe_symbolic.invoke_arn}"
+resource "aws_api_gateway_integration_response" "marlowe_symbolic_lambda" {
+  rest_api_id = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.id}"
+  resource_id = "${aws_api_gateway_resource.marlowe_symbolic_proxy.id}"
+  http_method = "${aws_api_gateway_method.marlowe_symbolic_proxy.http_method}"
+  status_code = "${aws_api_gateway_method_response.marlowe_symbolic_lambda.status_code}"
 }
 
 resource "aws_api_gateway_deployment" "marlowe_symbolic_lambda" {
   depends_on = [
     "aws_api_gateway_integration.marlowe_symbolic_lambda",
-    "aws_api_gateway_integration.marlowe_symbolic_lambda_root",
   ]
 
   rest_api_id = "${aws_api_gateway_rest_api.marlowe_symbolic_lambda.id}"
