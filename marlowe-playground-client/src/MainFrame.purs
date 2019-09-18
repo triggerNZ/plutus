@@ -32,6 +32,7 @@ import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Foreign (unsafeToForeign)
 import Foreign.Class (decode)
+import Foreign.JSON (parseJSON)
 import Gist (gistFileContent, gistId)
 import Gists (parseGistUrl, gistControls)
 import Halogen (Component, action)
@@ -401,9 +402,11 @@ evalF (AnalyseContract next) = do
   pure next
 
 evalF (RecieveWebsocketMessage msg next) = do
-  let msgDecoded = unwrap <<< runExceptT <<< decode $ unsafeToForeign msg
+  let msgDecoded = unwrap <<< runExceptT $ do
+                                            f <- parseJSON msg
+                                            decode f
   case msgDecoded of
-    Left err -> assign _analysisState <<< Failure $ show err
+    Left err -> assign _analysisState <<< Failure $ show $ msg
     Right (OtherError err) -> assign _analysisState $ Failure err
     Right (CheckForWarningsResult result) -> assign _analysisState $ Success result
   pure next
