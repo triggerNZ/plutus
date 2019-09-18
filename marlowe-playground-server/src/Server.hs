@@ -38,7 +38,7 @@ import           Marlowe.Contracts             (escrow)
 import           Network.HTTP.Types            (hContentType)
 import           Network.WebSockets.Connection (PendingConnection, Connection, receiveData, sendTextData)
 import           Servant                       (ServantErr, err400, errBody, errHeaders)
-import           Servant.API                   ((:<|>) ((:<|>)), (:>), JSON, Post, ReqBody)
+import           Servant.API                   ((:<|>) ((:<|>)), (:>), JSON, Post, ReqBody, NoContent)
 import           Servant.Server                (Handler, Server)
 import           System.Timeout                (timeout)
 import Control.Concurrent.STM.TVar (TVar, modifyTVar, readTVarIO)
@@ -72,7 +72,7 @@ checkHealth = do
 marloweSymbolicApi :: Proxy MarloweSymbolicAPI
 marloweSymbolicApi = Proxy
 
-marloweSymbolicClient :: (Maybe Text) -> (Maybe Text) -> MSReq.Request -> ClientM MSRes.Response
+marloweSymbolicClient :: (Maybe Text) -> (Maybe Text) -> MSReq.Request -> ClientM NoContent
 marloweSymbolicClient = client marloweSymbolicApi
 
 -- | Each user (Connection) is only allowed to send one analysis request at a time
