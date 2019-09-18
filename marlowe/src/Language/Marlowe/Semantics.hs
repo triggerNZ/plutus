@@ -75,8 +75,15 @@ data ChoiceId = ChoiceId ChoiceName Party
   deriving (Eq,Ord,Show,Read,Generic,Pretty)
 
 newtype ValueId = ValueId Text
-  deriving stock (Eq,Ord,Show,Read,Generic)
-  deriving anyclass Pretty
+  deriving stock (Eq,Ord,Generic)
+
+instance Pretty ValueId where
+  prettyFragment = text . show
+
+instance Show ValueId where
+  showsPrec p (ValueId txt) r = showsPrec p (T.unpack txt) r
+instance Read ValueId where
+  readsPrec p x = [(ValueId (T.pack v), s) | (v, s) <- readsPrec p x]
 
 data Value = AvailableMoney AccountId
            | Constant Integer
