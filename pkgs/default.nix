@@ -44650,9 +44650,10 @@ license = stdenv.lib.licenses.asl20;
 , base
 , bytestring
 , containers
-, HTTP
+, http-client
 , marlowe
 , mtl
+, process
 , QuickCheck
 , sbv
 , servant
@@ -44680,9 +44681,10 @@ aws-lambda-haskell-runtime
 base
 bytestring
 containers
-HTTP
+http-client
 marlowe
 mtl
+process
 QuickCheck
 sbv
 servant

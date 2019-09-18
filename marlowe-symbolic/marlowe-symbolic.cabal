@@ -11,7 +11,6 @@ cabal-version:          >= 1.10
 library
     exposed-modules:
         Lib
-        Marlowe.Symbolic.Types.Error
         Marlowe.Symbolic.Types.Request
         Marlowe.Symbolic.Types.Response
         Marlowe.Symbolic.Types.API
@@ -27,13 +26,14 @@ library
                         aws-lambda-haskell-runtime >= 2.0.1,
                         base >=4.9,
                         bytestring,
-                        HTTP,
+                        http-client,
                         marlowe,
                         mtl,
                         containers,
                         text,
                         sbv >= 8.4,
                         time,
+                        process,
                         QuickCheck,
                         servant,
                         servant-client -any,
@@ -46,6 +46,7 @@ library
 
 
 executable marlowe-symbolic
+    ghc-options:        -threaded
     default-language:   Haskell2010
     build-depends:      aws-lambda-haskell-runtime >= 2.0.1,
                         base >=4.9,
