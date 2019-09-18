@@ -21,6 +21,10 @@ let
       github-client-secret: ${ghsecrets.githubClientSecret}
       jwt-signature: ${ghsecrets.jwtSignature}
       redirect-url: ${redirectUrl}
+    marlowe:
+      # The API Gateway url to trigger the marlowe symbolic lambda
+      symbolic-url: "${machines.marloweSymbolicUrl}"
+      api-key: "${secrets.apiGatewayKey}"
     '';
   };
   playgroundConfig = mkConfig secrets.plutus "https://${machines.environment}.${machines.plutusTld}" "playground.yaml";

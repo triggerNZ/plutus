@@ -22,7 +22,7 @@ type API
 
 type WSAPI = "ws" :> WebSocketPending
 
-type MarloweSymbolicAPI = "" :> Header "X-Amz-Invocation-Type" Text :> Header "x-api-key" Text :> ReqBody '[JSON] MSReq.Request :> Post '[JSON] NoContent
+type MarloweSymbolicAPI = "marlowe-analysis" :> Header "X-Amz-Invocation-Type" Text :> Header "x-api-key" Text :> ReqBody '[JSON] MSReq.Request :> Post '[JSON] NoContent
 
 newtype RunResult = RunResult Text
    deriving stock (Show, Eq, Generic)
