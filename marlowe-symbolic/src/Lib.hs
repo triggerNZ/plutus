@@ -49,7 +49,7 @@ showIfLeft (Right x) = Right x
 
 handler :: Request -> Context -> IO (Either Response Response)
 handler (Request {Req.uuid = u, callbackUrl = cu, contract = c}) context =
-  do rawSystem "killall" ["-9", "z3"]
+  do rawSystem "killall" ["-q", "-9", "z3"]
      semaphore <- newEmptyMVar
      mainThread <-
        forkOS (do evRes <- (warningsTrace (read c))
@@ -65,7 +65,7 @@ handler (Request {Req.uuid = u, callbackUrl = cu, contract = c}) context =
      x <- readMVar semaphore
      killThread mainThread
      killThread timerThread
-     rawSystem "killall" ["-9", "z3"]
+     rawSystem "killall" ["-q", "-9", "z3"]
      return $ Right x
 
 
