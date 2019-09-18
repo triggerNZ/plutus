@@ -61,7 +61,7 @@ resource "aws_lambda_function" "marlowe_symbolic" {
 
   s3_bucket = "plutus-playground-tf"
   s3_key = "marlowe-symbolic-lambda/async.zip"
-  s3_object_version = "gzWOyLvZRL5Rn.5QVGmSB3P4eeI5axw2"
+  s3_object_version = "We6Ks6PzgGXyz61gDy4_PQ3Kng6XsNJR"
   
   memory_size = 512
   timeout = 30
