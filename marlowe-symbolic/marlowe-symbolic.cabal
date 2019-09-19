@@ -27,6 +27,7 @@ library
                         base >=4.9,
                         bytestring,
                         http-client,
+                        http-client-tls,
                         marlowe,
                         mtl,
                         containers,

@@ -14,10 +14,11 @@ import           Marlowe.Symbolic.Types.Response(Response(Response,result),Resul
 import qualified Marlowe.Symbolic.Types.Response as Res
 import           Network.HTTP.Client hiding (Request, Response)
 import           System.Process (rawSystem)
+import           Network.HTTP.Client.TLS (tlsManagerSettings)
 
 sendRequest :: String -> Response -> IO ()
 sendRequest cu resp =
-  do manager <- newManager defaultManagerSettings
+  do manager <- newManager tlsManagerSettings
      maybeRequest <- try (parseRequest cu) 
      (case maybeRequest of
         Left (InvalidUrlException _ _) -> return ()
