@@ -85,7 +85,7 @@ handleWS registryVar apiKey marloweSymbolicClientEnv pending = liftIO $ do
     atomically . modifyTVar registryVar $ insertIntoRegistry uuid connection
     runWithConnection connection (handle connection uuid)
     atomically . modifyTVar registryVar $ deleteFromRegistry uuid
-    putStrLn "closed connection"
+    putStrLn $ "closed connection for user " <> show uuid
     where
         handle :: Connection -> UUID.UUID -> Text -> IO ()
         handle connection uuid msg = do
