@@ -79,8 +79,8 @@ marloweSymbolicClient = client marloweSymbolicApi
 --   These requests are sent in a fire and forget manner and the user is informed
 --   of the result when the analysis sends a response to the handleNotifcation endpoint
 --   We keep a registry of each user and any active request
-handleWS :: TVar Registry -> Text -> ClientEnv -> PendingConnection -> Handler ()
-handleWS registryVar apiKey marloweSymbolicClientEnv pending = liftIO $ do
+handleWS :: TVar Registry -> Text -> Text -> ClientEnv -> PendingConnection -> Handler ()
+handleWS registryVar apiKey callbackUrl marloweSymbolicClientEnv pending = liftIO $ do
     (uuid, connection) <- initializeConnection pending
     atomically . modifyTVar registryVar $ insertIntoRegistry uuid connection
     putStrLn $ "created connection for user " <> show uuid
@@ -105,7 +105,7 @@ handleWS registryVar apiKey marloweSymbolicClientEnv pending = liftIO $ do
                           putStrLn $ "could not decode websocket message: " <> Text.unpack msg
                           sendTextData connection $ encode $ OtherError "Invalid message sent through websocket"
                         Right (CheckForWarnings contract) -> do
-                            let req = MSReq.Request (UUID.toString uuid) "https://david.marlowe.iohkdev.io/api" contract
+                            let req = MSReq.Request (UUID.toString uuid) (Text.unpack callbackUrl) contract
                             putStrLn $ "send request for user " <> show uuid
                             res <- runClientM (marloweSymbolicClient (Just "Event") (Just apiKey) req) marloweSymbolicClientEnv
                             case res of
@@ -152,8 +152,8 @@ handleNotification registryVar response = liftIO $ do
           ("HLint: ignore Avoid restricted function" :: String)
         #-}
 
-mkHandlers :: (MonadLogger m, MonadIO m) => Text -> ClientEnv -> m (Server (API :<|> MS.API :<|> WSAPI))
-mkHandlers apiKey marloweSymbolicClientEnv = do
+mkHandlers :: (MonadLogger m, MonadIO m) => Text -> Text -> ClientEnv -> m (Server (API :<|> MS.API :<|> WSAPI))
+mkHandlers apiKey callbackUrl marloweSymbolicClientEnv = do
     logInfoN "Interpreter ready"
     registry <- liftIO $ atomically newRegistry
-    pure $ (acceptSourceCode :<|> checkHealth) :<|> handleNotification registry :<|> handleWS registry apiKey marloweSymbolicClientEnv
+    pure $ (acceptSourceCode :<|> checkHealth) :<|> handleNotification registry :<|> handleWS registry apiKey callbackUrl marloweSymbolicClientEnv

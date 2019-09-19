@@ -8,6 +8,7 @@ import Data.Text (Text)
 data Config = Config
     { _symbolicUrl :: Text 
     , _apiKey :: Text
+    , _callbackUrl :: Text
     }
 
 instance FromJSON Config where
@@ -15,4 +16,5 @@ instance FromJSON Config where
         withObject "config" $ \o -> do
             _symbolicUrl <- o .: "symbolic-url"
             _apiKey <- o .: "api-key"
+            _callbackUrl <- o .: "callback-url"
             pure Config {..}

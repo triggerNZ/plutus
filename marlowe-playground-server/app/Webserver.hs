@@ -44,7 +44,7 @@ import           System.Metrics.Prometheus.Concurrent.RegistryT (runRegistryT)
 import           System.Metrics.Prometheus.Http.Scrape          (serveHttpTextMetricsT)
 import           Types                                          (Config (Config, _authConfig, _marloweConfig))
 import qualified Marlowe.Symbolic.Types.API   as MS
-import Marlowe.Config (_symbolicUrl, _apiKey)
+import Marlowe.Config (_symbolicUrl, _apiKey, _callbackUrl)
 import Servant.Client (ClientEnv, mkClientEnv, parseBaseUrl)
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
@@ -97,7 +97,8 @@ run settings _staticDir config = runRegistryT $ do
   githubEndpoints <- liftIO Auth.mkGithubEndpoints
   marloweSymbolicClientEnv <- liftIO $ mkMarloweSymbolicClientEnv config
   let apiKey = _apiKey . _marloweConfig $ config
-  handlers <- mkHandlers apiKey marloweSymbolicClientEnv
+      callbackUrl = _callbackUrl . _marloweConfig $ config
+  handlers <- mkHandlers apiKey callbackUrl marloweSymbolicClientEnv
   appMonitor <- monitorEndpoints (Proxy @Web)
   logInfoN "Starting webserver."
   void . liftIO . forkIO . runSettings settings . appMonitor $ app handlers _staticDir githubEndpoints config
