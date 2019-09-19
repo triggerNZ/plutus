@@ -5,6 +5,7 @@ import Prelude
 import Control.Coroutine (Consumer, Process, connect, consumer, runProcess, ($$))
 import Control.Monad.Reader.Trans (runReaderT)
 import Data.Maybe (Maybe(..))
+import Debug.Trace (trace)
 import Effect (Effect)
 import Effect.Aff (forkAff, Aff)
 import Effect.Class (liftEffect)
@@ -19,11 +20,11 @@ import LocalStorage as LocalStorage
 import MainFrame (mainFrame)
 import Marlowe (SPParams_(SPParams_))
 import Servant.PureScript.Settings (SPSettingsDecodeJson_(..), SPSettingsEncodeJson_(..), SPSettings_(..), defaultSettings)
+import Web.HTML as W
+import Web.HTML.Location as WL
+import Web.HTML.Window as WW
 import Web.Socket.WebSocket as WS
 import Websockets (wsConsumer, wsProducer, wsSender)
-import Web.HTML as W
-import Web.HTML.Window as WW
-import Web.HTML.Location as WL
 
 ajaxSettings :: SPSettings_ SPParams_
 ajaxSettings = SPSettings_ $ (settings { decodeJson = decodeJson, encodeJson = encodeJson })
@@ -45,8 +46,8 @@ main = do
   protocol <- WL.protocol location
   hostname <- WL.hostname location
   port <- WL.port location
-  let wsProtocol = case protocol of
-                    "https" -> "wss"
+  let wsProtocol = trace protocol \_ -> case protocol of
+                    "https:" -> "wss"
                     _ -> "ws"
       wsPath = wsProtocol <> "://" <> hostname <> ":" <> port <> "/api/ws"
   socket <- WS.create wsPath []
