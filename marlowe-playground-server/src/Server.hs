@@ -38,7 +38,7 @@ import           Marlowe.Contracts             (escrow)
 import           Network.HTTP.Types            (hContentType)
 import           Network.WebSockets.Connection (PendingConnection, Connection, receiveData, sendTextData)
 import           Servant                       (ServantErr, err400, errBody, errHeaders)
-import           Servant.API                   ((:<|>) ((:<|>)), (:>), JSON, Post, ReqBody, NoContent)
+import           Servant.API                   ((:<|>) ((:<|>)), (:>), JSON, Post, ReqBody, NoContent(NoContent))
 import           Servant.Server                (Handler, Server)
 import           System.Timeout                (timeout)
 import Control.Concurrent.STM.TVar (TVar, modifyTVar, readTVarIO)
@@ -104,7 +104,7 @@ handleWS registryVar apiKey marloweSymbolicClientEnv pending = liftIO $ do
                           putStrLn $ "could not decode websocket message: " <> Text.unpack msg
                           sendTextData connection $ encode $ OtherError "Invalid message sent through websocket"
                         Right (CheckForWarnings contract) -> do
-                            let req = MSReq.Request (UUID.toString uuid) "https://david.marlowe.iohkdev.io/api/marlowe-analysis" contract
+                            let req = MSReq.Request (UUID.toString uuid) "https://david.marlowe.iohkdev.io/api" contract
                             res <- runClientM (marloweSymbolicClient (Just "Event") (Just apiKey) req) marloweSymbolicClientEnv
                             case res of
                                 Left err -> do
@@ -131,18 +131,19 @@ handleWS registryVar apiKey marloweSymbolicClientEnv pending = liftIO $ do
                                         else pure ()
             
 
-handleNotification :: TVar Registry -> MSRes.Response -> Handler ()
-handleNotification registryVar response = liftIO $
+handleNotification :: TVar Registry -> MSRes.Response -> Handler NoContent
+handleNotification registryVar response = liftIO $ do
     case UUID.fromString $ MSRes.uuid response of
         Nothing -> putStrLn "Response contains an invalid UUID"
         Just uuid -> do
             registry <- readTVarIO registryVar
             case lookupInRegistry uuid registry of
                           Nothing -> putStrLn $ "Ignoring response because user " <> show uuid <> " is not in the registry, they've probably disconnected"
-                          Just (connection, Nothing) -> putStrLn $ "Ignoring response because user " <> show uuid <> " isn't waiting for one"
+                          Just (_, Nothing) -> putStrLn $ "Ignoring response because user " <> show uuid <> " isn't waiting for one"
                           Just (connection, _) -> do
                               atomically . modifyTVar registryVar $ finishWaiting uuid
                               sendTextData connection $ encode $ CheckForWarningsResult $ MSRes.result response
+    pure NoContent
 
 
 {-# ANN mkHandlers

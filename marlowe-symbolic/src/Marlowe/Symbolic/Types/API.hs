@@ -8,7 +8,8 @@ import           Servant.API                    ( (:<|>)
                                                 , JSON
                                                 , Post
                                                 , ReqBody
+                                                , NoContent
                                                 )
 import           Marlowe.Symbolic.Types.Response                 ( Response )
 
-type API = "notify" :> ReqBody '[JSON] Response :> Post '[JSON] ()
+type API = "notify" :> ReqBody '[JSON] Response :> Post '[JSON] NoContent
