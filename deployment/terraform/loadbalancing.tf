@@ -175,7 +175,7 @@ resource "aws_alb_target_group" "marlowe" {
 resource "aws_alb_listener_rule" "marlowe" {
   depends_on   = ["aws_alb_target_group.marlowe"]
   listener_arn = "${aws_alb_listener.playground.arn}"
-  priority     = 102
+  priority     = 122
   action {
     type             = "forward"
     target_group_arn = "${aws_alb_target_group.marlowe.id}"

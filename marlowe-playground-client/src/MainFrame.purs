@@ -30,7 +30,6 @@ import Editor (editorPane)
 import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
-import Foreign (unsafeToForeign)
 import Foreign.Class (decode)
 import Foreign.JSON (parseJSON)
 import Gist (gistFileContent, gistId)
@@ -393,11 +392,11 @@ evalF (SetBlocklyCode next) = runMaybeT f *> pure next
     MaybeT resizeBlockly
 
 evalF (AnalyseContract next) = do
-  currContract <- marloweEditorGetValue
+  currContract <- use _currentContract
   case currContract of
     Nothing -> pure unit
     Just contract -> do
-      checkContractForWarnings contract
+      checkContractForWarnings (show contract)
       assign _analysisState Loading
   pure next
 
