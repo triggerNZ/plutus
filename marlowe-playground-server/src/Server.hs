@@ -83,6 +83,7 @@ handleWS :: TVar Registry -> Text -> ClientEnv -> PendingConnection -> Handler (
 handleWS registryVar apiKey marloweSymbolicClientEnv pending = liftIO $ do
     (uuid, connection) <- initializeConnection pending
     atomically . modifyTVar registryVar $ insertIntoRegistry uuid connection
+    putStrLn $ "created connection for user " <> show uuid
     runWithConnection connection (handle connection uuid)
     atomically . modifyTVar registryVar $ deleteFromRegistry uuid
     putStrLn $ "closed connection for user " <> show uuid
