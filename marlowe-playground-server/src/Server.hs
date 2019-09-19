@@ -106,7 +106,7 @@ handleWS registryVar apiKey callbackUrl marloweSymbolicClientEnv pending = liftI
                           sendTextData connection $ encode $ OtherError "Invalid message sent through websocket"
                         Right (CheckForWarnings contract) -> do
                             let req = MSReq.Request (UUID.toString uuid) (Text.unpack callbackUrl) contract
-                            putStrLn $ "send request for user " <> show uuid
+                            putStrLn $ "send request for user " <> show uuid <> " to " <> Text.unpack callbackUrl
                             res <- runClientM (marloweSymbolicClient (Just "Event") (Just apiKey) req) marloweSymbolicClientEnv
                             case res of
                                 Left err -> do
