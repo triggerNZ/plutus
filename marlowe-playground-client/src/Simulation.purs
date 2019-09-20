@@ -36,6 +36,7 @@ import Halogen.HTML.Properties (InputType(InputNumber), class_, classes, enabled
 import Halogen.Query as HQ
 import Halogen.VDom.DOM.Prop (propFromString)
 import LocalStorage as LocalStorage
+import Marlowe.Symbolic.Types.Response (Response(..), Result(..))
 import Network.RemoteData (RemoteData(..), isLoading)
 import Prelude (class Show, Unit, bind, const, discard, flip, identity, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>), (+))
 import StaticData as StaticData
@@ -84,7 +85,7 @@ simulationPane state =
             ]
         , br_
         , errorList
-        , row_ [analysisPane state]
+        , analysisPane state
         ]
       ]
     )
@@ -687,22 +688,25 @@ renderPayment (Payment party money) =
 
 analysisPane :: forall p. FrontendState -> HTML p Query
 analysisPane state =
-  div
-    [ class_ $ ClassName "col"
-    ]
-    [ button
-      [ classes
-          [ btn
-          , btnPrimary
-          , ClassName "transaction-btn"
-          ]
-      , onClick $ Just <<< HQ.action <<< const AnalyseContract
-      , enabled $ state ^. _analysisState <<< to (not isLoading)
-      ] [ loading
-        , text btnText
-        ]
-    , analysisResultPane state
-    ]
+ div [ class_ $ ClassName "full-width-card" ]
+     [ paneHeader "Static analysis"
+     , card_
+       [ cardBody_
+           [ analysisResultPane state
+           , button
+             [ classes
+                 [ btn
+                 , btnPrimary
+                 , ClassName "transaction-btn"
+                 ]
+             , onClick $ Just <<< HQ.action <<< const AnalyseContract
+             , enabled $ state ^. _analysisState <<< to (not isLoading)
+             ] [ loading
+               , text btnText
+               ]
+           ]
+       ]
+     ]
   where
     btnText = case state ^. _analysisState of
             Loading -> "  Analysing..."
@@ -722,25 +726,41 @@ analysisResultPane state =
   let
     result = state ^. _analysisState
   in
+    
     case result of
-      Success success ->
-        listGroup_
-          [ listGroupItem_
-              [ div_
-                  [ code_
-                      [ pre [class_ $ ClassName "success-code"] [text (genericShow success)]
-                      ]
-                  ]
-              ]
-          ]
-      Failure failure ->
-        listGroup_
-          [ listGroupItem_
-              [ div_
-                  [ code_
-                      [ pre [class_ $ ClassName "compilation-warnings"] [text (show failure)]
-                      ]
-                  ]
-              ]
-          ]
+      NotAsked -> div [ classes [ ClassName "padded-explanation" ] ]
+                      [ text "Press the button below to analyse the contract for runtime warnings." ]
+      Success (Valid) -> div [ classes [ ClassName "padded-explanation" ] ]
+                             [ h3_ [ text "Analysis Result: Pass" ]
+                             , text "Static analysis could not find any execution that results in any warning."
+                             ]
+      Success (CounterExample {initialSlot, transactionList, transactionWarning}) ->
+         div [ classes [ ClassName "padded-explanation" ] ]
+             [ h3_ [ text "Analysis Result: Fail" ]
+             , text "Static analysis found the following counterexample:"
+             , ul_ [ li_ [ spanText "Initial slot: "
+                         , b_ [spanText (show initialSlot)]
+                         ]
+                   , li_ [ spanText "Offending transaction list: "
+                         , code_ [ text transactionList ]
+                         ]
+                   , li_ [ spanText "Warnings issued: "
+                         , code_ [ text transactionWarning ]
+                         ]
+                   ]
+             ]
+      Success (Error str) -> div [ classes [ ClassName "padded-explanation" ] ]
+                                 [ h3_ [ text "Error during analysis" ]
+                                 , text "Analysis failed for the following reason:"
+                                 , ul_ [ li_ [ b_ [spanText str]
+                                             ]
+                                       ]
+                                 ]
+      Failure failure -> div [ classes [ ClassName "padded-explanation" ] ]
+                             [ h3_ [ text "Error during analysis" ]
+                             , text "Analysis failed for the following reason:"
+                             , ul_ [ li_ [ b_ [spanText failure]
+                                         ]
+                                   ]
+                             ]
       _ -> empty
