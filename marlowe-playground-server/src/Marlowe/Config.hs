@@ -1,13 +1,13 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 module Marlowe.Config where
 
 import           Data.Aeson (FromJSON, parseJSON, withObject, (.:))
-import Data.Text (Text)
+import           Data.Text  (Text)
 
 data Config = Config
-    { _symbolicUrl :: Text 
-    , _apiKey :: Text
+    { _symbolicUrl :: Text
+    , _apiKey      :: Text
     , _callbackUrl :: Text
     }
 

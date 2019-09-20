@@ -5,10 +5,10 @@ import           Data.Aeson
 import           GHC.Generics
 
 data Request = Request
-  { uuid :: String
+  { uuid        :: String
   , callbackUrl :: String
-  , contract :: String
+  , contract    :: String
   } deriving (Generic)
 instance FromJSON Request
-instance ToJSON Request 
+instance ToJSON Request
 

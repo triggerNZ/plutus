@@ -1,24 +1,25 @@
 module Lib where
 
 import           Aws.Lambda
-import           Control.Concurrent (forkOS, threadDelay, killThread)
-import           Control.Concurrent.MVar (MVar, newEmptyMVar, readMVar, putMVar)
-import           Control.Exception (try)
-import           Data.Aeson (encode)
-import           Data.ByteString.UTF8 as BSU
-import Data.Proxy (Proxy(Proxy))
-import           Language.Marlowe.Semantics (Slot(Slot), TransactionInput, TransactionWarning)
+import           Control.Concurrent                    (forkOS, killThread, threadDelay)
+import           Control.Concurrent.MVar               (MVar, newEmptyMVar, putMVar, readMVar)
+import           Control.Exception                     (try)
+import           Data.Aeson                            (encode)
+import           Data.ByteString.UTF8                  as BSU
+import           Data.Proxy                            (Proxy (Proxy))
 import           Language.Marlowe.Analysis.FSSemantics (warningsTrace)
-import           Marlowe.Symbolic.Types.Request(Request(Request,contract,callbackUrl))
-import qualified Marlowe.Symbolic.Types.Request as Req
-import           Marlowe.Symbolic.Types.Response(Response(Response,result),Result(Valid, Error, CounterExample, initialSlot, transactionList, transactionWarning))
-import           Marlowe.Symbolic.Types.API (API)
-import qualified Marlowe.Symbolic.Types.Response as Res
-import           Network.HTTP.Client (newManager)
-import           System.Process (rawSystem)
-import           Network.HTTP.Client.TLS (tlsManagerSettings)
-import Servant.Client (ClientEnv, ClientM, client, runClientM, parseBaseUrl, mkClientEnv)
-import           Servant.API                    (NoContent)
+import           Language.Marlowe.Semantics            (Slot (Slot), TransactionInput, TransactionWarning)
+import           Marlowe.Symbolic.Types.API            (API)
+import           Marlowe.Symbolic.Types.Request        (Request (Request, callbackUrl, contract))
+import qualified Marlowe.Symbolic.Types.Request        as Req
+import           Marlowe.Symbolic.Types.Response       (Response (Response, result), Result (CounterExample, Error, Valid, initialSlot, transactionList, transactionWarning))
+import qualified Marlowe.Symbolic.Types.Response       as Res
+import           Network.HTTP.Client                   (newManager)
+import           Network.HTTP.Client.TLS               (tlsManagerSettings)
+import           Servant.API                           (NoContent)
+import           Servant.Client                        (ClientEnv, ClientM, client, mkClientEnv, parseBaseUrl,
+                                                        runClientM)
+import           System.Process                        (rawSystem)
 
 notifyApi :: Proxy API
 notifyApi = Proxy
@@ -47,12 +48,12 @@ makeResponse u (Right res) =
                      CounterExample
                        { initialSlot = sn
                        , transactionList = show ti
-                       , transactionWarning = show tw 
+                       , transactionWarning = show tw
                        }
      }
 
 showIfLeft :: Show a => Either a b -> Either String b
-showIfLeft (Left a) = Left (show a)
+showIfLeft (Left a)  = Left (show a)
 showIfLeft (Right x) = Right x
 
 handler :: Request -> Context -> IO (Either Response Response)

@@ -6,11 +6,11 @@ module Types
   ) where
 
 import qualified Auth
+import           Data.Aeson     (FromJSON, parseJSON, withObject, (.:))
 import qualified Marlowe.Config as MC
-import           Data.Aeson (FromJSON, parseJSON, withObject, (.:))
 
 data Config = Config
-  { _authConfig :: Auth.Config
+  { _authConfig    :: Auth.Config
   , _marloweConfig :: MC.Config
   }
 

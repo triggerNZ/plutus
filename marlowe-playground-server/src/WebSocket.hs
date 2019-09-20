@@ -1,26 +1,27 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveAnyClass      #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass     #-}
 module WebSocket where
 
-import Network.WebSockets (WebSocketsData)
-import Network.WebSockets.Connection (Connection, PendingConnection, acceptRequest, forkPingThread, receiveData)
-import Control.Monad.IO.Class (liftIO, MonadIO)
-import Control.Monad.Except (MonadError, throwError)
-import Control.Monad (forever)
-import Data.Aeson (ToJSON, FromJSON)
-import Data.Text (Text)
-import Data.UUID (UUID)
-import Data.Map.Strict (Map)
-import Data.UUID.V4 (nextRandom)
-import Control.Newtype.Generics (Newtype, over, unpack)
-import GHC.Generics (Generic)
-import Control.Exception (handle, SomeException)
-import qualified Data.Map.Strict as Map
-import Control.Concurrent.STM.TVar (TVar, newTVar)
-import Control.Concurrent.STM (STM)
+import           Control.Concurrent.STM          (STM)
+import           Control.Concurrent.STM.TVar     (TVar, newTVar)
+import           Control.Exception               (SomeException, handle)
+import           Control.Monad                   (forever)
+import           Control.Monad.Except            (MonadError, throwError)
+import           Control.Monad.IO.Class          (MonadIO, liftIO)
+import           Control.Newtype.Generics        (Newtype, over, unpack)
+import           Data.Aeson                      (FromJSON, ToJSON)
+import           Data.Map.Strict                 (Map)
+import qualified Data.Map.Strict                 as Map
+import           Data.Text                       (Text)
+import           Data.UUID                       (UUID)
+import           Data.UUID.V4                    (nextRandom)
+import           GHC.Generics                    (Generic)
 import qualified Marlowe.Symbolic.Types.Response as MSRes
+import           Network.WebSockets              (WebSocketsData)
+import           Network.WebSockets.Connection   (Connection, PendingConnection, acceptRequest, forkPingThread,
+                                                  receiveData)
 
 newtype WebSocketRequestMessage
     = CheckForWarnings String
@@ -56,7 +57,7 @@ finishWaiting uuid = over Registry (Map.adjust (\(connection, _) -> (connection,
 
 isWaiting :: UUID -> UUID -> Registry -> Bool
 isWaiting uuid waiting registry = case Map.lookup uuid (unpack registry) of
-                                    Nothing -> False
+                                    Nothing                  -> False
                                     Just (_, currentWaiting) -> Just waiting == currentWaiting
 
 -- | Take a @PendingConnection@ and returns a @UUID@ and @Connection$ for the user

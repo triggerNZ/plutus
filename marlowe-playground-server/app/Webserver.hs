@@ -25,8 +25,12 @@ import           Control.Monad.Reader                           (ReaderT, runRea
 import           Data.Default.Class                             (def)
 import           Data.Proxy                                     (Proxy (Proxy))
 import           Data.Text                                      (Text)
-import qualified Data.Text as Text
+import qualified Data.Text                                      as Text
 import           Git                                            (gitRev)
+import           Marlowe.Config                                 (_apiKey, _callbackUrl, _symbolicUrl)
+import qualified Marlowe.Symbolic.Types.API                     as MS
+import           Network.HTTP.Client                            (newManager)
+import           Network.HTTP.Client.TLS                        (tlsManagerSettings)
 import           Network.HTTP.Types                             (Method)
 import           Network.Wai                                    (Application)
 import           Network.Wai.Handler.Warp                       (Settings, runSettings)
@@ -36,6 +40,7 @@ import           Network.Wai.Middleware.RequestLogger           (logStdout)
 import           Servant                                        ((:<|>) ((:<|>)), (:>), Get, Handler (Handler), JSON,
                                                                  PlainText, Raw, ServantErr, hoistServer, serve,
                                                                  serveDirectoryFileServer)
+import           Servant.Client                                 (ClientEnv, mkClientEnv, parseBaseUrl)
 import           Servant.Foreign                                (GenerateList, NoContent, Req, generateList)
 import           Servant.Prometheus                             (monitorEndpoints)
 import           Servant.Server                                 (Server)
@@ -43,11 +48,6 @@ import           Server                                         (mkHandlers)
 import           System.Metrics.Prometheus.Concurrent.RegistryT (runRegistryT)
 import           System.Metrics.Prometheus.Http.Scrape          (serveHttpTextMetricsT)
 import           Types                                          (Config (Config, _authConfig, _marloweConfig))
-import qualified Marlowe.Symbolic.Types.API   as MS
-import Marlowe.Config (_symbolicUrl, _apiKey, _callbackUrl)
-import Servant.Client (ClientEnv, mkClientEnv, parseBaseUrl)
-import Network.HTTP.Client (newManager)
-import Network.HTTP.Client.TLS (tlsManagerSettings)
 
 instance GenerateList NoContent (Method -> Req NoContent) where
   generateList _ = []
