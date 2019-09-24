@@ -10,7 +10,7 @@ import Data.BigInteger as BigInteger
 import Data.List (List, some)
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (fromCharArray)
-import Marlowe.Semantics (AccountId(..), Action(..), Ada(..), Bound(..), Case(..), ChoiceId(..), Contract(..), Input(..), Observation(..), Party, Payee(..), PubKey, Slot(..), Timeout, Value(..), ValueId(..))
+import Marlowe.Semantics (AccountId(..), Action(..), Ada(..), Bound(..), Case(..), ChoiceId(..), Contract(..), Input(..), Observation(..), Party, Payee(..), PubKey, Slot(..), SlotInterval(..), Timeout, TransactionInput(..), Value(..), ValueId(..))
 import Prelude ((*>), (<*), (<*>), bind, const, pure, (<$>), void, ($), (<<<), discard)
 import Text.Parsing.Parser (Parser, fail)
 import Text.Parsing.Parser.Basic (integral, parens)
@@ -342,6 +342,32 @@ input =
 
 inputList :: Parser String (List Input)
 inputList = haskellList input
+
+slotInterval :: Parser String SlotInterval
+slotInterval = (SlotInterval <$> (string "SlotInterval" **> slot) <**> slot)
+
+transactionInput :: Parser String TransactionInput
+transactionInput = 
+   do void $ string "TransactionInput"
+      void maybeSpaces
+      void $ string "{"
+      void maybeSpaces
+      void $ string "txInterval"
+      void maybeSpaces
+      void $ string "="
+      void maybeSpaces
+      interval <- slotInterval
+      void maybeSpaces
+      void $ string ","
+      void maybeSpaces
+      void $ string "txInputs"
+      void maybeSpaces
+      void $ string "="
+      void maybeSpaces
+      inputs <- inputList
+      void maybeSpaces
+      void $ string "}"
+      pure $ TransactionInput { interval, inputs }
 
 testTransactionInputParsing :: String
 testTransactionInputParsing = "[TransactionInput {txInterval = SlotInterval (-5) (-4), txInputs = [IDeposit (AccountId 1 \"Alice\") \"Bob\" 20,INotify]}]"
