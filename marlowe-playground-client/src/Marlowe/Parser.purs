@@ -10,8 +10,8 @@ import Data.BigInteger as BigInteger
 import Data.List (List, some)
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (fromCharArray)
-import Marlowe.Semantics (AccountId(..), Action(..), Bound(..), Case(..), ChoiceId(..), Contract(..), Observation(..), Party, Payee(..), PubKey, Slot(..), Timeout, Value(..), ValueId(..))
-import Prelude ((*>), (<*), (<*>), bind, pure, (<$>), void, ($), (<<<), discard)
+import Marlowe.Semantics (AccountId(..), Action(..), Ada(..), Bound(..), Case(..), ChoiceId(..), Contract(..), Input(..), Observation(..), Party, Payee(..), PubKey, Slot(..), Timeout, Value(..), ValueId(..))
+import Prelude ((*>), (<*), (<*>), bind, const, pure, (<$>), void, ($), (<<<), discard)
 import Text.Parsing.Parser (Parser, fail)
 import Text.Parsing.Parser.Basic (integral, parens)
 import Text.Parsing.Parser.Combinators (between, choice, sepBy)
@@ -62,10 +62,10 @@ bigInteger = do
     Nothing -> fail "not a valid BigInt"
 
 valueId :: Parser String ValueId
-valueId = ValueId <$> bigInteger
+valueId = ValueId <$> text
 
 slot :: Parser String Slot
-slot = Slot <$> bigInteger
+slot = Slot <$> maybeParens bigInteger
 
 timeout :: Parser String Timeout
 timeout = slot
@@ -76,7 +76,7 @@ accountId =
     void maybeSpaces
     void $ string "AccountId"
     void spaces
-    first <- bigInteger
+    first <- maybeParens bigInteger
     void spaces
     second <- text
     void maybeSpaces
@@ -101,7 +101,7 @@ atomValue = pure SlotIntervalStart <* string "SlotIntervalStart"
 recValue :: Parser String Value
 recValue =
   (AvailableMoney <$> (string "AvailableMoney" **> accountId))
-    <|> (Constant <$> (string "Constant" **> bigInteger))
+    <|> (Constant <$> (string "Constant" **> (maybeParens bigInteger)))
     <|> (NegValue <$> (string "NegValue" **> value'))
     <|> (AddValue <$> (string "AddValue" **> value') <**> value')
     <|> (SubValue <$> (string "SubValue" **> value') <**> value')
@@ -156,9 +156,9 @@ bound =
     void maybeSpaces
     void $ string "Bound"
     void spaces
-    first <- bigInteger
+    first <- maybeParens bigInteger
     void spaces
-    second <- bigInteger
+    second <- maybeParens bigInteger
     void maybeSpaces
     pure (Bound first second)
 
@@ -333,3 +333,18 @@ testString = """When [
                              (AccountId 0 "alice")
                              (Party "bob")
                              (Constant 450) Refund))] 100 Refund)))] 40 Refund))] 10 Refund"""
+
+input :: Parser String Input
+input = 
+   (IDeposit <$> (string "IDeposit" **> accountId) <**> party <**> (Lovelace <$> (maybeParens bigInteger)))
+   <|> (IChoice <$> (string "IChoice" **> choiceId) <**> (maybeParens bigInteger))
+   <|> ((const INotify) <$> (string "INotify"))
+
+inputList :: Parser String (List Input)
+inputList = haskellList input
+
+testTransactionInputParsing :: String
+testTransactionInputParsing = "[TransactionInput {txInterval = SlotInterval (-5) (-4), txInputs = [IDeposit (AccountId 1 \"Alice\") \"Bob\" 20,INotify]}]"
+   
+testTransactionWarningParsing :: String
+testTransactionWarningParsing = "[TransactionNonPositivePay (AccountId 1 \"Bob\") (Party \"Bob\") (-10),TransactionPartialPay (AccountId 1 \"Bob\") (Party \"Alice\") 0 21]"

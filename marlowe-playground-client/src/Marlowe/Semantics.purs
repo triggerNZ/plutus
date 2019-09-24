@@ -134,7 +134,7 @@ choiceOwner :: ChoiceId -> PubKey
 choiceOwner (ChoiceId _ owner) = owner
 
 newtype ValueId
-  = ValueId BigInteger
+  = ValueId String
 
 derive instance genericValueId :: Generic ValueId _
 
@@ -144,9 +144,11 @@ derive instance eqValueId :: Eq ValueId
 
 derive instance ordValueId :: Ord ValueId
 
-derive newtype instance showValueId :: Show ValueId
+instance showValueId :: Show ValueId where
+  show (ValueId valueId) = show valueId
 
-derive newtype instance prettyValueId :: Pretty ValueId
+instance prettyValueId :: Pretty ValueId where
+  prettyFragment a = text (show a)
 
 data Value
   = AvailableMoney AccountId
