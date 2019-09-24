@@ -356,7 +356,6 @@ evalF (ResetSimulator next) = do
         Just y -> y
   marloweEditorSetValue newContract (Just 1)
   resetContract
-  assign _analysisState Loading
   pure next
 
 evalF (Undo next) = do
