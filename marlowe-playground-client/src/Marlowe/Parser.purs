@@ -377,8 +377,9 @@ testTransactionInputParsing = "[TransactionInput {txInterval = SlotInterval (-5)
 
 transactionWarning :: Parser String TransactionWarning
 transactionWarning = (TransactionNonPositiveDeposit <$> (string "TransactionNonPositiveDeposit" **> party) <**> accountId <**> (Lovelace <$> (maybeParens bigInteger)))
-                 <|> (TransactionPartialPay <$> (string "TransactionPartialPay" **> accountId) <**> payee <**> (Lovelace <$> (maybeParens bigInteger)) <**> (Lovelace <$> (maybeParens bigInteger)))
-                 <|> (TransactionShadowing <$> (string "" **> valueId) <**> (maybeParens bigInteger) <**> (maybeParens bigInteger))
+                 <|> (TransactionNonPositivePay <$> (string "TransactionNonPositivePay" **> accountId) <**> (parens payee) <**> (Lovelace <$> (maybeParens bigInteger)))
+                 <|> (TransactionPartialPay <$> (string "TransactionPartialPay" **> accountId) <**> (parens payee) <**> (Lovelace <$> (maybeParens bigInteger)) <**> (Lovelace <$> (maybeParens bigInteger)))
+                 <|> (TransactionShadowing <$> (string "TransactionShadowing" **> valueId) <**> (maybeParens bigInteger) <**> (maybeParens bigInteger))
 
 transactionWarningList :: Parser String (List TransactionWarning)
 transactionWarningList = haskellList transactionWarning
