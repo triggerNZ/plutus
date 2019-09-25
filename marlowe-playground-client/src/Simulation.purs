@@ -35,7 +35,7 @@ import Halogen.HTML.Events as Events
 import Halogen.HTML.Properties (InputType(InputNumber), class_, classes, enabled, placeholder, type_, value)
 import Halogen.Query as HQ
 import LocalStorage as LocalStorage
-import Marlowe.Parser (transactionInputList)
+import Marlowe.Parser (transactionInputList, transactionWarningList)
 import Marlowe.Symbolic.Types.Response as R
 import Network.RemoteData (RemoteData(..), isLoading)
 import Prelude (class Show, Unit, bind, const, discard, flip, identity, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>), (+))
@@ -746,7 +746,7 @@ analysisResultPane state =
                          , displayTransactionList transactionList
                          ]
                    , li_ [ spanText "Warnings issued: "
-                         , code_ [ text transactionWarning ]
+                         , displayWarningList transactionWarning
                          ]
                    ]
              ]
@@ -816,3 +816,59 @@ displayInput (INotify) =
   , b_ [text "True"]
   ]
 
+displayWarningList :: forall p. String -> HTML p Query
+displayWarningList transactionWarnings =
+  case runParser transactionWarnings transactionWarningList of
+    Right pWL -> ol_ (do warning <- ((toUnfoldable pWL) :: Array TransactionWarning)
+                         pure (li_ (displayWarning warning)))
+    Left _ -> code_ [ text transactionWarnings ]
+
+displayWarning :: forall p. TransactionWarning -> Array (HTML p Query)
+displayWarning (TransactionNonPositiveDeposit party (AccountId accNum owner) (Lovelace amount)) =
+  [ b_ [text "TransactionNonPositiveDeposit"]
+  , text " - Party "
+  , b_ [text $ show party]
+  , text " is asked to deposit "
+  , b_ [text ((show amount) <> " Lovelace")]
+  , text " into account "
+  , b_ [text ((show accNum) <> " of " <> (show owner))]
+  , text "."
+  ]
+displayWarning (TransactionNonPositivePay (AccountId accNum owner) payee (Lovelace amount)) =
+  [ b_ [text "TransactionNonPositivePay"]
+  , text " - The contract is suppoused to make a payment of "
+  , b_ [text ((show amount) <> " Lovelace")]
+  , text " from account "
+  , b_ [text ((show accNum) <> " of " <> (show owner))]
+  , text " to "
+  , b_ [text case payee of
+               (Account (AccountId accNum2 owner2)) -> ("account" <> (show accNum2) <> " of " <> (show owner2))
+               (Party dest) -> ("party " <> (show dest))
+       ]
+  , text "."
+  ]
+displayWarning (TransactionPartialPay (AccountId accNum owner) payee (Lovelace amount) (Lovelace expected)) =
+  [ b_ [text "TransactionPartialPay"]
+  , text " - The contract is suppoused to make a payment of "
+  , b_ [text ((show expected) <> " Lovelace")]
+  , text " from account "
+  , b_ [text ((show accNum) <> " of " <> (show owner))]
+  , text " to "
+  , b_ [text case payee of
+               (Account (AccountId accNum2 owner2)) -> ("account" <> (show accNum2) <> " of " <> (show owner2))
+               (Party dest) -> ("party " <> (show dest))
+       ]
+  , text " but there is only "
+  , b_ [text ((show amount) <> " Lovelace")]
+  , text "."
+  ]
+displayWarning (TransactionShadowing valId oldVal newVal) =
+  [ b_ [text "TransactionShadowing"]
+  , text " - The contract defined the value with id "
+  , b_ [text (show valId)]
+  , text " before, it was assigned the value "
+  , b_ [text (show oldVal)]
+  , text " and now it is being assigned the value "
+  , b_ [text (show newVal)]
+  , text "."
+  ]
