@@ -10,7 +10,7 @@ import Data.BigInteger as BigInteger
 import Data.List (List, some)
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (fromCharArray)
-import Marlowe.Semantics (AccountId(..), Action(..), Ada(..), Bound(..), Case(..), ChoiceId(..), Contract(..), Input(..), Observation(..), Party, Payee(..), PubKey, Slot(..), SlotInterval(..), Timeout, TransactionInput(..), Value(..), ValueId(..))
+import Marlowe.Semantics (AccountId(..), Action(..), Ada(..), Bound(..), Case(..), ChoiceId(..), Contract(..), Input(..), Observation(..), Party, Payee(..), PubKey, Slot(..), SlotInterval(..), Timeout, TransactionInput(..), TransactionWarning(..), Value(..), ValueId(..))
 import Prelude ((*>), (<*), (<*>), bind, const, pure, (<$>), void, ($), (<<<), discard)
 import Text.Parsing.Parser (Parser, fail)
 import Text.Parsing.Parser.Basic (integral, parens)
@@ -369,8 +369,19 @@ transactionInput =
       void $ string "}"
       pure $ TransactionInput { interval, inputs }
 
+transactionInputList :: Parser String (List TransactionInput)
+transactionInputList = haskellList transactionInput
+
 testTransactionInputParsing :: String
 testTransactionInputParsing = "[TransactionInput {txInterval = SlotInterval (-5) (-4), txInputs = [IDeposit (AccountId 1 \"Alice\") \"Bob\" 20,INotify]}]"
-   
+
+transactionWarning :: Parser String TransactionWarning
+transactionWarning = (TransactionNonPositiveDeposit <$> (string "TransactionNonPositiveDeposit" **> party) <**> accountId <**> (Lovelace <$> (maybeParens bigInteger)))
+                 <|> (TransactionPartialPay <$> (string "TransactionPartialPay" **> accountId) <**> payee <**> (Lovelace <$> (maybeParens bigInteger)) <**> (Lovelace <$> (maybeParens bigInteger)))
+                 <|> (TransactionShadowing <$> (string "" **> valueId) <**> (maybeParens bigInteger) <**> (maybeParens bigInteger))
+
+transactionWarningList :: Parser String (List TransactionWarning)
+transactionWarningList = haskellList transactionWarning
+
 testTransactionWarningParsing :: String
 testTransactionWarningParsing = "[TransactionNonPositivePay (AccountId 1 \"Bob\") (Party \"Bob\") (-10),TransactionPartialPay (AccountId 1 \"Bob\") (Party \"Alice\") 0 21]"
