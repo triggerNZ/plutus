@@ -17,6 +17,7 @@ import Data.Eq ((==), (/=))
 import Data.Foldable (intercalate)
 import Data.HeytingAlgebra (not, (&&), (||))
 import Data.Lens (to, view, (^.))
+import Data.List (List, toUnfoldable, null)
 import Data.List.NonEmpty as NEL
 import Data.Map (Map)
 import Data.Map as Map
@@ -28,16 +29,18 @@ import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Halogen (HTML, PropName(..), action)
 import Halogen.Component (ParentHTML)
-import Halogen.HTML (ClassName(ClassName), b_, br_, button, code_, col, colgroup, div, div_, h2, h3_, input, li_, pre_, prop, slot', span, strong_, table_, tbody_, td, td_, text, th, th_, thead_, tr, ul_)
+import Halogen.HTML (ClassName(ClassName), b_, br_, button, code_, col, colgroup, div, div_, h2, h3_, input, li_, ol_, pre_, prop, slot', span, span_, strong_, table_, tbody_, td, td_, text, th, th_, thead_, tr, ul_)
 import Halogen.HTML.Events (input_, onClick, onDragOver, onDrop, onValueChange)
 import Halogen.HTML.Events as Events
 import Halogen.HTML.Properties (InputType(InputNumber), class_, classes, enabled, placeholder, type_, value)
 import Halogen.Query as HQ
 import LocalStorage as LocalStorage
+import Marlowe.Parser (transactionInputList)
 import Marlowe.Symbolic.Types.Response as R
 import Network.RemoteData (RemoteData(..), isLoading)
 import Prelude (class Show, Unit, bind, const, discard, flip, identity, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>), (+))
 import StaticData as StaticData
+import Text.Parsing.Parser (runParser)
 import Types (ActionInput(..), ChildQuery, ChildSlot, FrontendState, MarloweEditorSlot(MarloweEditorSlot), MarloweError(MarloweError), MarloweState, Query(..), _Head, _analysisState, _contract, _editorErrors, _marloweCompileResult, _marloweState, _moneyInContract, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, cpMarloweEditor)
 
 paneHeader :: forall p. String -> HTML p Query
@@ -740,7 +743,7 @@ analysisResultPane state =
                          , b_ [spanText (show initialSlot)]
                          ]
                    , li_ [ spanText "Offending transaction list: "
-                         , code_ [ text transactionList ]
+                         , displayTransactionList transactionList
                          ]
                    , li_ [ spanText "Warnings issued: "
                          , code_ [ text transactionWarning ]
@@ -762,3 +765,54 @@ analysisResultPane state =
                                    ]
                              ]
       _ -> empty
+
+displayTransactionList :: forall p. String -> HTML p Query
+displayTransactionList transactionList =
+  case runParser transactionList transactionInputList of
+    Right pTL -> ol_ (do (TransactionInput{ interval : SlotInterval (Slot from) (Slot to)
+                                          , inputs : inputList
+                                          }) <- ((toUnfoldable pTL) :: Array TransactionInput)
+                         pure (li_ [ span_ [ b_ [text "Transaction"]
+                                           , text " with slot interval "
+                                           , b_ [text $ (show from <> " to " <> show to)]
+                                           , if null inputList
+                                             then text " and no inputs (empty transaction)."
+                                             else text " and inputs:"
+                                           ]
+                                   , if null inputList
+                                     then empty
+                                     else displayInputList inputList
+                                   ]))
+    Left _ -> code_ [ text transactionList ]
+
+displayInputList :: forall p. List Input -> HTML p Query
+displayInputList inputList = ol_ ( do input <- (toUnfoldable inputList)
+                                      pure (li_ (displayInput input)) )
+
+displayInput :: forall p. Input -> Array (HTML p Query)
+displayInput (IDeposit (AccountId accNum owner) party (Lovelace money)) =
+  [ b_ [text "IDeposit"]
+  , text " - Party "
+  , b_ [text $ show party]
+  , text " deposits "
+  , b_ [text ((show money) <> " Lovelace")]
+  , text " into account "
+  , b_ [text ((show accNum) <> " of " <> (show owner))]
+  , text "."
+  ]
+displayInput (IChoice (ChoiceId choiceId party) chosenNum) =
+  [ b_ [text "IChoice"]
+  , text " - Party "
+  , b_ [text $ show party]
+  , text " chooses number "
+  , b_ [text $ show chosenNum]
+  , text " for choice "
+  , b_ [text $ show choiceId]
+  , text "."
+  ]
+displayInput (INotify) =
+  [ b_ [text "INotify"]
+  , text " - The contract is notified that an observation became "
+  , b_ [text "True"]
+  ]
+
