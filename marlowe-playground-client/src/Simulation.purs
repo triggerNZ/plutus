@@ -15,7 +15,6 @@ import Data.BigInteger (BigInteger, fromString, fromInt)
 import Data.Either (Either(..))
 import Data.Eq ((==), (/=))
 import Data.Foldable (intercalate)
-import Data.Generic.Rep.Show (genericShow)
 import Data.HeytingAlgebra (not, (&&), (||))
 import Data.Lens (to, view, (^.))
 import Data.List.NonEmpty as NEL
@@ -29,14 +28,13 @@ import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Halogen (HTML, PropName(..), action)
 import Halogen.Component (ParentHTML)
-import Halogen.HTML (ClassName(ClassName), b_, br_, button, code_, col, colgroup, div, div_, h2, h3_, input, li_, pre, pre_, prop, slot', span, strong_, table_, tbody_, td, td_, text, th, th_, thead_, tr, ul_)
+import Halogen.HTML (ClassName(ClassName), b_, br_, button, code_, col, colgroup, div, div_, h2, h3_, input, li_, pre_, prop, slot', span, strong_, table_, tbody_, td, td_, text, th, th_, thead_, tr, ul_)
 import Halogen.HTML.Events (input_, onClick, onDragOver, onDrop, onValueChange)
 import Halogen.HTML.Events as Events
 import Halogen.HTML.Properties (InputType(InputNumber), class_, classes, enabled, placeholder, type_, value)
 import Halogen.Query as HQ
-import Halogen.VDom.DOM.Prop (propFromString)
 import LocalStorage as LocalStorage
-import Marlowe.Symbolic.Types.Response (Response(..), Result(..))
+import Marlowe.Symbolic.Types.Response as R
 import Network.RemoteData (RemoteData(..), isLoading)
 import Prelude (class Show, Unit, bind, const, discard, flip, identity, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>), (+))
 import StaticData as StaticData
@@ -730,11 +728,11 @@ analysisResultPane state =
     case result of
       NotAsked -> div [ classes [ ClassName "padded-explanation" ] ]
                       [ text "Press the button below to analyse the contract for runtime warnings." ]
-      Success (Valid) -> div [ classes [ ClassName "padded-explanation" ] ]
-                             [ h3_ [ text "Analysis Result: Pass" ]
-                             , text "Static analysis could not find any execution that results in any warning."
-                             ]
-      Success (CounterExample {initialSlot, transactionList, transactionWarning}) ->
+      Success (R.Valid) -> div [ classes [ ClassName "padded-explanation" ] ]
+                               [ h3_ [ text "Analysis Result: Pass" ]
+                               , text "Static analysis could not find any execution that results in any warning."
+                               ]
+      Success (R.CounterExample {initialSlot, transactionList, transactionWarning}) ->
          div [ classes [ ClassName "padded-explanation" ] ]
              [ h3_ [ text "Analysis Result: Fail" ]
              , text "Static analysis found the following counterexample:"
@@ -749,13 +747,13 @@ analysisResultPane state =
                          ]
                    ]
              ]
-      Success (Error str) -> div [ classes [ ClassName "padded-explanation" ] ]
-                                 [ h3_ [ text "Error during analysis" ]
-                                 , text "Analysis failed for the following reason:"
-                                 , ul_ [ li_ [ b_ [spanText str]
-                                             ]
-                                       ]
-                                 ]
+      Success (R.Error str) -> div [ classes [ ClassName "padded-explanation" ] ]
+                                   [ h3_ [ text "Error during analysis" ]
+                                   , text "Analysis failed for the following reason:"
+                                   , ul_ [ li_ [ b_ [spanText str]
+                                               ]
+                                         ]
+                                   ]
       Failure failure -> div [ classes [ ClassName "padded-explanation" ] ]
                              [ h3_ [ text "Error during analysis" ]
                              , text "Analysis failed for the following reason:"
