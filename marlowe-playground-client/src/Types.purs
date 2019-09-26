@@ -5,9 +5,11 @@ import Ace (Annotation)
 import Ace.Halogen.Component (AceMessage, AceQuery)
 import Auth (AuthStatus)
 import Blockly.Types (BlocklyState)
+import Data.Array (null)
 import Data.BigInteger (BigInteger)
 import Data.Either (Either)
 import Data.Either.Nested (Either3)
+import Data.Semigroup.Foldable (fold1)
 import Data.Functor.Coproduct.Nested (Coproduct3)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -21,15 +23,15 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Json.JsonEither (JsonEither)
 import Data.Symbol (SProxy(..))
-import Data.Tuple (Tuple)
+import Data.Tuple (Tuple(..))
 import Gist (Gist)
 import Halogen.Blockly (BlocklyQuery, BlocklyMessage)
 import Halogen.Component.ChildPath (ChildPath, cp1, cp2, cp3)
 import Language.Haskell.Interpreter (InterpreterError, InterpreterResult)
-import Marlowe.Semantics (AccountId, Action(..), Ada, Bound, ChoiceId, ChosenNum, Contract, Environment(..), Input, Observation, Party, Payment, PubKey, Slot, SlotInterval(..), State, TransactionError, _minSlot, emptyState, evalValue)
+import Marlowe.Semantics (AccountId, Action(..), Ada, Bound, ChoiceId, ChosenNum, Contract, Environment(..), Input, Observation, Party, Payment, PubKey, Slot, SlotInterval(..), State, TransactionError, _minSlot, boundFrom, emptyState, evalValue)
 import Marlowe.Symbolic.Types.Response (Result)
 import Network.RemoteData (RemoteData)
-import Prelude (class Eq, class Ord, class Show, Unit, mempty, zero, (<<<))
+import Prelude (class Eq, class Ord, class Show, Unit, map, mempty, min, zero, (<<<))
 import Servant.PureScript.Ajax (AjaxError)
 import Type.Data.Boolean (kind Boolean)
 import Web.HTML.Event.DragEvent (DragEvent)
@@ -183,8 +185,17 @@ _timestamp = prop (SProxy :: SProxy "timestamp")
 _value :: forall s a. Lens' { value :: a | s } a
 _value = prop (SProxy :: SProxy "value")
 
+data ActionInputId
+  = DepositInputId AccountId Party
+  | ChoiceInputId ChoiceId (Array Bound)
+  | NotifyInputId Observation
+
+derive instance eqActionInputId :: Eq ActionInputId
+
+derive instance ordActionInputId :: Ord ActionInputId
+
 type MarloweState
-  = { possibleActions :: Map PubKey (Array ActionInput)
+  = { possibleActions :: Map PubKey (Map ActionInputId ActionInput)
     , pendingInputs :: Array (Tuple Input PubKey)
     , transactionError :: Maybe TransactionError
     , state :: State
@@ -257,10 +268,10 @@ data ActionInput
   | ChoiceInput ChoiceId (Array Bound) ChosenNum
   | NotifyInput Observation
 
-actionToActionInput :: State -> Action -> ActionInput
+actionToActionInput :: State -> Action -> Tuple ActionInputId ActionInput
 actionToActionInput state (Deposit accountId party value) = 
   let minSlot = state ^. _minSlot 
       env = Environment { slotInterval: (SlotInterval minSlot minSlot) }
-  in DepositInput accountId party (evalValue env state value)
-actionToActionInput _ (Choice choiceId bounds) = ChoiceInput choiceId bounds zero
-actionToActionInput _ (Notify observation) = NotifyInput observation
+  in Tuple (DepositInputId accountId party) (DepositInput accountId party (evalValue env state value))
+actionToActionInput _ (Choice choiceId bounds) = Tuple (ChoiceInputId choiceId bounds) (ChoiceInput choiceId bounds zero)
+actionToActionInput _ (Notify observation) = Tuple (NotifyInputId observation) (NotifyInput observation)

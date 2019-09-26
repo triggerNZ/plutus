@@ -23,7 +23,7 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Newtype (unwrap, wrap)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), snd)
 import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
@@ -41,7 +41,7 @@ import Network.RemoteData (RemoteData(..), isLoading)
 import Prelude (class Show, Unit, bind, const, discard, flip, identity, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>), (+))
 import StaticData as StaticData
 import Text.Parsing.Parser (runParser)
-import Types (ActionInput(..), ChildQuery, ChildSlot, FrontendState, MarloweEditorSlot(MarloweEditorSlot), MarloweError(MarloweError), MarloweState, Query(..), _Head, _analysisState, _contract, _editorErrors, _marloweCompileResult, _marloweState, _moneyInContract, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, cpMarloweEditor)
+import Types (ActionInput(..), ActionInputId, ChildQuery, ChildSlot, FrontendState, MarloweEditorSlot(MarloweEditorSlot), MarloweError(MarloweError), MarloweState, Query(..), _Head, _analysisState, _contract, _editorErrors, _marloweCompileResult, _marloweState, _moneyInContract, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, cpMarloweEditor)
 
 paneHeader :: forall p. String -> HTML p Query
 paneHeader s = h2 [class_ $ ClassName "pane-header"] [text s]
@@ -172,17 +172,20 @@ onEmpty alt [] = alt
 
 onEmpty _ arr = arr
 
-inputComposer :: forall p. Boolean -> Map PubKey (Array ActionInput) -> Array (HTML p Query)
+inputComposer :: forall p. Boolean -> Map PubKey (Map ActionInputId ActionInput) -> Array (HTML p Query)
 inputComposer isEnabled actionInputs =
-  onEmpty 
-    [text "No valid inputs can be added to the transaction"]
-    $ actionsForPeople actionInputs
+    if (Map.isEmpty actionInputs) 
+    then [text "No valid inputs can be added to the transaction"]
+    else (actionsForPeople actionInputs)
   where
   kvs :: forall k v. Map k v -> Array (Tuple k v)
   kvs = Map.toUnfoldable
 
-  actionsForPeople :: forall q. Map PubKey (Array ActionInput) -> Array (HTML q Query)
-  actionsForPeople m = foldMap (\(Tuple k v) -> inputComposerPerson isEnabled k v) (kvs m)
+  vs :: forall k v. Map k v -> Array v
+  vs m = map snd (kvs m)
+
+  actionsForPeople :: forall q. Map PubKey (Map ActionInputId ActionInput) -> Array (HTML q Query)
+  actionsForPeople m = foldMap (\(Tuple k v) -> inputComposerPerson isEnabled k (vs v)) (kvs m)
 
 inputComposerPerson ::
   forall p.

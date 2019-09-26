@@ -241,6 +241,12 @@ instance prettyBound :: Pretty Bound where
 inBounds :: ChosenNum -> Array Bound -> Boolean
 inBounds num = any (\(Bound l u) -> num >= l && num <= u)
 
+boundFrom :: Bound -> BigInteger
+boundFrom (Bound from _) = from
+
+boundTo :: Bound -> BigInteger
+boundTo (Bound _ to) = to
+
 data Action
   = Deposit AccountId Party Value
   | Choice ChoiceId (Array Bound)
@@ -892,11 +898,8 @@ extractRequiredActionsWithTxs txInput state contract = case computeTransaction t
 
 extractRequiredActions :: Contract -> Array Action
 extractRequiredActions contract = case contract of
-  Refund -> mempty
-  (Pay accId payee val nextContract) -> extractRequiredActions nextContract
   (When cases _ _) -> map (\(Case action _) -> action) cases
-  (If observation contract1 contract2) -> extractRequiredActions contract1 <> extractRequiredActions contract2
-  (Let valId val nextContract) -> extractRequiredActions nextContract
+  _ -> mempty
 
 moneyInContract :: State -> Money
 moneyInContract state = foldl (+) zero $ Map.values (unwrap state).accounts

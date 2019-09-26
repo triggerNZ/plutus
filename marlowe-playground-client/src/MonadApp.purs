@@ -11,9 +11,9 @@ import Control.Monad.Except (class MonadTrans, ExceptT, runExceptT)
 import Control.Monad.Reader (class MonadAsk)
 import Control.Monad.State (class MonadState)
 import Data.Array (fromFoldable)
-import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (foldl)
+import Data.FoldableWithIndex (foldlWithIndex)
 import Data.Lens (assign, modifying, over, set, to, use, (^.))
 import Data.List as List
 import Data.List.NonEmpty as NEL
@@ -46,7 +46,7 @@ import Servant.PureScript.Settings (SPSettings_)
 import StaticData (bufferLocalStorageKey, marloweBufferLocalStorageKey)
 import Text.Parsing.Parser (ParseError(..), runParser)
 import Text.Parsing.Parser.Pos (Position(..))
-import Types (ActionInput(..), BlocklySlot(..), ChildQuery, ChildSlot, EditorSlot(EditorSlot), FrontendState, MarloweEditorSlot(MarloweEditorSlot), MarloweState, Message(..), Query, WebData, _Head, _contract, _currentMarloweState, _editorErrors, _marloweState, _moneyInContract, _oldContract, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, actionToActionInput, cpBlockly, cpEditor, cpMarloweEditor, emptyMarloweState)
+import Types (ActionInput(..), ActionInputId, BlocklySlot(..), ChildQuery, ChildSlot, EditorSlot(EditorSlot), FrontendState, MarloweEditorSlot(MarloweEditorSlot), MarloweState, Message(..), Query, WebData, _Head, _contract, _currentMarloweState, _editorErrors, _marloweState, _moneyInContract, _oldContract, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, actionToActionInput, cpBlockly, cpEditor, cpMarloweEditor, emptyMarloweState)
 import Web.HTML.Event.DragEvent (DragEvent)
 import WebSocket (WebSocketRequestMessage(CheckForWarnings))
 
@@ -128,10 +128,10 @@ instance monadAppHalogenApp ::
     marloweEditorSetAnnotations annotations
   updateState = do
     saveInitialStateImpl
-    wrap $ modifying _currentMarloweState updateStateP
+    wrap $ modifying _currentMarloweState updateStateImpl
   saveInitialState = saveInitialStateImpl
-  updateMarloweState f = wrap $ modifying _marloweState (extendWith f)
-  applyTransactions = wrap $ modifying _marloweState (extendWith updateStateP)
+  updateMarloweState f = wrap $ modifying _marloweState (extendWith (updatePossibleActions <<< f))
+  applyTransactions = wrap $ modifying _marloweState (extendWith updateStateImpl)
   resetContract = do
     newContract <- marloweEditorGetValueImpl
     wrap $ assign _marloweState $ NEL.singleton (emptyMarloweState zero)
@@ -229,13 +229,19 @@ updatePossibleActions oldState =
       state = oldState ^. _state
       txInput = stateToTxInput oldState
       (Tuple nextState actions) = extractRequiredActionsWithTxs txInput state contract
-      actionInputs = map (actionToActionInput nextState) actions
-      actionInputsMap = splitActionsByPerson actionInputs
-  in set _possibleActions actionInputsMap oldState
+      actionInputs = foldl (\acc act -> insertTuple (actionToActionInput nextState act) acc) mempty actions
+  in over _possibleActions (updateActions actionInputs) oldState
   where
 
-  splitActionsByPerson :: Array ActionInput -> Map PubKey (Array ActionInput)
-  splitActionsByPerson actionInputs = foldl (\m actionInput -> appendValue m (actionPerson actionInput) actionInput) mempty actionInputs
+  insertTuple :: forall k v. Ord k => Tuple k v -> Map k v -> Map k v
+  insertTuple (Tuple k v) m = Map.insert k v m
+
+  updateActions :: Map ActionInputId ActionInput -> Map PubKey (Map ActionInputId ActionInput) -> Map PubKey (Map ActionInputId ActionInput)
+  updateActions actionInputs oldInputs =
+    foldlWithIndex (addButPreserveActionInputs oldInputs) mempty actionInputs
+
+  addButPreserveActionInputs :: Map PubKey (Map ActionInputId ActionInput) -> ActionInputId -> Map PubKey (Map ActionInputId ActionInput) -> ActionInput -> Map PubKey (Map ActionInputId ActionInput)
+  addButPreserveActionInputs oldInputs actionInputIdx m actionInput = appendValue m oldInputs (actionPerson actionInput) actionInputIdx actionInput
 
   actionPerson :: ActionInput -> PubKey
   actionPerson (DepositInput _ party _) = party
@@ -243,12 +249,23 @@ updatePossibleActions oldState =
   -- We have a special person for notifications
   actionPerson (NotifyInput _) = "Notifications"
   
-  appendValue :: forall k v. Ord k => Map k (Array v) -> k -> v -> Map k (Array v)
-  appendValue m k v = Map.alter (alterMap v) k m
+  appendValue :: forall k k2 v2. Ord k => Ord k2 => Map k (Map k2 v2) -> Map k (Map k2 v2) -> k -> k2 -> v2 -> Map k (Map k2 v2)
+  appendValue m oldMap k k2 v2 = Map.alter (alterMap k2 (findWithDefault2 v2 k k2 oldMap)) k m
 
-  alterMap :: forall v. v -> Maybe (Array v) -> Maybe (Array v)
-  alterMap v Nothing = Just $ Array.singleton v
-  alterMap v (Just vs) = Just $ Array.snoc vs v
+  alterMap :: forall k v. Ord k => k -> v -> Maybe (Map k v) -> Maybe (Map k v)
+  alterMap k v Nothing = Just $ Map.singleton k v
+  alterMap k v (Just vs) = Just $ Map.insert k v vs
+
+  findWithDefault2 :: forall k k2 v2. Ord k => Ord k2 => v2 -> k -> k2 -> Map k (Map k2 v2) -> v2
+  findWithDefault2 def k k2 m =
+    case Map.lookup k m of
+      Just m2 -> case Map.lookup k2 m2 of
+                   Just v -> v
+                   Nothing -> def
+      Nothing -> def
+
+updateStateImpl :: MarloweState -> MarloweState
+updateStateImpl = updatePossibleActions <<< updateStateP
 
 updateStateP :: MarloweState -> MarloweState
 updateStateP oldState = actState
