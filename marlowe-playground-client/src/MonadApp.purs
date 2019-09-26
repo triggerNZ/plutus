@@ -39,7 +39,7 @@ import LocalStorage as LocalStorage
 import Marlowe (SPParams_)
 import Marlowe as Server
 import Marlowe.Parser (contract)
-import Marlowe.Semantics (Contract(..), PubKey, SlotInterval(..), TransactionInput(..), TransactionOutput(..), accountOwner, choiceOwner, computeTransaction, extractRequiredActionsWithTxs, moneyInContract)
+import Marlowe.Semantics (Contract(..), PubKey, SlotInterval(..), TransactionInput(..), TransactionOutput(..), choiceOwner, computeTransaction, extractRequiredActionsWithTxs, moneyInContract)
 import Network.RemoteData as RemoteData
 import Servant.PureScript.Ajax (AjaxError)
 import Servant.PureScript.Settings (SPSettings_)
@@ -238,7 +238,7 @@ updatePossibleActions oldState =
   splitActionsByPerson actionInputs = foldl (\m actionInput -> appendValue m (actionPerson actionInput) actionInput) mempty actionInputs
 
   actionPerson :: ActionInput -> PubKey
-  actionPerson (DepositInput accountId _ _) = (accountOwner accountId)
+  actionPerson (DepositInput _ party _) = party
   actionPerson (ChoiceInput choiceId _ _) = (choiceOwner choiceId)
   -- We have a special person for notifications
   actionPerson (NotifyInput _) = "Notifications"
