@@ -5,11 +5,10 @@ import Ace (Annotation)
 import Ace.Halogen.Component (AceMessage, AceQuery)
 import Auth (AuthStatus)
 import Blockly.Types (BlocklyState)
-import Data.Array (null)
+import Data.Array (uncons)
 import Data.BigInteger (BigInteger)
 import Data.Either (Either)
 import Data.Either.Nested (Either3)
-import Data.Semigroup.Foldable (fold1)
 import Data.Functor.Coproduct.Nested (Coproduct3)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -22,6 +21,7 @@ import Data.Map (Map)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Json.JsonEither (JsonEither)
+import Data.NonEmpty (foldl1, (:|))
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Gist (Gist)
@@ -268,10 +268,16 @@ data ActionInput
   | ChoiceInput ChoiceId (Array Bound) ChosenNum
   | NotifyInput Observation
 
+minimumBound :: Array Bound -> ChosenNum
+minimumBound bnds =
+  case uncons (map boundFrom bnds) of
+    Just { head, tail } -> foldl1 min (head :| tail)
+    Nothing -> zero
+
 actionToActionInput :: State -> Action -> Tuple ActionInputId ActionInput
 actionToActionInput state (Deposit accountId party value) = 
   let minSlot = state ^. _minSlot 
       env = Environment { slotInterval: (SlotInterval minSlot minSlot) }
   in Tuple (DepositInputId accountId party) (DepositInput accountId party (evalValue env state value))
-actionToActionInput _ (Choice choiceId bounds) = Tuple (ChoiceInputId choiceId bounds) (ChoiceInput choiceId bounds zero)
+actionToActionInput _ (Choice choiceId bounds) = Tuple (ChoiceInputId choiceId bounds) (ChoiceInput choiceId bounds (minimumBound bounds))
 actionToActionInput _ (Notify observation) = Tuple (NotifyInputId observation) (NotifyInput observation)
