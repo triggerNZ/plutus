@@ -392,22 +392,21 @@ let
 	          										  "--ghc-option=-optl=-L${pkgsMusl.libffi.overrideAttrs (old: { dontDisableStatic = true; })}/lib"
 												];
                                                                                       }); };
-                #ghc864 = pkgsMusl.haskell.compiler.ghc864.overrideAttrs (old: {enableShared=false;});
                 ghc864 = pkgsMusl.callPackage ./nix/ghc-8.6.4.nix {
                   bootPkgs = pkgsMusl.haskell.packages.ghc822;
                   inherit (pkgsMusl.python3Packages) sphinx;
                   buildLlvmPackages = pkgsMusl.llvmPackages_6;
                   llvmPackages = pkgsMusl.llvmPackages_6;
-                  enableShared = false;
+                  enableShared = true;
                   enableRelocatedStaticLibs = true;
                 };
                 ghc = pkgsMusl.haskell.packages.ghc864.override {ghc=ghc864;};
 		staticHaskellPackages = (haskellPackages.override (old: {
-			pkgsGenerated = import ./pkgs { pkgs = pkgsMusl; compiler = ghc; };
-		})).extend(extension);
-	        staticHaskellPackages2 = import ./pkgs { pkgs = pkgsMusl; compiler = ghc; };
+			pkgsGenerated = import ./pkgs { pkgs = pkgsMusl; };
+			#pkgsGenerated = import ./pkgs { pkgs = pkgsMusl; compiler = ghc; };
+		})); #.extend(extension);
 	in
-		staticHaskellPackages2.marlowe-symbolic.overrideAttrs (oldAttrs: {
+		staticHaskellPackages.marlowe-symbolic.overrideAttrs (oldAttrs: {
                 isLibrary = false;
                 isExecutable = true;
 	        enableSharedExecutables = false;
@@ -417,23 +416,12 @@ let
                 # doCheck = false;
 	        configureFlags = [
 		  "--ghc-option=-v3"
-                # "--ghc-option=-optc=-static"
 	          "--ghc-option=-optl=-static"
                   "--ghc-option=-fPIC"
                   "--ghc-option=-fexternal-dynamic-refs"
 	          "--ghc-option=-optl=-L${pkgsMusl.gmp6.override { withStatic = true; }}/lib"
 	          "--ghc-option=-optl=-L${pkgsMusl.ncurses.overrideAttrs (old: { enableStatic = true; enableShared = false; })}/lib"
 	          "--ghc-option=-optl=-L${pkgsMusl.libffi.overrideAttrs (old: { dontDisableStatic = true; })}/lib"
-                #  "--ghc-option=-optl=-L${pkgs.glibc.static}/lib"
-	        #  "--ghc-option=-optl=-L${staticPkgs.zlib.static}/lib"
-                #  "--ghc-option=-optl=-L${pkgs.gmp5.static}/lib"
-                #  "--ghc-option=-optl=-L${pkgs.glibc.static}/lib"
-	        #  "--extra-lib-dirs=${staticPkgs.gmp6.override { withStatic = true; }}/lib"
-	        #  "--extra-lib-dirs=${staticPkgs.zlib.static}/lib"
-	        #  "--extra-lib-dirs=${staticPkgs.libffi.overrideAttrs (old: { dontDisableStatic = true; })}/lib"
-	        #  "--extra-lib-dirs=${staticPkgs.libffi.overrideAttrs (old: { enableStatic = true; })}/lib"
-	        #] ++ staticPkgs.lib.optionals (!strip) [
-	        #  "--disable-executable-stripping"
 	        ] ;
     });
 
