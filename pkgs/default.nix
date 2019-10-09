@@ -39321,12 +39321,12 @@ license = stdenv.lib.licenses.bsd3;
 ({
   mkDerivation
 , base
-, bytestring
 , containers
+, Diff
+, hspec
+, HUnit
 , mtl
 , stdenv
-, tasty
-, tasty-golden
 , text
 , wl-pprint-text
 }:
@@ -39345,11 +39345,11 @@ wl-pprint-text
 ];
 testHaskellDepends = [
 base
-bytestring
 containers
+Diff
+hspec
+HUnit
 mtl
-tasty
-tasty-golden
 text
 wl-pprint-text
 ];
@@ -44469,10 +44469,7 @@ license = "GPL";
   mkDerivation
 , base
 , containers
-, plutus-tx
-, plutus-wallet-api
 , stdenv
-, template-haskell
 , text
 , unlit
 , wl-pprint
@@ -44485,9 +44482,6 @@ src = .././marlowe;
 libraryHaskellDepends = [
 base
 containers
-plutus-tx
-plutus-wallet-api
-template-haskell
 text
 wl-pprint
 ];
@@ -44651,6 +44645,7 @@ license = stdenv.lib.licenses.asl20;
 , bytestring
 , containers
 , http-client
+, http-client-tls
 , marlowe
 , mtl
 , process
@@ -44682,6 +44677,7 @@ base
 bytestring
 containers
 http-client
+http-client-tls
 marlowe
 mtl
 process
@@ -53711,15 +53707,19 @@ license = stdenv.lib.licenses.bsd3;
 , containers
 , cookie
 , cryptonite
+, Diff
 , directory
 , exceptions
 , file-embed
 , filepath
 , hashable
+, hspec
+, hspec-discover
 , http-client
 , http-client-tls
 , http-conduit
 , http-types
+, HUnit
 , jwt
 , lens
 , monad-logger
@@ -53735,8 +53735,6 @@ license = stdenv.lib.licenses.bsd3;
 , servant-server
 , servant-websockets
 , stdenv
-, tasty
-, tasty-hunit
 , template-haskell
 , temporary
 , text
@@ -53802,10 +53800,14 @@ base
 bytestring
 containers
 cryptonite
-tasty
-tasty-hunit
+Diff
+hspec
+HUnit
 text
 wl-pprint-text
+];
+testToolDepends = [
+hspec-discover
 ];
 doHaddock = false;
 license = stdenv.lib.licenses.asl20;
@@ -54350,14 +54352,17 @@ license = stdenv.lib.licenses.asl20;
 , cookie
 , cryptonite
 , data-default-class
+, Diff
 , exceptions
 , file-embed
 , filepath
 , hspec
+, hspec-discover
 , http-client
 , http-client-tls
 , http-conduit
 , http-types
+, HUnit
 , insert-ordered-containers
 , iots-export
 , jwt
@@ -54383,9 +54388,6 @@ license = stdenv.lib.licenses.asl20;
 , servant-purescript
 , servant-server
 , stdenv
-, tasty
-, tasty-golden
-, tasty-hunit
 , template-haskell
 , temporary
 , text
@@ -54416,12 +54418,10 @@ cryptonite
 exceptions
 file-embed
 filepath
-hspec
 http-client
 http-client-tls
 http-conduit
 http-types
-insert-ordered-containers
 iots-export
 jwt
 lens
@@ -54464,7 +54464,6 @@ optparse-applicative
 playground-common
 plutus-emulator
 plutus-playground-lib
-plutus-tx
 plutus-wallet-api
 prometheus
 purescript-bridge
@@ -54484,6 +54483,9 @@ testHaskellDepends = [
 aeson
 base
 bytestring
+Diff
+hspec
+HUnit
 insert-ordered-containers
 iots-export
 mtl
@@ -54491,12 +54493,12 @@ playground-common
 plutus-emulator
 plutus-playground-lib
 plutus-wallet-api
-tasty
-tasty-golden
-tasty-hunit
 text
 time-units
 transformers
+];
+testToolDepends = [
+hspec-discover
 ];
 doHaddock = false;
 homepage = "https://github.com/iohk/plutus#readme";
@@ -54551,7 +54553,6 @@ license = stdenv.lib.licenses.asl20;
   mkDerivation
 , base
 , bytestring
-, cborg
 , containers
 , doctest
 , extra
@@ -54579,7 +54580,6 @@ src = .././plutus-tx;
 libraryHaskellDepends = [
 base
 bytestring
-cborg
 containers
 extra
 ghc
@@ -57315,7 +57315,7 @@ license = stdenv.lib.licenses.bsd3;
 mkDerivation {
 
 pname = "purescript-bridge";
-version = "0.13.1.0";
+version = "0.13.0.0";
 src = fetchgit {
 
 url = "https://github.com/shmish111/purescript-bridge.git";

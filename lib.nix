@@ -1,5 +1,18 @@
 { system ? builtins.currentSystem, config ? {} }:
 let
+  configWithOverrides = {
+    packageOverrides = pkgs: {
+        python36 = pkgs.python36.override {
+                packageOverrides = self: super: {
+                        cython = super.cython.overridePythonAttrs (old: rec {
+                                # TODO Cython tests for unknown reason hang with musl. Remove when that's fixed.
+                                # See https://github.com/nh2/static-haskell-nix/issues/6#issuecomment-421852854
+                                doCheck = false;
+                        });
+                };
+        };
+    };
+  };
   # iohk-nix can be overridden for debugging purposes by setting
   # NIX_PATH=iohk_nix=/path/to/iohk-nix
   iohkNix = import (
@@ -12,7 +25,7 @@ let
       in builtins.fetchTarball {
         url = "${spec.url}/archive/${spec.rev}.tar.gz";
         inherit (spec) sha256;
-      }) { inherit config system; };
+      }) { inherit system; config = configWithOverrides; };
 
   # nixpkgs can be overridden for debugging purposes by setting
   # NIX_PATH=custom_nixpkgs=/path/to/nixpkgs
