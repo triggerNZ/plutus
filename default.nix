@@ -483,7 +483,19 @@ let
         '';
       };
 
-      withDevTools = env: env.overrideAttrs (attrs: { nativeBuildInputs = attrs.nativeBuildInputs ++ [ packages.cabal-install pkgs.git pkgs.cacert ]; });
+      withDevTools = env: env.overrideAttrs (attrs: { nativeBuildInputs = attrs.nativeBuildInputs ++ 
+                                                                        [ packages.cabal-install 
+                                                                          pkgs.git 
+                                                                          pkgs.cacert 
+                                                                          pkgs.nodejs-10_x
+                                                                          pkgs.nodePackages_10_x.node-gyp
+                                                                          pkgs.yarn 
+                                                                          pkgs.yarn2nix
+                                                                          easyPS.purs
+                                                                          easyPS.psc-package
+                                                                          easyPS.spago
+                                                                          easyPS.spago2nix
+                                                                          ]; });
     };
   });
 
