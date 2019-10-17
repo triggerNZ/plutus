@@ -448,50 +448,9 @@ let
           exit
         '';
 
-        updateClientDepsScript = baseDirectory:
-          let
-            setup = pkgs.callPackage ./web-common/deps.nix { inherit baseDirectory; };
-          in
-            pkgs.writeScript "update-client-deps" ''
-              #!${pkgs.runtimeShell}
+        updateMarlowePlaygroundClientDeps = pkgs.callPackage ./web-common/deps.nix { inherit nixGitIgnore easyPS; baseDirectory = ./marlowe-playground-client; };
 
-              set -eou pipefail
-
-              export PATH=${pkgs.stdenv.lib.makeBinPath [
-                pkgs.coreutils
-                pkgs.git
-                pkgs.findutils
-                pkgs.nodejs-10_x
-                easyPS.purs
-                easyPS.psc-package
-                easyPS.spago
-                easyPS.spago2nix
-              ]}
-              if [ ! -f package.json ]
-              then
-                  echo "package.json not found. Please run this script from the client directory." >&2
-                  exit 1
-              fi
-
-              echo Remove old JavaScript Dependencies
-              rm -Rf node_modules : true
-
-              echo Installing JavaScript Dependencies
-              mkdir node_modules
-              cp -R ${setup}/node_modules/* ./node_modules
-              chown -R `whoami` node_modules
-              chmod -R +w node_modules
-
-              cat ${setup}/yarn.lock > yarn.lock
-              cat ${setup}/yarn.nix > yarn.nix
-
-              echo Generate nix files
-              spago2nix generate
-
-              echo Done
-            '';
-        updateMarlowePlaygroundClientDeps = updateClientDepsScript ./marlowe-playground-client;
-        updatePlutusPlaygroundClientDeps = updateClientDepsScript ./plutus-playground-client;
+        updatePlutusPlaygroundClientDeps = pkgs.callPackage ./web-common/deps.nix { inherit nixGitIgnore easyPS; baseDirectory = ./plutus-playground-client; };
       };
 
       withDevTools = env: env.overrideAttrs (attrs: { nativeBuildInputs = attrs.nativeBuildInputs ++ 
