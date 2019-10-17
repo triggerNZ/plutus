@@ -448,48 +448,48 @@ let
           exit
         '';
 
-        updateClientDeps = pkgs.writeScript "update-client-deps" ''
-          #!${pkgs.runtimeShell}
+        updateClientDeps =
+          let
+            setup = import ./marlowe-playground-client/deps.nix { inherit pkgs config system; };
+          in
+            pkgs.writeScript "update-client-deps" ''
+              #!${pkgs.runtimeShell}
 
-          set -eou pipefail
+              set -eou pipefail
 
-          export PATH=${pkgs.stdenv.lib.makeBinPath [
-            pkgs.coreutils
-            pkgs.git
-            # pkgs.gnumake
-            # pkgs.gcc
-            pkgs.which
-            pkgs.gnugrep
-            pkgs.python2
-            pkgs.nodejs-10_x
-            pkgs.nodePackages_10_x.node-gyp
-            pkgs.yarn
-            pkgs.yarn2nix
-            easyPS.purs
-            easyPS.psc-package
-            easyPS.spago
-            easyPS.spago2nix
-          ]}
+              export PATH=${pkgs.stdenv.lib.makeBinPath [
+                pkgs.coreutils
+                pkgs.git
+                pkgs.findutils
+                pkgs.nodejs-10_x
+                easyPS.purs
+                easyPS.psc-package
+                easyPS.spago
+                easyPS.spago2nix
+              ]}
+              if [ ! -f package.json ]
+              then
+                  echo "package.json not found. Please run this script from the client directory." >&2
+                  exit 1
+              fi
 
-          export HOME=`pwd`
-          export SHELL=${pkgs.runtimeShell}
-          export PYTHON=${pkgs.python2}/bin/python
+              echo Remove old JavaScript Dependencies
+              rm -Rf node_modules : true
 
-          if [ ! -f package.json ]
-          then
-              echo "package.json not found. Please run this script from the client directory." >&2
-              exit 1
-          fi
+              echo Installing JavaScript Dependencies
+              mkdir node_modules
+              cp -R ${setup}/node_modules/* ./node_modules
+              chown -R `whoami` node_modules
+              chmod -R +w node_modules
 
-          echo Installing JavaScript Dependencies
-          yarn
+              cat ${setup}/yarn.lock > yarn.lock
+              cat ${setup}/yarn.nix > yarn.nix
 
-          echo Generating nix configs.
-          yarn2nix > yarn.nix
-          spago2nix generate
+              echo Generate nix files
+              spago2nix generate
 
-          echo Done
-        '';
+              echo Done
+            '';
       };
 
       withDevTools = env: env.overrideAttrs (attrs: { nativeBuildInputs = attrs.nativeBuildInputs ++ 

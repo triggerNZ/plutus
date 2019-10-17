@@ -59,9 +59,9 @@ pkgs.stdenv.mkDerivation {
     yarn2nix > yarn.nix
     echo "spago"
     export HOME=$(pwd)
-    spago init
+    # spago init
     # spago list-packages -f transitive -j
-    spago -v sources
+    # spago -v sources
 
     # spago2nix generate
     '';
@@ -70,5 +70,6 @@ pkgs.stdenv.mkDerivation {
     mkdir -p $out
     cp yarn.lock $out/
     cp -r node_modules $out/
+    cp yarn.nix $out/
     '';
 }
