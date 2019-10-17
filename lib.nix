@@ -68,6 +68,7 @@ let
       };
 
       nodejs = pkgs.nodejs-10_x;
+      node = pkgs.nodejs-10_x;
       nodePackages = pkgs.nodePackages_10_x;
   };
 

@@ -10,8 +10,7 @@ let
   deps = pkgs.stdenv.mkDerivation {
       name = "deps";
       srcs = builtins.filterSource (path: type: pkgs.lib.elem (baseNameOf path) ["package.json" "spago.dhall" "packages.dhall"]) baseDirectory;
-      buildInputs = [ 
-                      pkgs.coreutils
+      buildInputs = [ pkgs.coreutils
                       pkgs.python2
                       pkgs.nodejs-10_x
                       pkgs.nodePackages_10_x.node-gyp
