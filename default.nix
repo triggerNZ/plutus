@@ -402,7 +402,7 @@ let
         inherit (self) haskellPackages; filter = name: builtins.elem name [ "cabal-install" "stylish-haskell" ];
       };
 
-      scripts = {
+      scripts = rec {
         inherit (localLib) regeneratePackages;
 
         fixStylishHaskell = pkgs.writeScriptBin "fix-stylish-haskell" ''
@@ -448,9 +448,9 @@ let
           exit
         '';
 
-        updateClientDeps =
+        updateClientDepsScript = baseDirectory:
           let
-            setup = import ./marlowe-playground-client/deps.nix { inherit pkgs config system; };
+            setup = pkgs.callPackage ./web-common/deps.nix { inherit baseDirectory; };
           in
             pkgs.writeScript "update-client-deps" ''
               #!${pkgs.runtimeShell}
@@ -490,6 +490,8 @@ let
 
               echo Done
             '';
+        updateMarlowePlaygroundClientDeps = updateClientDepsScript ./marlowe-playground-client;
+        updatePlutusPlaygroundClientDeps = updateClientDepsScript ./plutus-playground-client;
       };
 
       withDevTools = env: env.overrideAttrs (attrs: { nativeBuildInputs = attrs.nativeBuildInputs ++ 

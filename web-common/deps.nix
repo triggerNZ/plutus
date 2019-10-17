@@ -1,8 +1,7 @@
-{ system ? builtins.currentSystem
- # The nixpkgs configuration file
-, config ? { allowUnfreePredicate = (import ../lib.nix {}).unfreePredicate;
-             packageOverrides = (import ../lib.nix {}).packageOverrides; }
-, pkgs ? (import ../lib.nix { inherit config system; }).pkgs 
+{ system
+, config
+, pkgs
+, baseDirectory
 }:
 let
 
@@ -22,7 +21,7 @@ let
 
   node_modules = pkgs.stdenv.mkDerivation {
     name = "node_modules";
-    srcs = builtins.filterSource (path: type: baseNameOf path == "package.json") ./.;
+    srcs = builtins.filterSource (path: type: baseNameOf path == "package.json") baseDirectory;
     buildInputs = [ pkgs.yarn 
                   ];
     buildPhase = ''
@@ -37,7 +36,7 @@ let
 in
 pkgs.stdenv.mkDerivation {
     name = "deps";
-    srcs = builtins.filterSource (path: type: pkgs.lib.elem (baseNameOf path) ["package.json" "spago.dhall" "packages.dhall"]) ./.;
+    srcs = builtins.filterSource (path: type: pkgs.lib.elem (baseNameOf path) ["package.json" "spago.dhall" "packages.dhall"]) baseDirectory;
     buildInputs = [ 
                     pkgs.coreutils
                     pkgs.python2
