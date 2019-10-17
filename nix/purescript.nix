@@ -20,12 +20,12 @@ with pkgs;
 let
   # node-sass is terrible and we have to get it its binaries otherwise it will try to build them
   nodeSassBinLinux = fetchurl {
-    url = "https://github.com/sass/node-sass/releases/download/v4.11.0/linux-x64-57_binding.node";
-    sha256 = "1hv63bxf3wsknczg0x4431lfgizwqa1fvlhqblh5j4bw3p8mp3c0";
+    url = "https://github.com/sass/node-sass/releases/download/v4.11.0/linux-x64-64_binding.node";
+    sha256 = "0dl91l414na44h090cgghd06q0j2whlj9h98im2qb9823glq7xff";
   };
   nodeSassBinDarwin = fetchurl {
-    url = "https://github.com/sass/node-sass/releases/download/v4.11.0/darwin-x64-57_binding.node";
-    sha256 = "04m3lpqapsx1nsaz7xr6k0yr64car1447v5gf6x6sfiszmshvjw2";
+    url = "https://github.com/sass/node-sass/releases/download/v4.11.0/darwin-x64-64_binding.node";
+    sha256 = "1p5gz1694vxar81hbrrbdmmr2wjw3ksfvfgwh0kzzgjkc2dpk5pa";
   };
   webCommon = pkgs.copyPathToStore webCommonPath;
 
