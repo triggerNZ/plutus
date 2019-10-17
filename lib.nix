@@ -66,6 +66,9 @@ let
                       });
               };
       };
+
+      nodejs = pkgs.nodejs-10_x;
+      nodePackages = pkgs.nodePackages_10_x;
   };
 
   comp = f: g: (v: f(g v));

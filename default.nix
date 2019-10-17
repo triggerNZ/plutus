@@ -456,6 +456,11 @@ let
           export PATH=${pkgs.stdenv.lib.makeBinPath [
             pkgs.coreutils
             pkgs.git
+            # pkgs.gnumake
+            # pkgs.gcc
+            pkgs.which
+            pkgs.gnugrep
+            pkgs.python2
             pkgs.nodejs-10_x
             pkgs.nodePackages_10_x.node-gyp
             pkgs.yarn
@@ -465,6 +470,10 @@ let
             easyPS.spago
             easyPS.spago2nix
           ]}
+
+          export HOME=`pwd`
+          export SHELL=${pkgs.runtimeShell}
+          export PYTHON=${pkgs.python2}/bin/python
 
           if [ ! -f package.json ]
           then
@@ -486,6 +495,7 @@ let
       withDevTools = env: env.overrideAttrs (attrs: { nativeBuildInputs = attrs.nativeBuildInputs ++ 
                                                                         [ packages.cabal-install 
                                                                           pkgs.git 
+                                                                          pkgs.which
                                                                           pkgs.cacert 
                                                                           pkgs.nodejs-10_x
                                                                           pkgs.nodePackages_10_x.node-gyp
@@ -495,6 +505,7 @@ let
                                                                           easyPS.psc-package
                                                                           easyPS.spago
                                                                           easyPS.spago2nix
+                                                                          pkgs.nix
                                                                           ]; });
     };
   });
