@@ -37,6 +37,10 @@ type SMSchema s i =
 data SMContractError s i = SMError (SM.SMError s i) | ChooserError T.Text
 makeClassyPrisms ''SMContractError
 
+instance Show s => Show (SMContractError s i) where
+    show (SMError e) = show e
+    show (ChooserError t) = show t
+
 instance SM.AsSMError (SMContractError s i) s i where
     _SMError = _SMError
 

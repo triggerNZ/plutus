@@ -16,6 +16,7 @@ import           Control.Monad.Error.Lens
 
 import           Data.Maybe
 import qualified Data.Map                       as Map
+import qualified Data.Text                      as T
 
 import qualified Language.PlutusTx              as PlutusTx
 import qualified Language.PlutusTx.StateMachine as SM
@@ -25,8 +26,12 @@ import           Ledger.Value
 import qualified Ledger.Typed.Scripts           as Scripts
 import qualified Ledger                         as Ledger
 
-data SMError s i = InvalidTransition s i | HaltNonFinal s | FinalNonHalt s
+data SMError s i = InvalidTransition s i
 makeClassyPrisms ''SMError
+
+-- | This lets people use 'T.Text' as their error type.
+instance AsSMError T.Text s i where
+    _SMError = prism' (T.pack . show) (const Nothing)
 
 instance Show s => Show (SMError s i) where
     show (InvalidTransition _ _) = "Invalid transition"
