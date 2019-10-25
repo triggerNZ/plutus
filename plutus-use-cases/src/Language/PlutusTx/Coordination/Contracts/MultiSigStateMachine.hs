@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE ViewPatterns      #-}
@@ -17,6 +18,7 @@ module Language.PlutusTx.Coordination.Contracts.MultiSigStateMachine(
     , Payment(..)
     , State (..)
     , Input (..)
+    , Error (..)
     , mkValidator
     , scriptInstance
     , machineInstance
@@ -25,11 +27,13 @@ module Language.PlutusTx.Coordination.Contracts.MultiSigStateMachine(
 
 import Control.Monad.Reader
 import Control.Monad.State hiding (State, state)
+import Control.Lens
 
 import qualified Language.Plutus.Contract as Contract
 import qualified Language.Plutus.Contract.StateMachine as SMC
 
 import           Data.Functor                 (void)
+import qualified Data.Text                    as T
 import           Control.Applicative          (Applicative (..))
 import qualified Ledger.Interval              as Interval
 import           Ledger.Validation            (PendingTx, PendingTx'(..))
@@ -39,6 +43,7 @@ import qualified Ledger.Typed.Scripts         as Scripts
 import           Ledger.Value                 (Value)
 import qualified Ledger.Value                 as Value
 import           Wallet
+import           Wallet.Emulator.Types (AsAssertionError(..))
 import qualified Wallet                       as WAPI
 import qualified Wallet.Typed.API             as WAPITyped
 
@@ -49,7 +54,6 @@ import           Language.PlutusTx.Prelude     hiding (check, Applicative (..))
 import           Language.PlutusTx.StateMachine (StateMachine(..))
 import qualified Language.PlutusTx.StateMachine as SM
 import qualified Wallet.Typed.StateMachine as SM
-
 
 --   $multisig
 --   The n-out-of-m multisig contract works like a joint account of
@@ -129,6 +133,18 @@ data Input =
 
 PlutusTx.makeIsData ''Input
 PlutusTx.makeLift ''Input
+
+data Error = SMCError (SMC.SMContractError State Input) | OtherError T.Text deriving Show
+makeClassyPrisms ''Error
+
+instance SMC.AsSMContractError Error State Input where
+    _SMContractError = _SMCError
+
+instance SM.AsSMError Error State Input where
+    _SMError = _SMCError . SM._SMError
+
+instance AsAssertionError Error where
+    _AssertionError = _OtherError . _AssertionError
 
 {-# INLINABLE isSignatory #-}
 -- | Check if a public key is one of the signatories of the multisig contract.
@@ -248,10 +264,10 @@ stateChooser _ = Left $ SMC.ChooserError "Multiple states"
 
 contract
     :: SM.StateMachineInstance State Input
-    -> Contract.Contract (SMC.SMSchema State Input) (SMC.SMContractError State Input) ()
+    -> Contract.Contract (SMC.SMSchema State Input) Error ()
 contract machine = flip runReaderT (SMC.StateMachineClient machine stateChooser) $ r
     where
-        r :: ReaderT (SMC.StateMachineClient State Input) (Contract.Contract (SMC.SMSchema State Input) (SMC.SMContractError State Input)) ()
+        r :: ReaderT (SMC.StateMachineClient State Input) (Contract.Contract (SMC.SMSchema State Input) Error) ()
         r = SMC.run
 
 

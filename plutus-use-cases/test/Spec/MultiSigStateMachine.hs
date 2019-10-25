@@ -35,8 +35,7 @@ import qualified Language.PlutusTx.StateMachine                  as SM
 import           Language.PlutusTx.Coordination.Contracts.MultiSigStateMachine (Payment, State)
 import qualified Language.PlutusTx.Coordination.Contracts.MultiSigStateMachine as MS
 
-type E = T.Text -- SM.SMContractError MS.State MS.Input
-type MSTrace m a = ContractTrace (SM.SMSchema MS.State MS.Input) E m a
+type MSTrace m a = ContractTrace (SM.SMSchema MS.State MS.Input) MS.Error m a
 
 tests :: TestTree
 tests = testGroup "multi sig state machine tests" [
@@ -95,24 +94,24 @@ payment =
         , MS.paymentDeadline  = 20
         }
 
-lock' :: (MonadEmulator E m) => Value -> MSTrace m a ()
+lock' :: (MonadEmulator MS.Error m) => Value -> MSTrace m a ()
 -- wallet 1 locks the funds
 lock' value = Trace.callEndpoint @"initialise" w1 (MS.Holding value, value) >> Trace.handleBlockchainEvents w1
 
-proposePayment' :: (MonadEmulator E m) => MSTrace m a ()
+proposePayment' :: (MonadEmulator MS.Error m) => MSTrace m a ()
 proposePayment' = Trace.callEndpoint @"step" w2 (MS.ProposePayment payment) >> Trace.handleBlockchainEvents w2
 
-addSignature' :: (MonadEmulator E m) => Integer -> MSTrace m a ()
+addSignature' :: (MonadEmulator MS.Error m) => Integer -> MSTrace m a ()
 -- i wallets add their signatures
 addSignature' i = mapM_ (\w -> Trace.callEndpoint @"step" w (MS.AddSignature (Trace.walletPubKey w)) >> Trace.handleBlockchainEvents w) (take (fromIntegral i) [w1, w2, w3])
 
-makePayment' :: (WalletAPI m, WalletDiagnostics m) => MSTrace m a ()
+makePayment' :: (MonadEmulator MS.Error m) => MSTrace m a ()
 makePayment' = Trace.callEndpoint @"step" w3 MS.Pay >> Trace.handleBlockchainEvents w3
 
-proposeSignPay :: (MonadEmulator E m) => Integer -> MSTrace m a ()
+proposeSignPay :: (MonadEmulator MS.Error m) => Integer -> MSTrace m a ()
 proposeSignPay i = proposePayment' >> addSignature' i >> makePayment'
 
-lockProposeSignPay :: (EM.MonadEmulator E m) => Integer -> Integer -> MSTrace m a ()
+lockProposeSignPay :: (EM.MonadEmulator MS.Error m) => Integer -> Integer -> MSTrace m a ()
 lockProposeSignPay i j = do
     lock' (Ada.adaValueOf 10)
     proposeSignPay i
