@@ -9,6 +9,7 @@
 {-# LANGUAGE DataKinds #-}
 module Language.Plutus.Contract.StateMachine where
 
+import           Control.Applicative
 import           Control.Monad.State hiding (state)
 import           Control.Monad.Reader
 import           Control.Monad.Base
@@ -62,7 +63,7 @@ contractAddress = asks (SM.machineAddress . scInstance)
 
 data Liveness = NotStarted | Running | Finished
 
-run :: forall s i e m . (MonadSM s i e m) => m ()
+run :: forall s i e m . (MonadSM s i e m, Alternative m) => m ()
 run = go NotStarted
     where
         go :: Liveness -> m ()

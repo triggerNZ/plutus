@@ -114,7 +114,9 @@ proposeSignPay i = proposePayment' >> addSignature' i >> makePayment'
 lockProposeSignPay :: (EM.MonadEmulator MS.Error m) => Integer -> Integer -> MSTrace m a ()
 lockProposeSignPay i j = do
     lock' (Ada.adaValueOf 10)
-    proposeSignPay i
+    proposePayment'
+    addSignature' i
+    --proposeSignPay i
     Trace.handleBlockchainEvents w1
     --EM.assertOwnFundsEq w2 (scale j (Ada.adaValueOf 5))
 
