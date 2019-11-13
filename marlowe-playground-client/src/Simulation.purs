@@ -6,7 +6,7 @@ import Ace.Editor as Editor
 import Ace.Halogen.Component (Autocomplete(Live), aceComponent)
 import Ace.Types (Editor)
 import Ace.Types as Ace
-import Bootstrap (btn, btnInfo, btnPrimary, btnSecondary, btnSmall, card, cardBody_, card_, col3_, col6, col9, col_, dropdownToggle, empty, listGroupItem_, listGroup_, row_)
+import Bootstrap (btn, btnInfo, btnPrimary, btnSecondary, btnSmall, card, cardBody_, card_, col3, col6, col9, col_, dropdownToggle, empty, listGroupItem_, listGroup_, row_)
 import Bootstrap.Extra (ariaExpanded, ariaHasPopup, ariaLabelledBy, dataToggle)
 import Control.Alternative (map, (<|>))
 import Data.Array (catMaybes, fromFoldable, head, sortBy)
@@ -34,7 +34,7 @@ import Halogen.HTML.Events (onClick, onDragOver, onDrop, onValueChange)
 import Halogen.HTML.Properties (ButtonType(..), InputType(InputNumber), class_, classes, enabled, id_, placeholder, prop, type_, value)
 import Halogen.HTML.Properties.ARIA (role)
 import LocalStorage as LocalStorage
-import Marlowe.Holes (Holes(..), MarloweHole(..), MarloweType(..), getMarloweConstructors)
+import Marlowe.Holes (Constants, Holes(..), MarloweConstant(..), MarloweHole(..), MarloweType(..), getMarloweConstructors)
 import Marlowe.Parser (transactionInputList, transactionWarningList)
 import Marlowe.Semantics (AccountId(..), Ada(..), Bound(..), ChoiceId(..), ChosenNum, Input(..), Party, Payee(..), Payment(..), PubKey, Slot(..), SlotInterval(..), TransactionError, TransactionInput(..), TransactionWarning(..), ValueId(..), _accounts, _boundValues, _choices, inBounds)
 import Marlowe.Symbolic.Types.Response as R
@@ -43,7 +43,7 @@ import Prelude (class Show, Unit, bind, compare, const, discard, flip, identity,
 import StaticData as StaticData
 import Text.Parsing.Parser (runParser)
 import Text.Parsing.Parser.Pos (Position(..))
-import Types (ActionInput(..), ActionInputId, ChildSlots, FrontendState, HAction(..), MarloweError(..), MarloweState, _Head, _analysisState, _contract, _editorErrors, _holes, _marloweCompileResult, _marloweEditorSlot, _marloweState, _moneyInContract, _payments, _pendingInputs, _possibleActions, _selectedHole, _slot, _state, _transactionError)
+import Types (ActionInput(..), ActionInputId, ChildSlots, FrontendState, HAction(..), MarloweError(..), MarloweState, _Head, _analysisState, _constants, _contract, _editorErrors, _holes, _marloweCompileResult, _marloweEditorSlot, _marloweState, _moneyInContract, _payments, _pendingInputs, _possibleActions, _selectedConstant, _selectedHole, _slot, _state, _transactionError)
 
 paneHeader :: forall p. String -> HTML p HAction
 paneHeader s = h2 [ class_ $ ClassName "pane-header" ] [ text s ]
@@ -87,8 +87,11 @@ simulationPane state =
               , onDrop $ Just <<< MarloweHandleDropEvent
               ]
               [ row_
-                  [ div [ class_ $ col9 ] [ slot _marloweEditorSlot unit (aceComponent initEditor (Just Live)) unit (Just <<< MarloweHandleEditorMessage) ]
-                  , holesPane (view _selectedHole state) (view (_marloweState <<< _Head <<< _holes) $ state)
+                  [ div [ class_ col9 ] [ slot _marloweEditorSlot unit (aceComponent initEditor (Just Live)) unit (Just <<< MarloweHandleEditorMessage) ]
+                  , div [ class_ col3 ]
+                      [ holesPane (view _selectedHole state) (view (_marloweState <<< _Head <<< _holes) state)
+                      , constantsPane (view _selectedConstant state) (view (_marloweState <<< _Head <<< _constants) state)
+                      ]
                   ]
               ]
           , br_
@@ -128,19 +131,17 @@ holesPane selectedHole (Holes holes) =
   let
     kvs = Map.toUnfoldable holes
 
-    ordered = sortBy sortHoles kvs
+    ordered = sortBy (compare `on` (head <<< snd)) kvs
 
     holesGroup = map (\(Tuple k v) -> displayHole selectedHole k v) ordered
   in
-    col3_
-      [ div
-          [ class_ $ ClassName "btn-group-vertical"
-          , role "group"
-          ]
-          holesGroup
+    div
+      [ classes [ ClassName "btn-group-vertical", ClassName "w-100" ]
+      , role "group"
       ]
-  where
-  sortHoles = compare `on` (head <<< snd)
+      ( [ div [ classes [ btn ] ] [ text "Holes" ] ]
+          <> holesGroup
+      )
 
 displayHole :: forall p. Maybe String -> String -> Array MarloweHole -> HTML p HAction
 displayHole selectedHole name holes =
@@ -212,6 +213,63 @@ holeDropdowns holes = case Array.uncons holes of
   where
   holeToAcePosition (Position { column, line }) = Ace.Position { column, row: line }
 
+constantsPane :: forall p. Maybe String -> Constants -> HTML p HAction
+constantsPane selectedConstant constants =
+  let
+    kvs = Map.toUnfoldable (unwrap constants)
+
+    ordered = sortBy (compare `on` (head <<< snd)) kvs
+
+    holesGroup = map (\(Tuple k v) -> displayConstant selectedConstant k v) ordered
+  in
+    div
+      [ classes [ ClassName "btn-group-vertical", ClassName "w-100" ]
+      , role "group"
+      ]
+      ( [ div [ classes [ btn ] ] [ text "Accounts" ] ]
+          <> holesGroup
+      )
+
+displayConstant :: forall p. Maybe String -> String -> Array MarloweConstant -> HTML p HAction
+displayConstant selectedConstant name constants =
+  div [ classes ([ ClassName "btn-group" ] <> showClass) ]
+    [ button
+        [ classes [ btn, btnSecondary, dropdownToggle, ClassName "button-box" ]
+        , id_ ("constant-btn-" <> name)
+        , type_ ButtonButton
+        , dataToggle "dropdown"
+        , ariaHasPopup true
+        , ariaExpanded expanded
+        , onClick $ const $ Just $ SelectConstant selectConstant
+        ]
+        [ text name ]
+    , div
+        [ classes ([ ClassName "dropdown-menu" ] <> showClass)
+        , ariaLabelledBy ("constant-btn-" <> name)
+        ]
+        (constantDropdowns constants)
+    ]
+  where
+  expanded = selectedConstant == Just name
+
+  showClass = if selectedConstant == Just name then [ ClassName "show" ] else []
+
+  selectConstant = if selectedConstant == Just name then Nothing else Just name
+
+constantDropdowns :: forall p. Array MarloweConstant -> Array (HTML p HAction)
+constantDropdowns holes = case Array.uncons holes of
+  Nothing -> mempty
+  Just { head: (MarloweConstant { marloweType: AccountIdType, end }) } ->
+    [ div
+        [ classes [ ClassName "dropdown-item", ClassName "font-italic" ]
+        , onClick $ const $ Just $ MarloweMoveToPosition $ holeToAcePosition end
+        ]
+        [ text "Replace the hole with an integer" ]
+    ]
+  Just _ -> mempty
+  where
+  holeToAcePosition (Position { column, line }) = Ace.Position { column, row: line }
+  
 demoScriptsPane :: forall p. HTML p HAction
 demoScriptsPane =
   div_

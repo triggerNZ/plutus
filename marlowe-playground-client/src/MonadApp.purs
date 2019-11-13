@@ -1,6 +1,7 @@
 module MonadApp where
 
 import Prelude
+
 import API (RunResult)
 import Ace (Annotation, Editor)
 import Ace as Ace
@@ -10,7 +11,7 @@ import Auth (AuthStatus)
 import Control.Monad.Except (class MonadTrans, ExceptT, runExceptT)
 import Control.Monad.Reader (class MonadAsk)
 import Control.Monad.State (class MonadState)
-import Data.Array (fold, fromFoldable)
+import Data.Array (concat, fromFoldable)
 import Data.Either (Either(..))
 import Data.Foldable (foldl)
 import Data.FoldableWithIndex (foldlWithIndex)
@@ -38,7 +39,7 @@ import Language.Haskell.Interpreter (InterpreterError, InterpreterResult, Source
 import LocalStorage as LocalStorage
 import Marlowe (SPParams_)
 import Marlowe as Server
-import Marlowe.Holes (Holes(..), MarloweHole(..), fromTerm, getHoles, validateHoles)
+import Marlowe.Holes (MarloweHole(..), fromTerm, getConstants, getHoles)
 import Marlowe.Parser (parseTerm, contract)
 import Marlowe.Semantics (Contract(..), PubKey, SlotInterval(..), TransactionInput(..), TransactionOutput(..), choiceOwner, computeTransaction, extractRequiredActionsWithTxs, moneyInContract)
 import Network.RemoteData as RemoteData
@@ -224,27 +225,19 @@ withMarloweEditor = HalogenApp <<< Editor.withEditor _marloweEditorSlot unit
 
 updateContractInStateP :: String -> MarloweState -> MarloweState
 updateContractInStateP text state = case runParser text (parseTerm contract) of
-  Right pcon ->
-    let
-      (Tuple duplicates holes) = validateHoles $ getHoles mempty pcon
+  Right pcon -> case fromTerm pcon of
+    Just contract -> do
+      set _editorErrors [] <<< set _contract (Just contract) $ state
+    Nothing -> do
+      let
+        holes = getHoles mempty pcon
 
-      mContract = fromTerm pcon
-    in
-      case mContract of
-        Just contract -> do
-          set _editorErrors [] <<< set _contract (Just contract) $ state
-        Nothing -> do
-          let
-            holes' = fromFoldable $ Map.values holes
+        holesArray = concat $ fromFoldable $ Map.values (unwrap holes)
 
-            (Holes m) = getHoles mempty pcon
+        constants = getConstants mempty pcon
 
-            holesm = getHoles mempty pcon
-
-            holes'' = fold $ fromFoldable $ Map.values m
-
-            errors = map holeToAnnotation holes'
-          (set _editorErrors errors <<< set _holes holesm) state
+        warnings = map holeToAnnotation holesArray
+      (set _editorErrors warnings <<< set _holes holes <<< set _constants constants) state
   Left error -> (set _editorErrors [ errorToAnnotation error ] <<< set _holes mempty) state
   where
   errorToAnnotation (ParseError msg (Position { line, column })) = { column: column, row: (line - 1), text: msg, "type": "error" }

@@ -1,10 +1,10 @@
 module Marlowe.Holes where
 
 import Prelude
+
 import Data.Array (foldMap, foldl, mapWithIndex, (:))
 import Data.BigInteger (BigInteger)
 import Data.Foldable (intercalate)
-import Data.FoldableWithIndex (foldlWithIndex)
 import Data.Function (on)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
@@ -12,6 +12,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Newtype (class Newtype)
 import Data.String (length)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -146,6 +147,7 @@ instance showMarloweType :: Show MarloweType where
 data Term a
   = Term a
   | Hole String (Proxy a) Position Position
+  | Const String (Proxy a) Position Position
 
 derive instance genericTerm :: Generic (Term a) _
 
@@ -155,10 +157,12 @@ instance eqTerm :: Eq a => Eq (Term a) where
 instance showTerm :: Show a => Show (Term a) where
   show (Term a) = show a
   show (Hole name _ _ _) = "?" <> name
+  show (Const name _ _ _) = name
 
 instance prettyTerm :: Pretty a => Pretty (Term a) where
   prettyFragment (Term a) = prettyFragment a
   prettyFragment (Hole name _ _ _) = Leijen.text $ "?" <> name
+  prettyFragment (Const name _ _ _) = Leijen.text name
 
 -- a concrete type for holes only
 data MarloweHole
@@ -174,6 +178,20 @@ derive instance eqMarloweHole :: Eq MarloweHole
 instance ordMarloweHole :: Ord MarloweHole where
   compare (MarloweHole { start: (Position a) }) (MarloweHole { start: (Position b) }) = (compare `on` _.line <> compare `on` _.column) a b
 
+-- a concrete type for constants only
+data MarloweConstant
+  = MarloweConstant
+    { name :: String
+    , marloweType :: MarloweType
+    , start :: Position
+    , end :: Position
+    }
+
+derive instance eqMarloweConstant :: Eq MarloweConstant
+
+instance ordMarloweConstant :: Ord MarloweConstant where
+  compare (MarloweConstant { start: (Position a) }) (MarloweConstant { start: (Position b) }) = (compare `on` _.line <> compare `on` _.column) a b
+
 class IsMarloweType a where
   marloweType :: Proxy a -> MarloweType
 
@@ -184,8 +202,10 @@ instance bigIntegerIsMarloweType :: IsMarloweType BigInteger where
   marloweType _ = BigIntegerType
 
 -- a Monoid for collecting Holes
-data Holes
+newtype Holes
   = Holes (Map String (Array MarloweHole))
+
+derive instance newtypeHoles :: Newtype Holes _
 
 instance semigroupHoles :: Semigroup Holes where
   append (Holes a) (Holes b) = Holes (Map.unionWith append a b)
@@ -193,36 +213,51 @@ instance semigroupHoles :: Semigroup Holes where
 instance monoidHoles :: Monoid Holes where
   mempty = Holes mempty
 
-{- | Find holes with the same name
-  We collect all the `Holes` using `getHoles` and then we fold through the result
-  to find occurances that have the same name as well as changing the values to be
-  single MarloweHoles rather than an array of MarloweHoles
--}
-validateHoles :: Holes -> Tuple (Array MarloweHole) (Map String MarloweHole)
-validateHoles (Holes m) = foldlWithIndex f (Tuple [] mempty) m
-  where
-  f k (Tuple duplicates uniquesMap) [ v ] = Tuple duplicates (Map.insert k v uniquesMap)
+-- a Monoid for collecting Constants
+newtype Constants
+  = Constants (Map String (Array MarloweConstant))
 
-  f k (Tuple duplicates uniquesMap) vs = Tuple (duplicates <> vs) uniquesMap
+derive instance newtypeConstants :: Newtype Constants _
+
+instance semigroupConstants :: Semigroup Constants where
+  append (Constants a) (Constants b) = Constants (Map.unionWith append a b)
+
+instance monoidConstants :: Monoid Constants where
+  mempty = Constants mempty
 
 insertHole :: forall a. IsMarloweType a => Holes -> Term a -> Holes
-insertHole m (Term _) = m
-
 insertHole (Holes m) (Hole name proxy start end) = Holes $ Map.alter f name m
   where
   marloweHole = MarloweHole { name, marloweType: (marloweType proxy), start, end }
 
   f v = Just (marloweHole : fromMaybe [] v)
 
+insertHole m _ = m
+
+insertConstant :: forall a. IsMarloweType a => Constants -> Term a -> Constants
+insertConstant (Constants m) (Const name proxy start end) = Constants $ Map.alter f name m
+  where
+  marloweConstant = MarloweConstant { name, marloweType: (marloweType proxy), start, end }
+
+  f v = Just (marloweConstant : fromMaybe [] v)
+
+insertConstant m _ = m
+
 class HasMarloweHoles a where
   getHoles :: Holes -> a -> Holes
+  getConstants :: Constants -> a -> Constants
 
 instance termHasMarloweHoles :: (IsMarloweType a, HasMarloweHoles a) => HasMarloweHoles (Term a) where
   getHoles m (Term a) = getHoles m a
+  getHoles m (Const _ _ _ _) = m
   getHoles m h = insertHole m h
+  getConstants m (Term a) = getConstants m a
+  getConstants m (Hole _ _ _ _) = m
+  getConstants m c = insertConstant m c
 
 instance arrayHasMarloweHoles :: HasMarloweHoles a => HasMarloweHoles (Array a) where
   getHoles m as = foldMap (getHoles m) as
+  getConstants m as = foldMap (getConstants m) as
 
 -- Parsable versions of the Marlowe types
 data Bound
@@ -244,6 +279,7 @@ instance boundIsMarloweType :: IsMarloweType Bound where
 
 instance boundHasMarloweHoles :: HasMarloweHoles Bound where
   getHoles m (Bound a b) = insertHole m a <> insertHole m b
+  getConstants m (Bound a b) = insertConstant m a <> insertConstant m b
 
 data AccountId
   = AccountId (Term BigInteger) (Term PubKey)
@@ -265,6 +301,7 @@ instance accountIdIsMarloweType :: IsMarloweType AccountId where
 
 instance accountIdHasMarloweHoles :: HasMarloweHoles AccountId where
   getHoles m (AccountId a b) = insertHole m a <> insertHole m b
+  getConstants m (AccountId a b) = insertConstant m a <> insertConstant m b
 
 data ChoiceId
   = ChoiceId (Term String) (Term PubKey)
@@ -286,6 +323,7 @@ instance choiceIdIsMarloweType :: IsMarloweType ChoiceId where
 
 instance choiceIdHasMarloweHoles :: HasMarloweHoles ChoiceId where
   getHoles m (ChoiceId a b) = insertHole m a <> insertHole m b
+  getConstants m (ChoiceId a b) = insertConstant m a <> insertConstant m b
 
 data Action
   = Deposit (Term AccountId) (Term Party) (Term Value)
@@ -312,6 +350,9 @@ instance actionHasMarloweHoles :: HasMarloweHoles Action where
   getHoles m (Deposit a b c) = getHoles m a <> insertHole m b <> getHoles m c
   getHoles m (Choice a bs) = getHoles m a <> getHoles m bs
   getHoles m (Notify a) = getHoles m a
+  getConstants m (Deposit a b c) = getConstants m a <> insertConstant m b <> getConstants m c
+  getConstants m (Choice a bs) = getConstants m a <> getConstants m bs
+  getConstants m (Notify a) = getConstants m a
 
 data Payee
   = Account (Term AccountId)
@@ -336,6 +377,8 @@ instance payeeMarloweType :: IsMarloweType Payee where
 instance payeeHasMarloweHoles :: HasMarloweHoles Payee where
   getHoles m (Account a) = getHoles m a
   getHoles m (Party a) = insertHole m a
+  getConstants m (Account a) = getConstants m a
+  getConstants m (Party a) = insertConstant m a
 
 data Case
   = Case (Term Action) (Term Contract)
@@ -357,6 +400,7 @@ instance caseMarloweType :: IsMarloweType Case where
 
 instance caseHasMarloweHoles :: HasMarloweHoles Case where
   getHoles m (Case a b) = getHoles m a <> getHoles m b
+  getConstants m (Case a b) = getConstants m a <> getConstants m b
 
 data Value
   = AvailableMoney (Term AccountId)
@@ -401,6 +445,15 @@ instance valueHasMarloweHoles :: HasMarloweHoles Value where
   getHoles m SlotIntervalStart = mempty
   getHoles m SlotIntervalEnd = mempty
   getHoles m (UseValue a) = getHoles m a
+  getConstants m (AvailableMoney a) = getConstants m a
+  getConstants m (Constant a) = insertConstant m a
+  getConstants m (NegValue a) = getConstants m a
+  getConstants m (AddValue a b) = getConstants m a <> getConstants m b
+  getConstants m (SubValue a b) = getConstants m a <> getConstants m b
+  getConstants m (ChoiceValue a b) = getConstants m a <> getConstants m b
+  getConstants m SlotIntervalStart = mempty
+  getConstants m SlotIntervalEnd = mempty
+  getConstants m (UseValue a) = getConstants m a
 
 data Input
   = IDeposit (Term AccountId) (Term Party) (Term Money)
@@ -460,6 +513,17 @@ instance observationHasMarloweHoles :: HasMarloweHoles Observation where
   getHoles m (ValueEQ a b) = getHoles m a <> getHoles m b
   getHoles m TrueObs = mempty
   getHoles m FalseObs = mempty
+  getConstants m (AndObs a b) = getConstants m a <> getConstants m b
+  getConstants m (OrObs a b) = getConstants m a <> getConstants m b
+  getConstants m (NotObs a) = getConstants m a
+  getConstants m (ChoseSomething a) = getConstants m a
+  getConstants m (ValueGE a b) = getConstants m a <> getConstants m b
+  getConstants m (ValueGT a b) = getConstants m a <> getConstants m b
+  getConstants m (ValueLT a b) = getConstants m a <> getConstants m b
+  getConstants m (ValueLE a b) = getConstants m a <> getConstants m b
+  getConstants m (ValueEQ a b) = getConstants m a <> getConstants m b
+  getConstants m TrueObs = mempty
+  getConstants m FalseObs = mempty
 
 data Contract
   = Close
@@ -492,6 +556,11 @@ instance contractHasMarloweHoles :: HasMarloweHoles Contract where
   getHoles m (If a b c) = getHoles m a <> getHoles m b <> getHoles m c
   getHoles m (When as b c) = getHoles m as <> insertHole m b <> getHoles m c
   getHoles m (Let a b c) = getHoles m a <> getHoles m b <> getHoles m c
+  getConstants m Close = mempty
+  getConstants m (Pay a b c d) = getConstants m a <> getConstants m b <> getConstants m c <> getConstants m d
+  getConstants m (If a b c) = getConstants m a <> getConstants m b <> getConstants m c
+  getConstants m (When as b c) = getConstants m as <> insertConstant m b <> getConstants m c
+  getConstants m (Let a b c) = getConstants m a <> getConstants m b <> getConstants m c
 
 newtype ValueId
   = ValueId String
@@ -512,6 +581,7 @@ instance valueIdIsMarloweType :: IsMarloweType ValueId where
 
 instance valueIdHasMarloweHoles :: HasMarloweHoles ValueId where
   getHoles m _ = m
+  getConstants m _ = m
 
 termToValue :: forall a. Term a -> Maybe a
 termToValue (Term a) = Just a

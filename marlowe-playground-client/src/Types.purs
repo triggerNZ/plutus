@@ -29,7 +29,7 @@ import Gists (GistAction)
 import Halogen as H
 import Halogen.Blockly (BlocklyQuery, BlocklyMessage)
 import Language.Haskell.Interpreter (InterpreterError, InterpreterResult)
-import Marlowe.Holes (Holes, MarloweHole)
+import Marlowe.Holes (Constants, Holes, MarloweHole)
 import Marlowe.Semantics (AccountId, Action(..), Ada, Bound, ChoiceId, ChosenNum, Contract, Environment(..), Input, Party, Payment, PubKey, Slot, SlotInterval(..), State, TransactionError, _minSlot, boundFrom, emptyState, evalValue)
 import Marlowe.Symbolic.Types.Response (Result)
 import Network.RemoteData (RemoteData)
@@ -69,6 +69,7 @@ data HAction
   | Undo
   | SelectHole (Maybe String)
   | InsertHole String MarloweHole (Array MarloweHole)
+  | SelectConstant (Maybe String)
   -- blockly
   | HandleBlocklyMessage BlocklyMessage
   | SetBlocklyCode
@@ -120,6 +121,7 @@ newtype FrontendState
   , blocklyState :: Maybe BlocklyState
   , analysisState :: RemoteData String Result
   , selectedHole :: Maybe String
+  , selectedConstant :: Maybe String
   }
 
 derive instance newtypeFrontendState :: Newtype FrontendState _
@@ -160,6 +162,9 @@ _analysisState = _Newtype <<< prop (SProxy :: SProxy "analysisState")
 _selectedHole :: Lens' FrontendState (Maybe String)
 _selectedHole = _Newtype <<< prop (SProxy :: SProxy "selectedHole")
 
+_selectedConstant :: Lens' FrontendState (Maybe String)
+_selectedConstant = _Newtype <<< prop (SProxy :: SProxy "selectedConstant")
+
 -- editable
 _timestamp ::
   forall s a.
@@ -188,6 +193,7 @@ type MarloweState
     , contract :: Maybe Contract
     , editorErrors :: Array Annotation
     , holes :: Holes
+    , constants :: Constants
     , payments :: Array Payment
     }
 
@@ -218,6 +224,9 @@ _editorErrors = prop (SProxy :: SProxy "editorErrors")
 _holes :: forall s a. Lens' { holes :: a | s } a
 _holes = prop (SProxy :: SProxy "holes")
 
+_constants :: forall s a. Lens' { constants :: a | s } a
+_constants = prop (SProxy :: SProxy "constants")
+
 --- Language.Haskell.Interpreter ---
 _result :: forall s a. Lens' { result :: a | s } a
 _result = prop (SProxy :: SProxy "result")
@@ -242,6 +251,7 @@ emptyMarloweState sn =
   , contract: Nothing
   , editorErrors: []
   , holes: mempty
+  , constants: mempty
   , payments: []
   }
 

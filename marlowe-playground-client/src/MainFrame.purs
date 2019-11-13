@@ -57,7 +57,7 @@ import Servant.PureScript.Settings (SPSettings_)
 import Simulation (simulationPane)
 import StaticData as StaticData
 import Text.Parsing.Parser (runParser)
-import Types (ActionInput(..), ChildSlots, FrontendState(FrontendState), HAction(..), HQuery(..), View(..), WebsocketMessage, _analysisState, _authStatus, _blocklySlot, _compilationResult, _createGistResult, _currentContract, _gistUrl, _haskellEditorSlot, _marloweState, _oldContract, _pendingInputs, _possibleActions, _result, _selectedHole, _slot, _view, emptyMarloweState)
+import Types (ActionInput(..), ChildSlots, FrontendState(FrontendState), HAction(..), HQuery(..), View(..), WebsocketMessage, _selectedConstant, _analysisState, _authStatus, _blocklySlot, _compilationResult, _createGistResult, _currentContract, _gistUrl, _haskellEditorSlot, _marloweState, _oldContract, _pendingInputs, _possibleActions, _result, _selectedHole, _slot, _view, emptyMarloweState)
 import WebSocket (WebSocketResponseMessage(..))
 
 initialState :: FrontendState
@@ -74,6 +74,7 @@ initialState =
     , blocklyState: Nothing
     , analysisState: NotAsked
     , selectedHole: Nothing
+    , selectedConstant: Nothing
     }
 
 ------------------------------------------------------------
@@ -166,6 +167,8 @@ toEvent (SelectHole _) = Nothing
 
 toEvent (InsertHole _ _ _) = Nothing
 
+toEvent (SelectConstant _) = Nothing
+
 toEvent (HandleBlocklyMessage _) = Nothing
 
 toEvent SetBlocklyCode = Nothing
@@ -196,6 +199,7 @@ handleAction (HaskellEditorAction subEvent) = handleHaskellEditorAction subEvent
 
 handleAction (MarloweHandleEditorMessage (TextChanged text)) = do
   assign _selectedHole Nothing
+  assign _selectedConstant Nothing
   saveMarloweBuffer text
   updateContractInState text
 
@@ -210,6 +214,7 @@ handleAction (MarloweHandleDropEvent event) = do
 handleAction (MarloweMoveToPosition pos) = do
   marloweEditorMoveCursorToPosition pos
   assign _selectedHole Nothing
+  assign _selectedConstant Nothing
 
 handleAction CheckAuthStatus = do
   assign _authStatus Loading
@@ -332,6 +337,8 @@ handleAction (InsertHole constructor firstHole@(MarloweHole { start }) holes) = 
           withoutPrefix <- stripPrefix (Pattern "(") $ trim s
           withoutSuffix <- stripSuffix (Pattern ")") withoutPrefix
           pure withoutSuffix
+
+handleAction (SelectConstant constant) = assign _selectedConstant constant
 
 handleAction (HandleBlocklyMessage Initialized) = pure unit
 

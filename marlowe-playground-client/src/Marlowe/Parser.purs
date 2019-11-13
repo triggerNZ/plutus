@@ -8,6 +8,7 @@ import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.BigInteger (BigInteger)
 import Data.BigInteger as BigInteger
+import Data.Char.Unicode (isLower)
 import Data.Either (Either)
 import Data.List (List, some)
 import Data.Maybe (Maybe(..))
@@ -15,11 +16,11 @@ import Data.String.CodeUnits (fromCharArray)
 import Marlowe.Holes (class FromTerm, AccountId(..), Action(..), Bound(..), Case(..), ChoiceId(..), Contract(..), Observation(..), Payee(..), Term(..), Value(..), ValueId(..), fromTerm)
 import Marlowe.Semantics (Ada(..), Party, PubKey, Slot(..), SlotInterval(..), Timeout, TransactionInput(..), TransactionWarning(..))
 import Marlowe.Semantics as S
-import Prelude (bind, const, discard, flip, pure, show, void, ($), (*>), (<$>), (<*), (<*>), (<<<))
+import Prelude ((<>), bind, const, discard, flip, pure, show, void, ($), (*>), (<$>), (<*), (<*>), (<<<))
 import Text.Parsing.Parser (ParseState(..), Parser, fail, runParser)
 import Text.Parsing.Parser.Basic (integral, parens)
-import Text.Parsing.Parser.Combinators (between, choice, sepBy)
-import Text.Parsing.Parser.String (char, string)
+import Text.Parsing.Parser.Combinators (between, choice, sepBy, (<?>))
+import Text.Parsing.Parser.String (char, satisfy, string)
 import Text.Parsing.Parser.Token (alphaNum, space)
 import Type.Proxy (Proxy(..))
 
@@ -44,14 +45,31 @@ hole = do
   where
   nameChars = alphaNum <|> char '_'
 
+constant :: forall a. Parser String (Term a)
+constant = do
+  (ParseState _ start _) <- MonadState.get
+  firstLetter <- lower
+  name <- fromCharArray <$> (pure [firstLetter] <> many nameChars)
+  (ParseState _ end _) <- MonadState.get
+  pure $ Const name Proxy start end
+  where
+  nameChars = alphaNum <|> char '_'
+
 parseTerm :: forall a. Parser String a -> Parser String (Term a)
 parseTerm p = hole <|> (Term <$> p)
+
+parseTermConst :: forall a. Parser String a -> Parser String (Term a)
+parseTermConst p = constant <|> parseTerm p
 
 maybeSpaces :: Parser String (Array Char)
 maybeSpaces = many space
 
 spaces :: Parser String (List Char)
 spaces = some space
+
+-- | Parse an uppercase letter.  Matches any char that satisfies `Data.Char.Unicode.isUpper`.
+lower :: Parser String Char
+lower = satisfy isLower <?> "lowercase letter"
 
 -- All arguments are space separated so we add **> to reduce boilerplate
 appRSpaces :: forall a b. Parser String a -> Parser String b -> Parser String b
@@ -140,7 +158,7 @@ atomValue =
 
 recValue :: Parser String Value
 recValue =
-  (AvailableMoney <$> (string "AvailableMoney" **> parseTerm accountId))
+  (AvailableMoney <$> (string "AvailableMoney" **> parseTermConst accountId))
     <|> (Constant <$> (string "Constant" **> bigIntegerTerm))
     <|> (NegValue <$> (string "NegValue" **> value'))
     <|> (AddValue <$> (string "AddValue" **> value') <**> value')
@@ -179,7 +197,7 @@ observation = atomObservation <|> recObservation
 
 payee :: Parser String Payee
 payee =
-  (Account <$> (string "Account" **> parseTerm accountId))
+  (Account <$> (string "Account" **> parseTermConst accountId))
     <|> (Party <$> (string "Party" **> parseTerm text))
 
 pubkey :: Parser String PubKey
@@ -201,7 +219,7 @@ bound = do
 
 action :: Parser String Action
 action =
-  (Deposit <$> (string "Deposit" **> parseTerm accountId) <**> parseTerm party <**> value')
+  (Deposit <$> (string "Deposit" **> parseTermConst accountId) <**> parseTerm party <**> value')
     <|> (Choice <$> (string "Choice" **> parseTerm choiceId) <**> array (maybeParens (parseTerm bound)))
     <|> (Notify <$> (string "Notify" **> observation'))
   where
@@ -230,7 +248,7 @@ atomContract = pure Close <* string "Close"
 
 recContract :: Parser String Contract
 recContract =
-  ( Pay <$> (string "Pay" **> parseTerm accountId)
+  ( Pay <$> (string "Pay" **> parseTermConst accountId)
       <**> parseTerm (parens payee)
       <**> value'
       <**> contract'
