@@ -1,0 +1,29 @@
+{
+    "scopeName": "source.marlowe",
+    "patterns": [{ "include": "#expression" }],
+    "repository": {
+      "expression": {
+        "patterns": [{ "include": "#contract" }, { "include": "#paren-expression" }]
+      },
+      "letter": {
+        "match": "a|b|c",
+        "name": "keyword.letter"
+      },
+      "contract": {
+        "match": "Close|Pay|If|When|Let",
+        "name": "marlowe.contract"
+      },
+      "paren-expression": {
+        "begin": "\\(",
+        "end": "\\)",
+        "beginCaptures": {
+          "0": { "name": "punctuation.paren.open" }
+        },
+        "endCaptures": {
+          "0": { "name": "punctuation.paren.close" }
+        },
+        "name": "expression.group",
+        "patterns": [{ "include": "#expression" }]
+      }
+    }
+  }

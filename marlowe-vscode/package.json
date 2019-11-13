@@ -17,7 +17,22 @@
 		"commands": [{
             "command": "extension.helloWorld",
 			"title": "Hello World"
-		}]
+		}],
+		"languages":[
+			{
+				"id": "marlowe",
+				"extensions": [
+					".marlowe"
+				]
+			}
+		],
+		"grammars":[
+			{
+				"language": "marlowe",
+				"scopeName": "source.marlowe",
+				"path": "./syntaxes/marlowe.json"
+			}
+		]
 	},
 	"scripts": {
 		"compile": "spago build",
