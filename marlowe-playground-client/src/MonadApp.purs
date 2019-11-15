@@ -1,11 +1,11 @@
 module MonadApp where
 
 import Prelude
-
 import API (RunResult)
 import Ace (Annotation, Editor)
 import Ace as Ace
 import Ace.EditSession as Session
+import Ace.Editor as Ace.Editor
 import Ace.Editor as AceEditor
 import Auth (AuthStatus)
 import Control.Monad.Except (class MonadTrans, ExceptT, runExceptT)
@@ -39,7 +39,7 @@ import Language.Haskell.Interpreter (InterpreterError, InterpreterResult, Source
 import LocalStorage as LocalStorage
 import Marlowe (SPParams_)
 import Marlowe as Server
-import Marlowe.Holes (MarloweHole(..), fromTerm, getConstants, getHoles)
+import Marlowe.Holes (MarloweHole(..), fromTerm, getConstants, getHoles, getRefactoring)
 import Marlowe.Parser (parseTerm, contract)
 import Marlowe.Semantics (Contract(..), PubKey, SlotInterval(..), TransactionInput(..), TransactionOutput(..), choiceOwner, computeTransaction, extractRequiredActionsWithTxs, moneyInContract)
 import Network.RemoteData as RemoteData
@@ -47,8 +47,8 @@ import Servant.PureScript.Ajax (AjaxError)
 import Servant.PureScript.Settings (SPSettings_)
 import StaticData (bufferLocalStorageKey, marloweBufferLocalStorageKey)
 import Text.Parsing.Parser (ParseError(..), runParser)
-import Text.Parsing.Parser.Pos (Position(..))
-import Types (ActionInput(..), ActionInputId, ChildSlots, FrontendState, HAction, MarloweState, WebData, WebsocketMessage(..), _Head, _blocklySlot, _contract, _currentMarloweState, _editorErrors, _haskellEditorSlot, _holes, _marloweEditorSlot, _marloweState, _moneyInContract, _oldContract, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, actionToActionInput, emptyMarloweState)
+import Text.Parsing.Parser.Pos as Parser
+import Types (ActionInput(..), ActionInputId, ChildSlots, FrontendState, HAction, MarloweState, WebData, WebsocketMessage(..), _Head, _blocklySlot, _constants, _contract, _currentMarloweState, _editorErrors, _haskellEditorSlot, _holes, _marloweEditorSlot, _marloweState, _moneyInContract, _oldContract, _payments, _pendingInputs, _possibleActions, _refactoring, _slot, _state, _transactionError, actionToActionInput, emptyMarloweState)
 import Web.HTML.Event.DragEvent (DragEvent)
 import WebSocket (WebSocketRequestMessage(CheckForWarnings))
 
@@ -178,8 +178,14 @@ saveInitialState' = do
 marloweEditorGetValue' :: forall m. MonadEffect m => HalogenApp m (Maybe String)
 marloweEditorGetValue' = withMarloweEditor AceEditor.getValue
 
-updateContractInState' :: forall m. String -> HalogenApp m Unit
-updateContractInState' contract = modifying _currentMarloweState (updateStateP <<< updateContractInStateP contract)
+updateContractInState' :: forall m. MonadEffect m => String -> HalogenApp m Unit
+updateContractInState' contract = do
+  mCursor <- withMarloweEditor Ace.Editor.getCursorPosition
+  let
+    cursor = case mCursor of
+      Just (Ace.Position { column, row }) -> Parser.Position { line: (row + 1), column: (column + 1) }
+      Nothing -> Parser.Position { line: 0, column: 0 }
+  modifying _currentMarloweState (updateStateP <<< updateContractInStateP cursor contract)
 
 -- I don't quite understand why but if you try to use MonadApp methods in HalogenApp methods you
 -- blow the stack so we have 3 methods pulled out here. I think this just ensures they are run
@@ -197,8 +203,14 @@ saveInitialStateImpl = do
 marloweEditorGetValueImpl :: forall m. MonadEffect m => HalogenApp m (Maybe String)
 marloweEditorGetValueImpl = withMarloweEditor AceEditor.getValue
 
-updateContractInStateImpl :: forall m. String -> HalogenApp m Unit
-updateContractInStateImpl contract = modifying _currentMarloweState (updatePossibleActions <<< updateContractInStateP contract)
+updateContractInStateImpl :: forall m. MonadEffect m => String -> HalogenApp m Unit
+updateContractInStateImpl contract = do
+  mCursor <- withMarloweEditor Ace.Editor.getCursorPosition
+  let
+    cursor = case mCursor of
+      Just (Ace.Position { column, row }) -> Parser.Position { line: (row + 1), column: (column + 1) }
+      Nothing -> Parser.Position { line: 0, column: 0 }
+  modifying _currentMarloweState (updatePossibleActions <<< updateContractInStateP cursor contract)
 
 runHalogenApp :: forall m a. HalogenApp m a -> HalogenM FrontendState HAction ChildSlots WebsocketMessage m a
 runHalogenApp = unwrap
@@ -223,8 +235,8 @@ withMarloweEditor ::
   HalogenApp m (Maybe a)
 withMarloweEditor = HalogenApp <<< Editor.withEditor _marloweEditorSlot unit
 
-updateContractInStateP :: String -> MarloweState -> MarloweState
-updateContractInStateP text state = case runParser text (parseTerm contract) of
+updateContractInStateP :: Parser.Position -> String -> MarloweState -> MarloweState
+updateContractInStateP cursor text state = case runParser text (parseTerm contract) of
   Right pcon -> case fromTerm pcon of
     Just contract -> do
       set _editorErrors [] <<< set _contract (Just contract) $ state
@@ -236,13 +248,20 @@ updateContractInStateP text state = case runParser text (parseTerm contract) of
 
         constants = getConstants mempty pcon
 
+        refactoring = getRefactoring cursor pcon
+
         warnings = map holeToAnnotation holesArray
-      (set _editorErrors warnings <<< set _holes holes <<< set _constants constants) state
+      ( set _editorErrors warnings
+          <<< set _holes holes
+          <<< set _constants constants
+          <<< set _refactoring refactoring
+      )
+        state
   Left error -> (set _editorErrors [ errorToAnnotation error ] <<< set _holes mempty) state
   where
-  errorToAnnotation (ParseError msg (Position { line, column })) = { column: column, row: (line - 1), text: msg, "type": "error" }
+  errorToAnnotation (ParseError msg (Parser.Position { line, column })) = { column: column, row: (line - 1), text: msg, "type": "error" }
 
-  holeToAnnotation (MarloweHole { name, marloweType, start: (Position { column, line }), end }) = { column: column, row: (line - 1), text: "Found hole ?" <> name, "type": "warning" }
+  holeToAnnotation (MarloweHole { name, marloweType, start: (Parser.Position { column, line }), end }) = { column: column, row: (line - 1), text: "Found hole ?" <> name, "type": "warning" }
 
 updatePossibleActions :: MarloweState -> MarloweState
 updatePossibleActions oldState =

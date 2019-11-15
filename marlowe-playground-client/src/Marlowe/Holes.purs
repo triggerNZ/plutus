@@ -1,10 +1,10 @@
 module Marlowe.Holes where
 
 import Prelude
-
+import Control.Alt ((<|>))
 import Data.Array (foldMap, foldl, mapWithIndex, (:))
 import Data.BigInteger (BigInteger)
-import Data.Foldable (intercalate)
+import Data.Foldable (intercalate, oneOf)
 import Data.Function (on)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
@@ -145,7 +145,7 @@ instance showMarloweType :: Show MarloweType where
   show = genericShow
 
 data Term a
-  = Term a
+  = Term a Position Position
   | Hole String (Proxy a) Position Position
   | Const String (Proxy a) Position Position
 
@@ -155,12 +155,12 @@ instance eqTerm :: Eq a => Eq (Term a) where
   eq a b = genericEq a b
 
 instance showTerm :: Show a => Show (Term a) where
-  show (Term a) = show a
+  show (Term a _ _) = show a
   show (Hole name _ _ _) = "?" <> name
   show (Const name _ _ _) = name
 
 instance prettyTerm :: Pretty a => Pretty (Term a) where
-  prettyFragment (Term a) = prettyFragment a
+  prettyFragment (Term a _ _) = prettyFragment a
   prettyFragment (Hole name _ _ _) = Leijen.text $ "?" <> name
   prettyFragment (Const name _ _ _) = Leijen.text name
 
@@ -191,6 +191,9 @@ derive instance eqMarloweConstant :: Eq MarloweConstant
 
 instance ordMarloweConstant :: Ord MarloweConstant where
   compare (MarloweConstant { start: (Position a) }) (MarloweConstant { start: (Position b) }) = (compare `on` _.line <> compare `on` _.column) a b
+
+data Refactoring
+  = ExtractAccountId { name :: String, accountId :: S.AccountId, start :: Position, end :: Position }
 
 class IsMarloweType a where
   marloweType :: Proxy a -> MarloweType
@@ -246,18 +249,44 @@ insertConstant m _ = m
 class HasMarloweHoles a where
   getHoles :: Holes -> a -> Holes
   getConstants :: Constants -> a -> Constants
+  getRefactoring :: Position -> a -> Maybe Refactoring
+
+positionWithin :: Position -> Position -> Position -> Boolean
+positionWithin (Position needle) (Position start) (Position finish) =
+  needle.line >= start.line
+    && needle.line
+    <= finish.line
+    && needle.column
+    >= start.column
+    && needle.column
+    <= finish.column
+
+getExtractAccountId :: Position -> AccountId -> Position -> Position -> Maybe Refactoring
+getExtractAccountId cursor accountIdTerm start@(Position s) end =
+  if positionWithin cursor start end then case fromTerm accountIdTerm of
+    Nothing -> Nothing
+    Just accountId ->
+      let
+        name = "account_" <> show s.line <> "_" <> show s.column
+      in
+        Just $ ExtractAccountId { name, accountId, start, end }
+  else
+    Nothing
 
 instance termHasMarloweHoles :: (IsMarloweType a, HasMarloweHoles a) => HasMarloweHoles (Term a) where
-  getHoles m (Term a) = getHoles m a
+  getHoles m (Term a _ _) = getHoles m a
   getHoles m (Const _ _ _ _) = m
   getHoles m h = insertHole m h
-  getConstants m (Term a) = getConstants m a
+  getConstants m (Term a _ _) = getConstants m a
   getConstants m (Hole _ _ _ _) = m
   getConstants m c = insertConstant m c
+  getRefactoring cursor (Term a _ _) = getRefactoring cursor a
+  getRefactoring _ _ = Nothing
 
 instance arrayHasMarloweHoles :: HasMarloweHoles a => HasMarloweHoles (Array a) where
   getHoles m as = foldMap (getHoles m) as
   getConstants m as = foldMap (getConstants m) as
+  getRefactoring cursor as = oneOf $ map (getRefactoring cursor) as
 
 -- Parsable versions of the Marlowe types
 data Bound
@@ -280,6 +309,7 @@ instance boundIsMarloweType :: IsMarloweType Bound where
 instance boundHasMarloweHoles :: HasMarloweHoles Bound where
   getHoles m (Bound a b) = insertHole m a <> insertHole m b
   getConstants m (Bound a b) = insertConstant m a <> insertConstant m b
+  getRefactoring _ _ = Nothing
 
 data AccountId
   = AccountId (Term BigInteger) (Term PubKey)
@@ -293,7 +323,7 @@ instance prettyAccountId :: Pretty AccountId where
   prettyFragment a = Leijen.text (show a)
 
 instance accountIdFromTerm :: FromTerm AccountId S.AccountId where
-  fromTerm (AccountId (Term b) (Term c)) = pure $ S.AccountId b c
+  fromTerm (AccountId (Term b _ _) (Term c _ _)) = pure $ S.AccountId b c
   fromTerm _ = Nothing
 
 instance accountIdIsMarloweType :: IsMarloweType AccountId where
@@ -302,6 +332,7 @@ instance accountIdIsMarloweType :: IsMarloweType AccountId where
 instance accountIdHasMarloweHoles :: HasMarloweHoles AccountId where
   getHoles m (AccountId a b) = insertHole m a <> insertHole m b
   getConstants m (AccountId a b) = insertConstant m a <> insertConstant m b
+  getRefactoring _ _ = Nothing
 
 data ChoiceId
   = ChoiceId (Term String) (Term PubKey)
@@ -315,7 +346,7 @@ instance prettyChoiceId :: Pretty ChoiceId where
   prettyFragment a = Leijen.text (show a)
 
 instance choiceIdFromTerm :: FromTerm ChoiceId S.ChoiceId where
-  fromTerm (ChoiceId (Term a) (Term b)) = pure $ S.ChoiceId a b
+  fromTerm (ChoiceId (Term a _ _) (Term b _ _)) = pure $ S.ChoiceId a b
   fromTerm _ = Nothing
 
 instance choiceIdIsMarloweType :: IsMarloweType ChoiceId where
@@ -324,6 +355,7 @@ instance choiceIdIsMarloweType :: IsMarloweType ChoiceId where
 instance choiceIdHasMarloweHoles :: HasMarloweHoles ChoiceId where
   getHoles m (ChoiceId a b) = insertHole m a <> insertHole m b
   getConstants m (ChoiceId a b) = insertConstant m a <> insertConstant m b
+  getRefactoring _ _ = Nothing
 
 data Action
   = Deposit (Term AccountId) (Term Party) (Term Value)
@@ -353,6 +385,8 @@ instance actionHasMarloweHoles :: HasMarloweHoles Action where
   getConstants m (Deposit a b c) = getConstants m a <> insertConstant m b <> getConstants m c
   getConstants m (Choice a bs) = getConstants m a <> getConstants m bs
   getConstants m (Notify a) = getConstants m a
+  getRefactoring cursor (Deposit (Term accountId start end) _ c) = getExtractAccountId cursor accountId start end <|> getRefactoring cursor c
+  getRefactoring _ _ = Nothing
 
 data Payee
   = Account (Term AccountId)
@@ -368,7 +402,7 @@ instance prettyPayee :: Pretty Payee where
 
 instance payeeFromTerm :: FromTerm Payee S.Payee where
   fromTerm (Account a) = S.Account <$> fromTerm a
-  fromTerm (Party (Term a)) = pure $ S.Party a
+  fromTerm (Party (Term a _ _)) = pure $ S.Party a
   fromTerm _ = Nothing
 
 instance payeeMarloweType :: IsMarloweType Payee where
@@ -379,6 +413,8 @@ instance payeeHasMarloweHoles :: HasMarloweHoles Payee where
   getHoles m (Party a) = insertHole m a
   getConstants m (Account a) = getConstants m a
   getConstants m (Party a) = insertConstant m a
+  getRefactoring cursor (Account (Term accountId start end)) = getExtractAccountId cursor accountId start end
+  getRefactoring _ _ = Nothing
 
 data Case
   = Case (Term Action) (Term Contract)
@@ -401,6 +437,7 @@ instance caseMarloweType :: IsMarloweType Case where
 instance caseHasMarloweHoles :: HasMarloweHoles Case where
   getHoles m (Case a b) = getHoles m a <> getHoles m b
   getConstants m (Case a b) = getConstants m a <> getConstants m b
+  getRefactoring cursor (Case a b) = getRefactoring cursor a <|> getRefactoring cursor b
 
 data Value
   = AvailableMoney (Term AccountId)
@@ -454,6 +491,12 @@ instance valueHasMarloweHoles :: HasMarloweHoles Value where
   getConstants m SlotIntervalStart = mempty
   getConstants m SlotIntervalEnd = mempty
   getConstants m (UseValue a) = getConstants m a
+  getRefactoring cursor (AvailableMoney (Term accountId start end)) = getExtractAccountId cursor accountId start end
+  getRefactoring cursor (NegValue a) = getRefactoring cursor a
+  getRefactoring cursor (AddValue a b) = getRefactoring cursor a <|> getRefactoring cursor b
+  getRefactoring cursor (SubValue a b) = getRefactoring cursor a <|> getRefactoring cursor b
+  getRefactoring cursor (ChoiceValue a b) = getRefactoring cursor a <|> getRefactoring cursor b
+  getRefactoring cursor _ = Nothing
 
 data Input
   = IDeposit (Term AccountId) (Term Party) (Term Money)
@@ -482,7 +525,7 @@ instance prettyObservation :: Pretty Observation where
   prettyFragment a = genericPretty a
 
 instance fromTermTerm :: FromTerm a b => FromTerm (Term a) b where
-  fromTerm (Term a) = fromTerm a
+  fromTerm (Term a _ _) = fromTerm a
   fromTerm _ = Nothing
 
 instance observationFromTerm :: FromTerm Observation S.Observation where
@@ -524,6 +567,17 @@ instance observationHasMarloweHoles :: HasMarloweHoles Observation where
   getConstants m (ValueEQ a b) = getConstants m a <> getConstants m b
   getConstants m TrueObs = mempty
   getConstants m FalseObs = mempty
+  getRefactoring cursor (AndObs a b) = getRefactoring cursor a <|> getRefactoring cursor b
+  getRefactoring cursor (OrObs a b) = getRefactoring cursor a <|> getRefactoring cursor b
+  getRefactoring cursor (NotObs a) = getRefactoring cursor a
+  getRefactoring cursor (ChoseSomething _) = Nothing
+  getRefactoring cursor (ValueGE a b) = getRefactoring cursor a <|> getRefactoring cursor b
+  getRefactoring cursor (ValueGT a b) = getRefactoring cursor a <|> getRefactoring cursor b
+  getRefactoring cursor (ValueLT a b) = getRefactoring cursor a <|> getRefactoring cursor b
+  getRefactoring cursor (ValueLE a b) = getRefactoring cursor a <|> getRefactoring cursor b
+  getRefactoring cursor (ValueEQ a b) = getRefactoring cursor a <|> getRefactoring cursor b
+  getRefactoring cursor TrueObs = Nothing
+  getRefactoring cursor FalseObs = Nothing
 
 data Contract
   = Close
@@ -561,6 +615,12 @@ instance contractHasMarloweHoles :: HasMarloweHoles Contract where
   getConstants m (If a b c) = getConstants m a <> getConstants m b <> getConstants m c
   getConstants m (When as b c) = getConstants m as <> insertConstant m b <> getConstants m c
   getConstants m (Let a b c) = getConstants m a <> getConstants m b <> getConstants m c
+  getRefactoring cursor Close = Nothing
+  getRefactoring cursor (Pay (Term accountId start end) _ c d) = getExtractAccountId cursor accountId start end <|> getRefactoring cursor c <|> getRefactoring cursor d
+  getRefactoring cursor (Pay a b c d) = getRefactoring cursor a <|> getRefactoring cursor b <|> getRefactoring cursor c <|> getRefactoring cursor d
+  getRefactoring cursor (If a b c) = getRefactoring cursor a <|> getRefactoring cursor b <|> getRefactoring cursor c
+  getRefactoring cursor (When as b c) = getRefactoring cursor as <|> getRefactoring cursor c
+  getRefactoring cursor (Let _ b c) = getRefactoring cursor b <|> getRefactoring cursor c
 
 newtype ValueId
   = ValueId String
@@ -582,9 +642,10 @@ instance valueIdIsMarloweType :: IsMarloweType ValueId where
 instance valueIdHasMarloweHoles :: HasMarloweHoles ValueId where
   getHoles m _ = m
   getConstants m _ = m
+  getRefactoring _ _ = Nothing
 
 termToValue :: forall a. Term a -> Maybe a
-termToValue (Term a) = Just a
+termToValue (Term a _ _) = Just a
 
 termToValue _ = Nothing
 

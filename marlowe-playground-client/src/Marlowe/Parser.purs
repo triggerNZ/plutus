@@ -49,14 +49,20 @@ constant :: forall a. Parser String (Term a)
 constant = do
   (ParseState _ start _) <- MonadState.get
   firstLetter <- lower
-  name <- fromCharArray <$> (pure [firstLetter] <> many nameChars)
+  name <- fromCharArray <$> (pure [ firstLetter ] <> many nameChars)
   (ParseState _ end _) <- MonadState.get
   pure $ Const name Proxy start end
   where
   nameChars = alphaNum <|> char '_'
 
 parseTerm :: forall a. Parser String a -> Parser String (Term a)
-parseTerm p = hole <|> (Term <$> p)
+parseTerm p =
+  hole
+    <|> do
+        (ParseState _ start _) <- MonadState.get
+        t <- p
+        (ParseState _ end _) <- MonadState.get
+        pure $ Term t start end
 
 parseTermConst :: forall a. Parser String a -> Parser String (Term a)
 parseTermConst p = constant <|> parseTerm p

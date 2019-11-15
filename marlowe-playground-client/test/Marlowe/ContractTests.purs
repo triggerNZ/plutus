@@ -17,6 +17,7 @@ import MonadApp (class MonadApp, applyTransactions, extendWith, marloweEditorSet
 import Network.RemoteData (RemoteData(..))
 import Test.Unit (TestSuite, suite, test)
 import Test.Unit.Assert (equal)
+import Text.Parsing.Parser.Pos as Parser
 import Types (FrontendState(..), View(..), _Head, _contract, _currentMarloweState, _editorErrors, _marloweState, _pendingInputs, _transactionError, emptyMarloweState)
 
 -- | For these tests we only need to worry about the MarloweState that is being carried around
@@ -72,7 +73,7 @@ instance monadAppState :: MonadApp MockApp where
   checkContractForWarnings _ = pure unit
 
 updateContractInStateImpl :: String -> MockApp Unit
-updateContractInStateImpl contract = modifying _currentMarloweState (updatePossibleActions <<< updateContractInStateP contract)
+updateContractInStateImpl contract = modifying _currentMarloweState (updatePossibleActions <<< updateContractInStateP (Parser.Position { line: 0, column: 0 }) contract)
 
 initialState :: FrontendState
 initialState =
@@ -88,6 +89,7 @@ initialState =
     , blocklyState: Nothing
     , analysisState: NotAsked
     , selectedHole: Nothing
+    , displayRefactoring: false
     }
 
 runTests :: forall a. MockApp a -> Tuple a FrontendState

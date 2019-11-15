@@ -73,10 +73,17 @@ genHole = do
   end <- genPosition
   pure $ Hole name proxy start end
 
+genTerm' :: forall m a. MonadGen m => MonadRec m => m a -> m (Term a)
+genTerm' g = do
+  t <- g
+  start <- genPosition
+  end <- genPosition
+  pure $ Term t start end
+
 genTerm :: forall m a. MonadGen m => MonadRec m => MonadAsk Boolean m => m a -> m (Term a)
 genTerm g = do
   withHoles <- ask
-  oneOf $ (Term <$> g) :| (if withHoles then [ genHole ] else [])
+  oneOf $ (genTerm' g) :| (if withHoles then [ genHole ] else [])
 
 genAccountId :: forall m. MonadGen m => MonadRec m => MonadAsk Boolean m => m AccountId
 genAccountId = do

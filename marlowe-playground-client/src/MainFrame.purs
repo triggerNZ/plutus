@@ -57,7 +57,7 @@ import Servant.PureScript.Settings (SPSettings_)
 import Simulation (simulationPane)
 import StaticData as StaticData
 import Text.Parsing.Parser (runParser)
-import Types (ActionInput(..), ChildSlots, FrontendState(FrontendState), HAction(..), HQuery(..), View(..), WebsocketMessage, _selectedConstant, _analysisState, _authStatus, _blocklySlot, _compilationResult, _createGistResult, _currentContract, _gistUrl, _haskellEditorSlot, _marloweState, _oldContract, _pendingInputs, _possibleActions, _result, _selectedHole, _slot, _view, emptyMarloweState)
+import Types (ActionInput(..), ChildSlots, FrontendState(FrontendState), HAction(..), HQuery(..), View(..), WebsocketMessage, _analysisState, _authStatus, _blocklySlot, _compilationResult, _createGistResult, _currentContract, _gistUrl, _haskellEditorSlot, _marloweState, _oldContract, _pendingInputs, _possibleActions, _result, _selectedHole, _slot, _view, emptyMarloweState)
 import WebSocket (WebSocketResponseMessage(..))
 
 initialState :: FrontendState
@@ -74,7 +74,7 @@ initialState =
     , blocklyState: Nothing
     , analysisState: NotAsked
     , selectedHole: Nothing
-    , selectedConstant: Nothing
+    , displayRefactoring: false
     }
 
 ------------------------------------------------------------
@@ -127,6 +127,8 @@ toEvent (HaskellEditorAction CompileProgram) = Just $ defaultEvent "CompileProgr
 
 toEvent (HaskellEditorAction (ScrollTo _)) = Nothing
 
+toEvent MarloweEditorCursorMoved = Nothing
+
 toEvent (MarloweHandleEditorMessage _) = Nothing
 
 toEvent (MarloweHandleDragEvent _) = Nothing
@@ -167,7 +169,9 @@ toEvent (SelectHole _) = Nothing
 
 toEvent (InsertHole _ _ _) = Nothing
 
-toEvent (SelectConstant _) = Nothing
+toEvent (SetAccountId _ _) = Nothing
+
+toEvent StartRefactoring = Nothing
 
 toEvent (HandleBlocklyMessage _) = Nothing
 
@@ -199,7 +203,6 @@ handleAction (HaskellEditorAction subEvent) = handleHaskellEditorAction subEvent
 
 handleAction (MarloweHandleEditorMessage (TextChanged text)) = do
   assign _selectedHole Nothing
-  assign _selectedConstant Nothing
   saveMarloweBuffer text
   updateContractInState text
 
@@ -214,7 +217,11 @@ handleAction (MarloweHandleDropEvent event) = do
 handleAction (MarloweMoveToPosition pos) = do
   marloweEditorMoveCursorToPosition pos
   assign _selectedHole Nothing
-  assign _selectedConstant Nothing
+
+handleAction MarloweEditorCursorMoved = do
+  assign _selectedHole Nothing
+  currContract <- marloweEditorGetValue
+  updateContractInState $ fromMaybe "" currContract
 
 handleAction CheckAuthStatus = do
   assign _authStatus Loading
@@ -338,7 +345,9 @@ handleAction (InsertHole constructor firstHole@(MarloweHole { start }) holes) = 
           withoutSuffix <- stripSuffix (Pattern ")") withoutPrefix
           pure withoutSuffix
 
-handleAction (SelectConstant constant) = assign _selectedConstant constant
+handleAction (SetAccountId _ _) = pure unit
+
+handleAction StartRefactoring = pure unit
 
 handleAction (HandleBlocklyMessage Initialized) = pure unit
 

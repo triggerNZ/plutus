@@ -6,7 +6,8 @@ import Ace.Editor as Editor
 import Ace.Halogen.Component (Autocomplete(Live), aceComponent)
 import Ace.Types (Editor)
 import Ace.Types as Ace
-import Bootstrap (btn, btnInfo, btnPrimary, btnSecondary, btnSmall, card, cardBody_, card_, col3, col6, col9, col_, dropdownToggle, empty, listGroupItem_, listGroup_, row_)
+import Bootstrap (btn, btnInfo, btnPrimary, btnSecondary, btnSmall, card, cardBody_, card_, col3, col6, col9, colFormLabel, col_, dropdownToggle, empty, formControl, formRow_, listGroupItem_, listGroup_, row_)
+import Bootstrap as Bootstrap
 import Bootstrap.Extra (ariaExpanded, ariaHasPopup, ariaLabelledBy, dataToggle)
 import Control.Alternative (map, (<|>))
 import Data.Array (catMaybes, fromFoldable, head, sortBy)
@@ -29,21 +30,22 @@ import Data.Tuple (Tuple(..), snd)
 import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
-import Halogen.HTML (ClassName(..), ComponentHTML, HTML, PropName(..), a, b_, br_, button, code_, col, colgroup, div, div_, h2, h3_, input, li_, ol_, pre_, slot, span, span_, strong_, table_, tbody_, td, td_, text, th, th_, thead_, tr, ul_)
-import Halogen.HTML.Events (onClick, onDragOver, onDrop, onValueChange)
-import Halogen.HTML.Properties (ButtonType(..), InputType(InputNumber), class_, classes, enabled, id_, placeholder, prop, type_, value)
+import Halogen.HTML (ClassName(..), ComponentHTML, HTML, PropName(..), a, b_, br_, button, code_, col, colgroup, div, div_, h2, h3_, input, label, li_, ol_, pre_, slot, span, span_, strong_, table_, tbody_, td, td_, text, th, th_, thead_, tr, ul_)
+import Halogen.HTML.Events (onClick, onDragOver, onDrop, onKeyUp, onValueChange)
+import Halogen.HTML.Properties (ButtonType(..), InputType(..), class_, classes, enabled, id_, min, placeholder, prop, required, type_, value)
 import Halogen.HTML.Properties.ARIA (role)
 import LocalStorage as LocalStorage
-import Marlowe.Holes (Constants, Holes(..), MarloweConstant(..), MarloweHole(..), MarloweType(..), getMarloweConstructors)
+import Marlowe.Holes (Holes(..), MarloweConstant(..), MarloweHole(..), MarloweType(..), Refactoring(..), getMarloweConstructors)
 import Marlowe.Parser (transactionInputList, transactionWarningList)
 import Marlowe.Semantics (AccountId(..), Ada(..), Bound(..), ChoiceId(..), ChosenNum, Input(..), Party, Payee(..), Payment(..), PubKey, Slot(..), SlotInterval(..), TransactionError, TransactionInput(..), TransactionWarning(..), ValueId(..), _accounts, _boundValues, _choices, inBounds)
 import Marlowe.Symbolic.Types.Response as R
 import Network.RemoteData (RemoteData(..), isLoading)
-import Prelude (class Show, Unit, bind, compare, const, discard, flip, identity, mempty, not, pure, show, unit, void, ($), (+), (<$>), (<<<), (<>), (>))
+import Prelude (class Show, Unit, bind, compare, const, discard, flip, identity, mempty, not, pure, show, unit, void, zero, ($), (+), (<$>), (<<<), (<>), (>))
+import Simulation.AccountIdEditor (accountIdEditor)
 import StaticData as StaticData
 import Text.Parsing.Parser (runParser)
 import Text.Parsing.Parser.Pos (Position(..))
-import Types (ActionInput(..), ActionInputId, ChildSlots, FrontendState, HAction(..), MarloweError(..), MarloweState, _Head, _analysisState, _constants, _contract, _editorErrors, _holes, _marloweCompileResult, _marloweEditorSlot, _marloweState, _moneyInContract, _payments, _pendingInputs, _possibleActions, _selectedConstant, _selectedHole, _slot, _state, _transactionError)
+import Types (ActionInput(..), ActionInputId, ChildSlots, FrontendState, HAction(..), MarloweError(..), MarloweState, _Head, _analysisState, _contract, _displayRefactoring, _editorErrors, _holes, _marloweAccounts, _marloweCompileResult, _marloweEditorSlot, _marloweState, _moneyInContract, _payments, _pendingInputs, _possibleActions, _refactoring, _selectedHole, _slot, _state, _transactionError)
 
 paneHeader :: forall p. String -> HTML p HAction
 paneHeader s = h2 [ class_ $ ClassName "pane-header" ] [ text s ]
@@ -85,12 +87,15 @@ simulationPane state =
           , div
               [ onDragOver $ Just <<< MarloweHandleDragEvent
               , onDrop $ Just <<< MarloweHandleDropEvent
+              , onKeyUp $ Just <<< const MarloweEditorCursorMoved
+              , onClick $ Just <<< const MarloweEditorCursorMoved
               ]
               [ row_
                   [ div [ class_ col9 ] [ slot _marloweEditorSlot unit (aceComponent initEditor (Just Live)) unit (Just <<< MarloweHandleEditorMessage) ]
                   , div [ class_ col3 ]
                       [ holesPane (view _selectedHole state) (view (_marloweState <<< _Head <<< _holes) state)
-                      , constantsPane (view _selectedConstant state) (view (_marloweState <<< _Head <<< _constants) state)
+                      , accountsPane (view (_marloweState <<< _Head <<< _marloweAccounts) state)
+                      , refactoringPane (view (_marloweState <<< _Head <<< _marloweAccounts) state) (view _displayRefactoring state) (view (_marloweState <<< _Head <<< _refactoring) state)
                       ]
                   ]
               ]
@@ -213,22 +218,15 @@ holeDropdowns holes = case Array.uncons holes of
   where
   holeToAcePosition (Position { column, line }) = Ace.Position { column, row: line }
 
-constantsPane :: forall p. Maybe String -> Constants -> HTML p HAction
-constantsPane selectedConstant constants =
-  let
-    kvs = Map.toUnfoldable (unwrap constants)
-
-    ordered = sortBy (compare `on` (head <<< snd)) kvs
-
-    holesGroup = map (\(Tuple k v) -> displayConstant selectedConstant k v) ordered
-  in
-    div
-      [ classes [ ClassName "btn-group-vertical", ClassName "w-100" ]
-      , role "group"
-      ]
-      ( [ div [ classes [ btn ] ] [ text "Accounts" ] ]
-          <> holesGroup
-      )
+accountsPane :: forall p. Array AccountId -> HTML p HAction
+accountsPane accounts =
+  div
+    [ classes [ ClassName "btn-group-vertical", ClassName "w-100" ]
+    , role "group"
+    ]
+    ( [ div [ classes [ btn ] ] [ text "Accounts" ] ]
+        <> []
+    )
 
 displayConstant :: forall p. Maybe String -> String -> Array MarloweConstant -> HTML p HAction
 displayConstant selectedConstant name constants =
@@ -240,7 +238,7 @@ displayConstant selectedConstant name constants =
         , dataToggle "dropdown"
         , ariaHasPopup true
         , ariaExpanded expanded
-        , onClick $ const $ Just $ SelectConstant selectConstant
+        -- , onClick $ const $ Just $ SelectConstant selectConstant
         ]
         [ text name ]
     , div
@@ -261,15 +259,82 @@ constantDropdowns holes = case Array.uncons holes of
   Nothing -> mempty
   Just { head: (MarloweConstant { marloweType: AccountIdType, end }) } ->
     [ div
-        [ classes [ ClassName "dropdown-item", ClassName "font-italic" ]
-        , onClick $ const $ Just $ MarloweMoveToPosition $ holeToAcePosition end
+        [] -- classes [ ClassName "dropdown-item", ClassName "font-italic" ]-- , onClick $ const $ Just $ MarloweMoveToPosition $ holeToAcePosition end] [ div [ class_ formGroup ]
+        [ formRow_
+            [ label [ classes [ Bootstrap.col, colFormLabel ] ] [ text "Variable Name" ]
+            , col_
+                [ input
+                    [ type_ InputText
+                    , classes [ formControl ] -- (Array.cons formControl (actionArgumentClass ancestors))
+                    , value $ "example" -- fromMaybe "" s
+                    , required true
+                    , placeholder "Var Name"
+                    -- , onValueInput (Just <<< SetField <<< SetStringField)
+                    ]
+                ]
+            ]
+        , formRow_
+            [ label [ classes [ Bootstrap.col, colFormLabel ] ] [ text "Account Name" ]
+            , col_
+                [ input
+                    [ type_ InputText
+                    , classes [ formControl ] -- (Array.cons formControl (actionArgumentClass ancestors))
+                    , value $ "example" -- fromMaybe "" s
+                    , required true
+                    , placeholder "Acc Name"
+                    -- , onValueInput (Just <<< SetField <<< SetStringField)
+                    ]
+                ]
+            ]
+        , formRow_
+            [ label [ classes [ Bootstrap.col, colFormLabel ] ] [ text "Account Number" ]
+            , col_
+                [ input
+                    [ type_ InputNumber
+                    , classes [ formControl ] -- (Array.cons formControl (actionArgumentClass ancestors))
+                    , value $ "0" -- fromMaybe "" s
+                    , required true
+                    , placeholder "Acc Number"
+                    , min zero
+                    -- , onValueInput
+                    -- $ \str -> do
+                    -- newAmount <- Int.fromString str
+                    -- pure $ handler $ SetBalance currencySymbol tokenName newAmount
+                    ]
+                ]
+            ]
         ]
-        [ text "Replace the hole with an integer" ]
     ]
   Just _ -> mempty
   where
   holeToAcePosition (Position { column, line }) = Ace.Position { column, row: line }
-  
+
+refactoringPane :: forall p. Array AccountId -> Boolean -> Maybe Refactoring -> HTML p HAction
+refactoringPane accounts display refactoring =
+  div
+    [ classes [ ClassName "btn-group-vertical", ClassName "w-100" ]
+    , role "group"
+    ]
+    ( [ div [ classes [ btn ] ]
+          [ text "Refactorings"
+          , displayRefactoring display refactoring
+          ]
+      ]
+    )
+
+displayRefactoring :: forall p. Boolean -> Maybe Refactoring -> HTML p HAction
+displayRefactoring _ Nothing = text ""
+
+displayRefactoring false (Just (ExtractAccountId _)) =
+  button
+    [ classes [ btn, btnSecondary, ClassName "button-box" ]
+    , type_ ButtonButton
+    , onClick $ const $ Just $ StartRefactoring
+    ]
+    [ text "Extract Account Id" ]
+
+displayRefactoring true (Just (ExtractAccountId { name, accountId, start, end })) = accountIdEditor name accountId start end
+
 demoScriptsPane :: forall p. HTML p HAction
 demoScriptsPane =
   div_
