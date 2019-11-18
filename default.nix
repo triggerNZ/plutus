@@ -87,6 +87,14 @@ let
     # it is read using IFD and git, which is avilable on local builds.
     git-rev = if isNull rev then localLib.iohkNix.commitIdFromGitRepo ./.git else rev;
 
+
+    ormoluPkgs =
+      let spec = builtins.fromJSON (builtins.readFile ./ormolu.json);
+      in import (builtins.fetchTarball {
+        url = "${spec.url}/archive/${spec.rev}.tar.gz";
+        inherit (spec) sha256;
+      }) {};
+
     # set-git-rev is a function that can be called on a haskellPackages package to inject the git revision post-compile
     set-git-rev = self.callPackage ./scripts/set-git-rev {
       inherit (self.haskellPackages) ghc;
@@ -412,6 +420,69 @@ let
           exit
         '';
 
+        fixBrittany = pkgs.writeScript "fix-brittany" ''
+          #!${pkgs.runtimeShell}
+
+          ${pkgs.git}/bin/git diff > pre-brittany.diff
+          ${pkgs.fd}/bin/fd \
+            --extension hs \
+            --exclude '*/dist/*' \
+            --exclude '*/docs/*' \
+            --exec ${pkgs.haskellPackages.brittany}/bin/brittany --write-mode inplace {}
+          ${pkgs.git}/bin/git diff > post-brittany.diff
+          diff pre-brittany.diff post-brittany.diff > /dev/null
+          if [ $? != 0 ]
+          then
+            echo "Changes by brittany have been made. Please commit them."
+          else
+            echo "No brittany changes were made."
+          fi
+          rm pre-brittany.diff post-brittany.diff
+          exit
+        '';
+
+        fixHindent = pkgs.writeScript "fix-hindent" ''
+          #!${pkgs.runtimeShell}
+
+          ${pkgs.git}/bin/git diff > pre-hindent.diff
+          ${pkgs.fd}/bin/fd \
+            --extension hs \
+            --exclude '*/dist/*' \
+            --exclude '*/docs/*' \
+            --exec ${pkgs.haskellPackages.hindent}/bin/hindent {}
+          ${pkgs.git}/bin/git diff > post-hindent.diff
+          diff pre-hindent.diff post-hindent.diff > /dev/null
+          if [ $? != 0 ]
+          then
+            echo "Changes by hindent have been made. Please commit them."
+          else
+            echo "No hindent changes were made."
+          fi
+          rm pre-hindent.diff post-hindent.diff
+          exit
+        '';
+
+        fixOrmolu = pkgs.writeScript "fix-ormolu" ''
+          #!${pkgs.runtimeShell}
+
+          ${pkgs.git}/bin/git diff > pre-ormolu.diff
+          ${pkgs.fd}/bin/fd \
+            --extension hs \
+            --exclude '*/dist/*' \
+            --exclude '*/docs/*' \
+            --exec ${ormoluPkgs.ormolu}/bin/ormolu -p -m inplace {}
+          ${pkgs.git}/bin/git diff > post-ormolu.diff
+          diff pre-ormolu.diff post-ormolu.diff > /dev/null
+          if [ $? != 0 ]
+          then
+            echo "Changes by ormolu have been made. Please commit them."
+          else
+            echo "No ormolu changes were made."
+          fi
+          rm pre-ormolu.diff post-ormolu.diff
+          exit
+        '';
+
         fixPurty = pkgs.writeScript "fix-purty" ''
           #!${pkgs.runtimeShell}
 
@@ -492,6 +563,9 @@ let
                                                                             # Code style.
                                                                             pkgs.haskellPackages.hlint
                                                                             pkgs.haskellPackages.stylish-haskell
+                                                                            pkgs.haskellPackages.hindent
+                                                                            pkgs.haskellPackages.brittany
+                                                                            ormoluPkgs.ormolu
                                                                           ]; });
     };
   });
