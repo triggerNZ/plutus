@@ -477,14 +477,21 @@ let
         '';
       };
 
-      withDevTools = env: env.overrideAttrs (attrs: { nativeBuildInputs = attrs.nativeBuildInputs ++ 
-                                                                        [ packages.cabal-install 
-                                                                          pkgs.git 
-                                                                          pkgs.cacert 
-                                                                          pkgs.yarn
-                                                                          easyPS.purs
-                                                                          easyPS.spago
-                                                                          easyPS.purty
+      withDevTools = env: env.overrideAttrs (attrs: { nativeBuildInputs = attrs.nativeBuildInputs ++
+                                                                          [ # General
+                                                                            packages.cabal-install
+                                                                            pkgs.git
+                                                                            pkgs.cacert
+
+                                                                            # Frontend.
+                                                                            pkgs.yarn
+                                                                            easyPS.purs
+                                                                            easyPS.spago
+                                                                            easyPS.purty
+
+                                                                            # Code style.
+                                                                            pkgs.haskellPackages.hlint
+                                                                            pkgs.haskellPackages.stylish-haskell
                                                                           ]; });
     };
   });
