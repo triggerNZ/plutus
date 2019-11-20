@@ -27,7 +27,6 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Newtype (unwrap, wrap)
 import Data.Tuple (Tuple(..), snd)
-import Debug.Trace (trace)
 import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
@@ -142,7 +141,7 @@ holesPane selectedHole (Holes holes) =
 
     ordered = sortBy (compare `on` (head <<< snd)) kvs
 
-    holesGroup = map (\(Tuple k v) -> displayHole (trace selectedHole \_ -> selectedHole) k v) ordered
+    holesGroup = map (\(Tuple k v) -> displayHole selectedHole k v) ordered
   in
     div
       [ classes [ ClassName "btn-group-vertical", ClassName "w-100" ]
