@@ -10,7 +10,8 @@ import Marlowe.Holes (Refactoring(..))
 import Marlowe.Semantics (AccountId)
 import Prelude (const, ($))
 import Simulation.AccountIdEditor (accountIdEditor)
-import Types (HAction(..))
+import Types (HAction)
+import Types as Types
 
 refactoringPane :: forall p. Array AccountId -> Boolean -> Maybe Refactoring -> HTML p HAction
 refactoringPane accounts display refactoring =
@@ -28,11 +29,11 @@ refactoringPane accounts display refactoring =
 displayRefactoring :: forall p. Boolean -> Maybe Refactoring -> HTML p HAction
 displayRefactoring _ Nothing = text ""
 
-displayRefactoring false (Just (ExtractAccountId _)) =
+displayRefactoring false (Just r@(ExtractAccountId _)) =
   button
     [ classes [ btn, btnSecondary, ClassName "button-box" ]
     , type_ ButtonButton
-    , onClick $ const $ Just $ StartRefactoring
+    , onClick $ const $ Just $ Types.ExtractAccountId r
     ]
     [ text "Extract Account Id" ]
 

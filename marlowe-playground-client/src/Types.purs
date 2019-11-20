@@ -70,7 +70,7 @@ data HAction
   | Undo
   | SelectHole (Maybe String)
   | InsertHole String MarloweHole (Array MarloweHole)
-  | StartRefactoring
+  | ExtractAccountId Refactoring
   | SetAccountId String AccountId
   -- blockly
   | HandleBlocklyMessage BlocklyMessage
@@ -124,6 +124,7 @@ newtype FrontendState
   , analysisState :: RemoteData String Result
   , selectedHole :: Maybe String
   , displayRefactoring :: Boolean
+  , accountIds :: Array Refactoring
   }
 
 derive instance newtypeFrontendState :: Newtype FrontendState _
@@ -166,6 +167,9 @@ _selectedHole = _Newtype <<< prop (SProxy :: SProxy "selectedHole")
 
 _displayRefactoring :: Lens' FrontendState Boolean
 _displayRefactoring = _Newtype <<< prop (SProxy :: SProxy "displayRefactoring")
+
+_accountIds :: Lens' FrontendState (Array Refactoring)
+_accountIds = _Newtype <<< prop (SProxy :: SProxy "accountIds")
 
 -- editable
 _timestamp ::

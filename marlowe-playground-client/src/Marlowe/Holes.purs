@@ -24,7 +24,7 @@ import Text.Parsing.Parser.Basic (replaceInPosition)
 import Text.Parsing.Parser.Pos (Position(..))
 import Text.PrettyPrint.Leijen (appendWithSoftbreak)
 import Text.PrettyPrint.Leijen as Leijen
-import Type.Proxy (Proxy)
+import Type.Proxy (Proxy(Proxy))
 
 data MarloweType
   = StringType
@@ -248,6 +248,7 @@ insertConstant m _ = m
 
 class HasMarloweHoles a where
   getMetadata :: Metadata -> a -> Metadata
+  doRefactoring :: Refactoring -> a -> a
 
 newtype Metadata
   = Metadata
@@ -312,6 +313,8 @@ instance termHasMarloweHoles :: (IsMarloweType a, HasMarloweHoles a) => HasMarlo
   getMetadata m (Term a _ _) = getMetadata m a
   getMetadata (Metadata m) c@(Const _ _ _ _) = Metadata $ m { constants = insertConstant m.constants c }
   getMetadata (Metadata m) h@(Hole _ _ _ _) = Metadata $ m { holes = insertHole m.holes h }
+  doRefactoring r (Term a b c) = Term (doRefactoring r a) b c
+  doRefactoring _ a = a
 
 instance arrayHasMarloweHoles :: HasMarloweHoles a => HasMarloweHoles (Array a) where
   getMetadata m as =
@@ -324,6 +327,7 @@ instance arrayHasMarloweHoles :: HasMarloweHoles a => HasMarloweHoles (Array a) 
           , constants = inner.constants
           , refactoring = inner.refactoring
           }
+  doRefactoring r as = map (doRefactoring r) as
 
 -- Parsable versions of the Marlowe types
 data Bound
@@ -350,6 +354,7 @@ instance boundHasMarloweHoles :: HasMarloweHoles Bound where
         { holes = insertHole m.holes a <> insertHole m.holes b
         , constants = insertConstant m.constants a <> insertConstant m.constants b
         }
+  doRefactoring _ b = b
 
 data AccountId
   = AccountId (Term BigInteger) (Term PubKey)
@@ -376,6 +381,7 @@ instance accountIdHasMarloweHoles :: HasMarloweHoles AccountId where
         { holes = insertHole m.holes a <> insertHole m.holes b
         , constants = insertConstant m.constants a <> insertConstant m.constants b
         }
+  doRefactoring _ a = a
 
 data ChoiceId
   = ChoiceId (Term String) (Term PubKey)
@@ -402,6 +408,7 @@ instance choiceIdHasMarloweHoles :: HasMarloweHoles ChoiceId where
         { holes = insertHole m.holes a <> insertHole m.holes b
         , constants = insertConstant m.constants a <> insertConstant m.constants b
         }
+  doRefactoring _ c = c
 
 data Action
   = Deposit (Term AccountId) (Term Party) (Term Value)
@@ -447,6 +454,18 @@ instance actionHasMarloweHoles :: HasMarloweHoles Action where
           }
   getMetadata m (Choice a bs) = getMetadata m a <> getMetadata m bs
   getMetadata m (Notify a) = getMetadata m a
+  doRefactoring (ExtractAccountId r) deposit@(Deposit (Term (AccountId (Term a _ _) (Term b _ _)) start end) c d) =
+    let
+      (S.AccountId a1 b1) = r.accountId
+
+      refactoredD = doRefactoring (ExtractAccountId r) d
+    in
+      if a == a1 && b == b1 then
+        Deposit (Const r.name Proxy start end) c refactoredD
+      else
+        deposit
+  doRefactoring r (Notify o) = Notify $ doRefactoring r o
+  doRefactoring _ a = a
 
 data Payee
   = Account (Term AccountId)
@@ -484,6 +503,15 @@ instance payeeHasMarloweHoles :: HasMarloweHoles Payee where
           , refactoring = refactoring
           }
   getMetadata (Metadata m) (Party a) = Metadata m { holes = insertHole m.holes a, constants = insertConstant m.constants a }
+  doRefactoring (ExtractAccountId r) account@(Account (Term (AccountId (Term a _ _) (Term b _ _)) start end)) =
+    let
+      (S.AccountId a1 b1) = r.accountId
+    in
+      if a == a1 && b == b1 then
+        Account (Const r.name Proxy start end)
+      else
+        account
+  doRefactoring _ a = a
 
 data Case
   = Case (Term Action) (Term Contract)
@@ -505,6 +533,7 @@ instance caseMarloweType :: IsMarloweType Case where
 
 instance caseHasMarloweHoles :: HasMarloweHoles Case where
   getMetadata m (Case a b) = getMetadata m a <> getMetadata m b
+  doRefactoring r (Case a b) = Case (doRefactoring r a) (doRefactoring r b)
 
 data Value
   = AvailableMoney (Term AccountId)
@@ -567,6 +596,19 @@ instance valueHasMarloweHoles :: HasMarloweHoles Value where
   getMetadata m SlotIntervalStart = mempty
   getMetadata m SlotIntervalEnd = mempty
   getMetadata m (UseValue a) = getMetadata m a
+  doRefactoring (ExtractAccountId r) availableMoney@(AvailableMoney (Term (AccountId (Term a _ _) (Term b _ _)) start end)) =
+    let
+      (S.AccountId a1 b1) = r.accountId
+    in
+      if a == a1 && b == b1 then
+        AvailableMoney (Const r.name Proxy start end)
+      else
+        availableMoney
+  doRefactoring r (NegValue a) = NegValue $ doRefactoring r a
+  doRefactoring r (AddValue a b) = AddValue (doRefactoring r a) (doRefactoring r b)
+  doRefactoring r (SubValue a b) = SubValue (doRefactoring r a) (doRefactoring r b)
+  doRefactoring r (ChoiceValue a b) = ChoiceValue a $ doRefactoring r b
+  doRefactoring _ a = a
 
 data Input
   = IDeposit (Term AccountId) (Term Party) (Term Money)
@@ -626,6 +668,15 @@ instance observationHasMarloweHoles :: HasMarloweHoles Observation where
   getMetadata m (ValueEQ a b) = getMetadata m a <> getMetadata m b
   getMetadata m TrueObs = mempty
   getMetadata m FalseObs = mempty
+  doRefactoring r (AndObs a b) = AndObs (doRefactoring r a) (doRefactoring r b)
+  doRefactoring r (OrObs a b) = OrObs (doRefactoring r a) (doRefactoring r b)
+  doRefactoring r (NotObs a) = NotObs $ doRefactoring r a
+  doRefactoring r (ValueGE a b) = ValueGE (doRefactoring r a) (doRefactoring r b)
+  doRefactoring r (ValueGT a b) = ValueGT (doRefactoring r a) (doRefactoring r b)
+  doRefactoring r (ValueLT a b) = ValueLT (doRefactoring r a) (doRefactoring r b)
+  doRefactoring r (ValueLE a b) = ValueLE (doRefactoring r a) (doRefactoring r b)
+  doRefactoring r (ValueEQ a b) = ValueEQ (doRefactoring r a) (doRefactoring r b)
+  doRefactoring r a = a
 
 data Contract
   = Close
@@ -690,6 +741,23 @@ instance contractHasMarloweHoles :: HasMarloweHoles Contract where
           , refactoring = refactoring
           }
   getMetadata m (Let a b c) = getMetadata m a <> getMetadata m b <> getMetadata m c
+  doRefactoring r Close = Close
+  doRefactoring (ExtractAccountId r) pay@(Pay (Term (AccountId (Term a _ _) (Term b _ _)) start end) c d e) =
+    let
+      (S.AccountId a1 b1) = r.accountId
+
+      refactoredD = doRefactoring (ExtractAccountId r) d
+
+      refactoredE = doRefactoring (ExtractAccountId r) e
+    in
+      if a == a1 && b == b1 then
+        Pay (Const r.name Proxy start end) c refactoredD refactoredE
+      else
+        pay
+  doRefactoring r (Pay a b c d) = Pay (doRefactoring r a) (doRefactoring r b) (doRefactoring r c) (doRefactoring r d)
+  doRefactoring r (If a b c) = If (doRefactoring r a) (doRefactoring r b) (doRefactoring r c)
+  doRefactoring r (When a b c) = When (doRefactoring r a) b (doRefactoring r c)
+  doRefactoring r (Let a b c) = Let a (doRefactoring r b) (doRefactoring r c)
 
 newtype ValueId
   = ValueId String
@@ -710,6 +778,7 @@ instance valueIdIsMarloweType :: IsMarloweType ValueId where
 
 instance valueIdHasMarloweHoles :: HasMarloweHoles ValueId where
   getMetadata m _ = m
+  doRefactoring _ a = a
 
 termToValue :: forall a. Term a -> Maybe a
 termToValue (Term a _ _) = Just a

@@ -46,7 +46,7 @@ import Language.Haskell.Interpreter (SourceCode(SourceCode), InterpreterError(Co
 import Marlowe (SPParams_)
 import Marlowe.Blockly as MB
 import Marlowe.Gists (mkNewGist, playgroundGistFile)
-import Marlowe.Holes (MarloweHole(..), replaceInPositions)
+import Marlowe.Holes (MarloweHole(..), doRefactoring, replaceInPositions)
 import Marlowe.Parser (contract, hole)
 import Marlowe.Pretty (pretty)
 import Marlowe.Semantics (ChoiceId, Input(..), inBounds)
@@ -75,6 +75,7 @@ initialState =
     , analysisState: NotAsked
     , selectedHole: Nothing
     , displayRefactoring: false
+    , accountIds: []
     }
 
 ------------------------------------------------------------
@@ -171,7 +172,7 @@ toEvent (InsertHole _ _ _) = Nothing
 
 toEvent (SetAccountId _ _) = Nothing
 
-toEvent StartRefactoring = Nothing
+toEvent (ExtractAccountId _) = Nothing
 
 toEvent (HandleBlocklyMessage _) = Nothing
 
@@ -347,7 +348,20 @@ handleAction (InsertHole constructor firstHole@(MarloweHole { start }) holes) = 
 
 handleAction (SetAccountId _ _) = pure unit
 
-handleAction StartRefactoring = pure unit
+handleAction (ExtractAccountId refactoring) = do
+  -- assign _displayRefactoring true
+  mCurrContract <- marloweEditorGetValue
+  case mCurrContract of
+    Just currContract -> do
+      case runParser currContract contract of
+        Right contract -> do
+          let
+            newContract = doRefactoring refactoring contract
+
+            prettyContract = show $ pretty newContract
+          marloweEditorSetValue prettyContract (Just 1)
+        Left _ -> pure unit
+    Nothing -> pure unit
 
 handleAction (HandleBlocklyMessage Initialized) = pure unit
 
