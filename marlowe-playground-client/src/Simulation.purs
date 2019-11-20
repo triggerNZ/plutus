@@ -27,6 +27,7 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Newtype (unwrap, wrap)
 import Data.Tuple (Tuple(..), snd)
+import Debug.Trace (trace)
 import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
@@ -85,13 +86,16 @@ simulationPane state =
               ]
               [ paneHeader "Marlowe Contract", codeToBlocklyButton state, demoScriptsPane ]
           , div
-              [ onDragOver $ Just <<< MarloweHandleDragEvent
-              , onDrop $ Just <<< MarloweHandleDropEvent
-              , onKeyUp $ Just <<< const MarloweEditorCursorMoved
-              , onClick $ Just <<< const MarloweEditorCursorMoved
-              ]
+              []
               [ row_
-                  [ div [ class_ col9 ] [ slot _marloweEditorSlot unit (aceComponent initEditor (Just Live)) unit (Just <<< MarloweHandleEditorMessage) ]
+                  [ div
+                      [ class_ col9
+                      , onDragOver $ Just <<< MarloweHandleDragEvent
+                      , onDrop $ Just <<< MarloweHandleDropEvent
+                      , onKeyUp $ Just <<< const MarloweEditorCursorMoved
+                      , onClick $ Just <<< const MarloweEditorCursorMoved
+                      ]
+                      [ slot _marloweEditorSlot unit (aceComponent initEditor (Just Live)) unit (Just <<< MarloweHandleEditorMessage) ]
                   , div [ class_ col3 ]
                       [ holesPane (view _selectedHole state) (view (_marloweState <<< _Head <<< _holes) state)
                       , accountsPane (view (_marloweState <<< _Head <<< _marloweAccounts) state)
@@ -138,7 +142,7 @@ holesPane selectedHole (Holes holes) =
 
     ordered = sortBy (compare `on` (head <<< snd)) kvs
 
-    holesGroup = map (\(Tuple k v) -> displayHole selectedHole k v) ordered
+    holesGroup = map (\(Tuple k v) -> displayHole (trace selectedHole \_ -> selectedHole) k v) ordered
   in
     div
       [ classes [ ClassName "btn-group-vertical", ClassName "w-100" ]

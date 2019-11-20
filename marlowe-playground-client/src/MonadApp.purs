@@ -39,7 +39,7 @@ import Language.Haskell.Interpreter (InterpreterError, InterpreterResult, Source
 import LocalStorage as LocalStorage
 import Marlowe (SPParams_)
 import Marlowe as Server
-import Marlowe.Holes (MarloweHole(..), fromTerm, getConstants, getHoles, getRefactoring)
+import Marlowe.Holes (MarloweHole(..), fromTerm, getMetadata, mkMetadata)
 import Marlowe.Parser (parseTerm, contract)
 import Marlowe.Semantics (Contract(..), PubKey, SlotInterval(..), TransactionInput(..), TransactionOutput(..), choiceOwner, computeTransaction, extractRequiredActionsWithTxs, moneyInContract)
 import Network.RemoteData as RemoteData
@@ -242,13 +242,15 @@ updateContractInStateP cursor text state = case runParser text (parseTerm contra
       set _editorErrors [] <<< set _contract (Just contract) $ state
     Nothing -> do
       let
-        holes = getHoles mempty pcon
+        metadata = getMetadata (mkMetadata cursor) pcon
+
+        constants = (unwrap metadata).constants
+
+        holes = (unwrap metadata).holes
 
         holesArray = concat $ fromFoldable $ Map.values (unwrap holes)
 
-        constants = getConstants mempty pcon
-
-        refactoring = getRefactoring cursor pcon
+        refactoring = (unwrap metadata).refactoring
 
         warnings = map holeToAnnotation holesArray
       ( set _editorErrors warnings

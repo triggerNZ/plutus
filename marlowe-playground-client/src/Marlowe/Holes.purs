@@ -4,7 +4,7 @@ import Prelude
 import Control.Alt ((<|>))
 import Data.Array (foldMap, foldl, mapWithIndex, (:))
 import Data.BigInteger (BigInteger)
-import Data.Foldable (intercalate, oneOf)
+import Data.Foldable (intercalate)
 import Data.Function (on)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
@@ -12,7 +12,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (class Newtype)
+import Data.Newtype (class Newtype, unwrap)
 import Data.String (length)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -247,9 +247,44 @@ insertConstant (Constants m) (Const name proxy start end) = Constants $ Map.alte
 insertConstant m _ = m
 
 class HasMarloweHoles a where
-  getHoles :: Holes -> a -> Holes
-  getConstants :: Constants -> a -> Constants
-  getRefactoring :: Position -> a -> Maybe Refactoring
+  getMetadata :: Metadata -> a -> Metadata
+
+newtype Metadata
+  = Metadata
+  { holes :: Holes
+  , constants :: Constants
+  , position :: Position
+  , refactoring :: Maybe Refactoring
+  }
+
+derive instance newtypeMetadata :: Newtype Metadata _
+
+instance semigroupMetadata :: Semigroup Metadata where
+  append (Metadata a) (Metadata b) =
+    Metadata
+      { holes: a.holes <> b.holes
+      , constants: a.constants <> b.constants
+      , position: a.position
+      , refactoring: a.refactoring <|> b.refactoring
+      }
+
+instance monoidMetadata :: Monoid Metadata where
+  mempty =
+    Metadata
+      { holes: mempty
+      , constants: mempty
+      , position: Position { column: zero, line: zero }
+      , refactoring: Nothing
+      }
+
+mkMetadata :: Position -> Metadata
+mkMetadata position =
+  Metadata
+    { holes: mempty
+    , constants: mempty
+    , position: position
+    , refactoring: Nothing
+    }
 
 positionWithin :: Position -> Position -> Position -> Boolean
 positionWithin (Position needle) (Position start) (Position finish) =
@@ -274,19 +309,21 @@ getExtractAccountId cursor accountIdTerm start@(Position s) end =
     Nothing
 
 instance termHasMarloweHoles :: (IsMarloweType a, HasMarloweHoles a) => HasMarloweHoles (Term a) where
-  getHoles m (Term a _ _) = getHoles m a
-  getHoles m (Const _ _ _ _) = m
-  getHoles m h = insertHole m h
-  getConstants m (Term a _ _) = getConstants m a
-  getConstants m (Hole _ _ _ _) = m
-  getConstants m c = insertConstant m c
-  getRefactoring cursor (Term a _ _) = getRefactoring cursor a
-  getRefactoring _ _ = Nothing
+  getMetadata m (Term a _ _) = getMetadata m a
+  getMetadata (Metadata m) c@(Const _ _ _ _) = Metadata $ m { constants = insertConstant m.constants c }
+  getMetadata (Metadata m) h@(Hole _ _ _ _) = Metadata $ m { holes = insertHole m.holes h }
 
 instance arrayHasMarloweHoles :: HasMarloweHoles a => HasMarloweHoles (Array a) where
-  getHoles m as = foldMap (getHoles m) as
-  getConstants m as = foldMap (getConstants m) as
-  getRefactoring cursor as = oneOf $ map (getRefactoring cursor) as
+  getMetadata m as =
+    let
+      inner = unwrap $ foldMap (getMetadata m) as
+    in
+      Metadata
+        (unwrap m)
+          { holes = inner.holes
+          , constants = inner.constants
+          , refactoring = inner.refactoring
+          }
 
 -- Parsable versions of the Marlowe types
 data Bound
@@ -307,9 +344,12 @@ instance boundIsMarloweType :: IsMarloweType Bound where
   marloweType _ = BoundType
 
 instance boundHasMarloweHoles :: HasMarloweHoles Bound where
-  getHoles m (Bound a b) = insertHole m a <> insertHole m b
-  getConstants m (Bound a b) = insertConstant m a <> insertConstant m b
-  getRefactoring _ _ = Nothing
+  getMetadata (Metadata m) (Bound a b) =
+    Metadata
+      m
+        { holes = insertHole m.holes a <> insertHole m.holes b
+        , constants = insertConstant m.constants a <> insertConstant m.constants b
+        }
 
 data AccountId
   = AccountId (Term BigInteger) (Term PubKey)
@@ -330,9 +370,12 @@ instance accountIdIsMarloweType :: IsMarloweType AccountId where
   marloweType _ = AccountIdType
 
 instance accountIdHasMarloweHoles :: HasMarloweHoles AccountId where
-  getHoles m (AccountId a b) = insertHole m a <> insertHole m b
-  getConstants m (AccountId a b) = insertConstant m a <> insertConstant m b
-  getRefactoring _ _ = Nothing
+  getMetadata (Metadata m) (AccountId a b) =
+    Metadata
+      m
+        { holes = insertHole m.holes a <> insertHole m.holes b
+        , constants = insertConstant m.constants a <> insertConstant m.constants b
+        }
 
 data ChoiceId
   = ChoiceId (Term String) (Term PubKey)
@@ -353,9 +396,12 @@ instance choiceIdIsMarloweType :: IsMarloweType ChoiceId where
   marloweType _ = ChoiceIdType
 
 instance choiceIdHasMarloweHoles :: HasMarloweHoles ChoiceId where
-  getHoles m (ChoiceId a b) = insertHole m a <> insertHole m b
-  getConstants m (ChoiceId a b) = insertConstant m a <> insertConstant m b
-  getRefactoring _ _ = Nothing
+  getMetadata (Metadata m) (ChoiceId a b) =
+    Metadata
+      m
+        { holes = insertHole m.holes a <> insertHole m.holes b
+        , constants = insertConstant m.constants a <> insertConstant m.constants b
+        }
 
 data Action
   = Deposit (Term AccountId) (Term Party) (Term Value)
@@ -379,14 +425,28 @@ instance actionMarloweType :: IsMarloweType Action where
   marloweType _ = ActionType
 
 instance actionHasMarloweHoles :: HasMarloweHoles Action where
-  getHoles m (Deposit a b c) = getHoles m a <> insertHole m b <> getHoles m c
-  getHoles m (Choice a bs) = getHoles m a <> getHoles m bs
-  getHoles m (Notify a) = getHoles m a
-  getConstants m (Deposit a b c) = getConstants m a <> insertConstant m b <> getConstants m c
-  getConstants m (Choice a bs) = getConstants m a <> getConstants m bs
-  getConstants m (Notify a) = getConstants m a
-  getRefactoring cursor (Deposit (Term accountId start end) _ c) = getExtractAccountId cursor accountId start end <|> getRefactoring cursor c
-  getRefactoring _ _ = Nothing
+  getMetadata m (Deposit a b c) =
+    let
+      left = unwrap $ getMetadata m a
+
+      right = unwrap $ getMetadata m c
+
+      holes = insertHole (unwrap m).holes b
+
+      constants = insertConstant (unwrap m).constants b
+
+      refactoring = case a of
+        (Term accountId start end) -> getExtractAccountId (unwrap m).position accountId start end <|> right.refactoring
+        _ -> left.refactoring <|> right.refactoring
+    in
+      Metadata
+        (unwrap m)
+          { holes = left.holes <> holes <> right.holes
+          , constants = left.constants <> constants <> right.constants
+          , refactoring = refactoring
+          }
+  getMetadata m (Choice a bs) = getMetadata m a <> getMetadata m bs
+  getMetadata m (Notify a) = getMetadata m a
 
 data Payee
   = Account (Term AccountId)
@@ -409,12 +469,21 @@ instance payeeMarloweType :: IsMarloweType Payee where
   marloweType _ = PayeeType
 
 instance payeeHasMarloweHoles :: HasMarloweHoles Payee where
-  getHoles m (Account a) = getHoles m a
-  getHoles m (Party a) = insertHole m a
-  getConstants m (Account a) = getConstants m a
-  getConstants m (Party a) = insertConstant m a
-  getRefactoring cursor (Account (Term accountId start end)) = getExtractAccountId cursor accountId start end
-  getRefactoring _ _ = Nothing
+  getMetadata m (Account a) =
+    let
+      inner = unwrap $ getMetadata m a
+
+      refactoring = case a of
+        (Term accountId start end) -> getExtractAccountId (unwrap m).position accountId start end
+        _ -> Nothing
+    in
+      Metadata
+        (unwrap m)
+          { holes = inner.holes
+          , constants = inner.constants
+          , refactoring = refactoring
+          }
+  getMetadata (Metadata m) (Party a) = Metadata m { holes = insertHole m.holes a, constants = insertConstant m.constants a }
 
 data Case
   = Case (Term Action) (Term Contract)
@@ -435,9 +504,7 @@ instance caseMarloweType :: IsMarloweType Case where
   marloweType _ = CaseType
 
 instance caseHasMarloweHoles :: HasMarloweHoles Case where
-  getHoles m (Case a b) = getHoles m a <> getHoles m b
-  getConstants m (Case a b) = getConstants m a <> getConstants m b
-  getRefactoring cursor (Case a b) = getRefactoring cursor a <|> getRefactoring cursor b
+  getMetadata m (Case a b) = getMetadata m a <> getMetadata m b
 
 data Value
   = AvailableMoney (Term AccountId)
@@ -473,30 +540,33 @@ instance valueIsMarloweType :: IsMarloweType Value where
   marloweType _ = ValueType
 
 instance valueHasMarloweHoles :: HasMarloweHoles Value where
-  getHoles m (AvailableMoney a) = getHoles m a
-  getHoles m (Constant a) = insertHole m a
-  getHoles m (NegValue a) = getHoles m a
-  getHoles m (AddValue a b) = getHoles m a <> getHoles m b
-  getHoles m (SubValue a b) = getHoles m a <> getHoles m b
-  getHoles m (ChoiceValue a b) = getHoles m a <> getHoles m b
-  getHoles m SlotIntervalStart = mempty
-  getHoles m SlotIntervalEnd = mempty
-  getHoles m (UseValue a) = getHoles m a
-  getConstants m (AvailableMoney a) = getConstants m a
-  getConstants m (Constant a) = insertConstant m a
-  getConstants m (NegValue a) = getConstants m a
-  getConstants m (AddValue a b) = getConstants m a <> getConstants m b
-  getConstants m (SubValue a b) = getConstants m a <> getConstants m b
-  getConstants m (ChoiceValue a b) = getConstants m a <> getConstants m b
-  getConstants m SlotIntervalStart = mempty
-  getConstants m SlotIntervalEnd = mempty
-  getConstants m (UseValue a) = getConstants m a
-  getRefactoring cursor (AvailableMoney (Term accountId start end)) = getExtractAccountId cursor accountId start end
-  getRefactoring cursor (NegValue a) = getRefactoring cursor a
-  getRefactoring cursor (AddValue a b) = getRefactoring cursor a <|> getRefactoring cursor b
-  getRefactoring cursor (SubValue a b) = getRefactoring cursor a <|> getRefactoring cursor b
-  getRefactoring cursor (ChoiceValue a b) = getRefactoring cursor a <|> getRefactoring cursor b
-  getRefactoring cursor _ = Nothing
+  getMetadata m (AvailableMoney a) =
+    let
+      inner = unwrap $ getMetadata m a
+
+      refactoring = case a of
+        (Term accountId start end) -> getExtractAccountId (unwrap m).position accountId start end
+        _ -> Nothing
+    in
+      Metadata
+        (unwrap m)
+          { holes = inner.holes
+          , constants = inner.constants
+          , refactoring = refactoring
+          }
+  getMetadata (Metadata m) (Constant a) =
+    Metadata
+      m
+        { holes = insertHole m.holes a
+        , constants = insertConstant m.constants a
+        }
+  getMetadata m (NegValue a) = getMetadata m a
+  getMetadata m (AddValue a b) = getMetadata m a <> getMetadata m b
+  getMetadata m (SubValue a b) = getMetadata m a <> getMetadata m b
+  getMetadata m (ChoiceValue a b) = getMetadata m a <> getMetadata m b
+  getMetadata m SlotIntervalStart = mempty
+  getMetadata m SlotIntervalEnd = mempty
+  getMetadata m (UseValue a) = getMetadata m a
 
 data Input
   = IDeposit (Term AccountId) (Term Party) (Term Money)
@@ -545,39 +615,17 @@ instance observationIsMarloweType :: IsMarloweType Observation where
   marloweType _ = ObservationType
 
 instance observationHasMarloweHoles :: HasMarloweHoles Observation where
-  getHoles m (AndObs a b) = getHoles m a <> getHoles m b
-  getHoles m (OrObs a b) = getHoles m a <> getHoles m b
-  getHoles m (NotObs a) = getHoles m a
-  getHoles m (ChoseSomething a) = getHoles m a
-  getHoles m (ValueGE a b) = getHoles m a <> getHoles m b
-  getHoles m (ValueGT a b) = getHoles m a <> getHoles m b
-  getHoles m (ValueLT a b) = getHoles m a <> getHoles m b
-  getHoles m (ValueLE a b) = getHoles m a <> getHoles m b
-  getHoles m (ValueEQ a b) = getHoles m a <> getHoles m b
-  getHoles m TrueObs = mempty
-  getHoles m FalseObs = mempty
-  getConstants m (AndObs a b) = getConstants m a <> getConstants m b
-  getConstants m (OrObs a b) = getConstants m a <> getConstants m b
-  getConstants m (NotObs a) = getConstants m a
-  getConstants m (ChoseSomething a) = getConstants m a
-  getConstants m (ValueGE a b) = getConstants m a <> getConstants m b
-  getConstants m (ValueGT a b) = getConstants m a <> getConstants m b
-  getConstants m (ValueLT a b) = getConstants m a <> getConstants m b
-  getConstants m (ValueLE a b) = getConstants m a <> getConstants m b
-  getConstants m (ValueEQ a b) = getConstants m a <> getConstants m b
-  getConstants m TrueObs = mempty
-  getConstants m FalseObs = mempty
-  getRefactoring cursor (AndObs a b) = getRefactoring cursor a <|> getRefactoring cursor b
-  getRefactoring cursor (OrObs a b) = getRefactoring cursor a <|> getRefactoring cursor b
-  getRefactoring cursor (NotObs a) = getRefactoring cursor a
-  getRefactoring cursor (ChoseSomething _) = Nothing
-  getRefactoring cursor (ValueGE a b) = getRefactoring cursor a <|> getRefactoring cursor b
-  getRefactoring cursor (ValueGT a b) = getRefactoring cursor a <|> getRefactoring cursor b
-  getRefactoring cursor (ValueLT a b) = getRefactoring cursor a <|> getRefactoring cursor b
-  getRefactoring cursor (ValueLE a b) = getRefactoring cursor a <|> getRefactoring cursor b
-  getRefactoring cursor (ValueEQ a b) = getRefactoring cursor a <|> getRefactoring cursor b
-  getRefactoring cursor TrueObs = Nothing
-  getRefactoring cursor FalseObs = Nothing
+  getMetadata m (AndObs a b) = getMetadata m a <> getMetadata m b
+  getMetadata m (OrObs a b) = getMetadata m a <> getMetadata m b
+  getMetadata m (NotObs a) = getMetadata m a
+  getMetadata m (ChoseSomething a) = getMetadata m a
+  getMetadata m (ValueGE a b) = getMetadata m a <> getMetadata m b
+  getMetadata m (ValueGT a b) = getMetadata m a <> getMetadata m b
+  getMetadata m (ValueLT a b) = getMetadata m a <> getMetadata m b
+  getMetadata m (ValueLE a b) = getMetadata m a <> getMetadata m b
+  getMetadata m (ValueEQ a b) = getMetadata m a <> getMetadata m b
+  getMetadata m TrueObs = mempty
+  getMetadata m FalseObs = mempty
 
 data Contract
   = Close
@@ -605,22 +653,43 @@ instance contractIsMarloweType :: IsMarloweType Contract where
   marloweType _ = ContractType
 
 instance contractHasMarloweHoles :: HasMarloweHoles Contract where
-  getHoles m Close = mempty
-  getHoles m (Pay a b c d) = getHoles m a <> getHoles m b <> getHoles m c <> getHoles m d
-  getHoles m (If a b c) = getHoles m a <> getHoles m b <> getHoles m c
-  getHoles m (When as b c) = getHoles m as <> insertHole m b <> getHoles m c
-  getHoles m (Let a b c) = getHoles m a <> getHoles m b <> getHoles m c
-  getConstants m Close = mempty
-  getConstants m (Pay a b c d) = getConstants m a <> getConstants m b <> getConstants m c <> getConstants m d
-  getConstants m (If a b c) = getConstants m a <> getConstants m b <> getConstants m c
-  getConstants m (When as b c) = getConstants m as <> insertConstant m b <> getConstants m c
-  getConstants m (Let a b c) = getConstants m a <> getConstants m b <> getConstants m c
-  getRefactoring cursor Close = Nothing
-  getRefactoring cursor (Pay (Term accountId start end) _ c d) = getExtractAccountId cursor accountId start end <|> getRefactoring cursor c <|> getRefactoring cursor d
-  getRefactoring cursor (Pay a b c d) = getRefactoring cursor a <|> getRefactoring cursor b <|> getRefactoring cursor c <|> getRefactoring cursor d
-  getRefactoring cursor (If a b c) = getRefactoring cursor a <|> getRefactoring cursor b <|> getRefactoring cursor c
-  getRefactoring cursor (When as b c) = getRefactoring cursor as <|> getRefactoring cursor c
-  getRefactoring cursor (Let _ b c) = getRefactoring cursor b <|> getRefactoring cursor c
+  getMetadata m Close = mempty
+  getMetadata m (Pay a b c d) =
+    let
+      newM = getMetadata m a <> getMetadata m b <> getMetadata m c <> getMetadata m d
+
+      refactoring = case a of
+        (Term accountId start end) ->
+          getExtractAccountId (unwrap m).position accountId start end
+            <|> (unwrap newM).refactoring
+        _ -> (unwrap newM).refactoring
+    in
+      Metadata
+        (unwrap m)
+          { holes = (unwrap newM).holes
+          , constants = (unwrap newM).constants
+          , refactoring = refactoring
+          }
+  getMetadata m (If a b c) = getMetadata m a <> getMetadata m b <> getMetadata m c
+  getMetadata m (When as b c) =
+    let
+      left = unwrap $ getMetadata m as
+
+      right = unwrap $ getMetadata m c
+
+      holes = insertHole (unwrap m).holes b
+
+      constants = insertConstant (unwrap m).constants b
+
+      refactoring = left.refactoring <|> right.refactoring
+    in
+      Metadata
+        (unwrap m)
+          { holes = left.holes <> holes <> right.holes
+          , constants = left.constants <> constants <> right.constants
+          , refactoring = refactoring
+          }
+  getMetadata m (Let a b c) = getMetadata m a <> getMetadata m b <> getMetadata m c
 
 newtype ValueId
   = ValueId String
@@ -640,9 +709,7 @@ instance valueIdIsMarloweType :: IsMarloweType ValueId where
   marloweType _ = ValueIdType
 
 instance valueIdHasMarloweHoles :: HasMarloweHoles ValueId where
-  getHoles m _ = m
-  getConstants m _ = m
-  getRefactoring _ _ = Nothing
+  getMetadata m _ = m
 
 termToValue :: forall a. Term a -> Maybe a
 termToValue (Term a _ _) = Just a
