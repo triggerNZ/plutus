@@ -3,17 +3,23 @@ module Marlowe.Holes where
 import Prelude
 import Control.Alt ((<|>))
 import Data.Array (foldMap, foldl, mapWithIndex, (:))
+import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty as NEA
 import Data.BigInteger (BigInteger)
 import Data.Foldable (intercalate)
 import Data.Function (on)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Lens (Lens')
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.String (length)
+import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
@@ -144,6 +150,9 @@ derive instance genericMarloweType :: Generic MarloweType _
 instance showMarloweType :: Show MarloweType where
   show = genericShow
 
+zeroPosition :: Position
+zeroPosition = Position { line: 0, column: 0 }
+
 data Term a
   = Term a Position Position
   | Hole String (Proxy a) Position Position
@@ -194,6 +203,8 @@ instance ordMarloweConstant :: Ord MarloweConstant where
 
 data Refactoring
   = ExtractAccountId { name :: String, accountId :: S.AccountId, start :: Position, end :: Position }
+  | RenameConstant { oldName :: String, newName :: String }
+  | InjectAccountIds (Map String S.AccountId)
 
 class IsMarloweType a where
   marloweType :: Proxy a -> MarloweType
@@ -218,7 +229,7 @@ instance monoidHoles :: Monoid Holes where
 
 -- a Monoid for collecting Constants
 newtype Constants
-  = Constants (Map String (Array MarloweConstant))
+  = Constants (Map String (NonEmptyArray MarloweConstant))
 
 derive instance newtypeConstants :: Newtype Constants _
 
@@ -242,7 +253,10 @@ insertConstant (Constants m) (Const name proxy start end) = Constants $ Map.alte
   where
   marloweConstant = MarloweConstant { name, marloweType: (marloweType proxy), start, end }
 
-  f v = Just (marloweConstant : fromMaybe [] v)
+  f :: Maybe (NonEmptyArray MarloweConstant) -> Maybe (NonEmptyArray MarloweConstant)
+  f v = case v of
+    Just cs -> Just $ NEA.cons marloweConstant cs
+    Nothing -> Just $ NEA.singleton marloweConstant
 
 insertConstant m _ = m
 
@@ -278,6 +292,9 @@ instance monoidMetadata :: Monoid Metadata where
       , refactoring: Nothing
       }
 
+_constants :: Lens' Metadata Constants
+_constants = _Newtype <<< prop (SProxy :: SProxy "constants")
+
 mkMetadata :: Position -> Metadata
 mkMetadata position =
   Metadata
@@ -301,9 +318,9 @@ getExtractAccountId :: Position -> AccountId -> Position -> Position -> Maybe Re
 getExtractAccountId cursor accountIdTerm start@(Position s) end =
   if positionWithin cursor start end then case fromTerm accountIdTerm of
     Nothing -> Nothing
-    Just accountId ->
+    Just accountId@(S.AccountId accNumber accName) ->
       let
-        name = "account_" <> show s.line <> "_" <> show s.column
+        name = "account_" <> show accNumber <> "_" <> accName
       in
         Just $ ExtractAccountId { name, accountId, start, end }
   else
@@ -314,6 +331,7 @@ instance termHasMarloweHoles :: (IsMarloweType a, HasMarloweHoles a) => HasMarlo
   getMetadata (Metadata m) c@(Const _ _ _ _) = Metadata $ m { constants = insertConstant m.constants c }
   getMetadata (Metadata m) h@(Hole _ _ _ _) = Metadata $ m { holes = insertHole m.holes h }
   doRefactoring r (Term a b c) = Term (doRefactoring r a) b c
+  doRefactoring (RenameConstant r) c@(Const name proxy start end) = if name == r.oldName then Const r.newName proxy start end else c
   doRefactoring _ a = a
 
 instance arrayHasMarloweHoles :: HasMarloweHoles a => HasMarloweHoles (Array a) where
@@ -370,6 +388,9 @@ instance prettyAccountId :: Pretty AccountId where
 instance accountIdFromTerm :: FromTerm AccountId S.AccountId where
   fromTerm (AccountId (Term b _ _) (Term c _ _)) = pure $ S.AccountId b c
   fromTerm _ = Nothing
+
+instance accountIdToTerm :: ToTerm S.AccountId AccountId where
+  toTerm (S.AccountId accNumber accName) = Term (AccountId (toTerm accNumber) (toTerm accName)) zeroPosition zeroPosition
 
 instance accountIdIsMarloweType :: IsMarloweType AccountId where
   marloweType _ = AccountIdType
@@ -464,6 +485,9 @@ instance actionHasMarloweHoles :: HasMarloweHoles Action where
         Deposit (Const r.name Proxy start end) c refactoredD
       else
         deposit
+  doRefactoring (InjectAccountIds m) deposit@(Deposit (Const name proxy start end) c d) = case Map.lookup name m of
+    Just acc -> Deposit (toTerm acc) c d
+    _ -> deposit
   doRefactoring r (Notify o) = Notify $ doRefactoring r o
   doRefactoring _ a = a
 
@@ -511,6 +535,9 @@ instance payeeHasMarloweHoles :: HasMarloweHoles Payee where
         Account (Const r.name Proxy start end)
       else
         account
+  doRefactoring (InjectAccountIds m) account@(Account (Const name proxy start end)) = case Map.lookup name m of
+    Just acc -> Account (toTerm acc)
+    _ -> account
   doRefactoring _ a = a
 
 data Case
@@ -604,6 +631,9 @@ instance valueHasMarloweHoles :: HasMarloweHoles Value where
         AvailableMoney (Const r.name Proxy start end)
       else
         availableMoney
+  doRefactoring (InjectAccountIds m) availableMoney@(AvailableMoney (Const name proxy start end)) = case Map.lookup name m of
+    Just acc -> AvailableMoney (toTerm acc)
+    _ -> availableMoney
   doRefactoring r (NegValue a) = NegValue $ doRefactoring r a
   doRefactoring r (AddValue a b) = AddValue (doRefactoring r a) (doRefactoring r b)
   doRefactoring r (SubValue a b) = SubValue (doRefactoring r a) (doRefactoring r b)
@@ -754,6 +784,9 @@ instance contractHasMarloweHoles :: HasMarloweHoles Contract where
         Pay (Const r.name Proxy start end) c refactoredD refactoredE
       else
         pay
+  doRefactoring (InjectAccountIds m) pay@(Pay (Const name proxy start end) c d e) = case Map.lookup name m of
+    Just acc -> Pay (toTerm acc) c d e
+    _ -> pay
   doRefactoring r (Pay a b c d) = Pay (doRefactoring r a) (doRefactoring r b) (doRefactoring r c) (doRefactoring r d)
   doRefactoring r (If a b c) = If (doRefactoring r a) (doRefactoring r b) (doRefactoring r c)
   doRefactoring r (When a b c) = When (doRefactoring r a) b (doRefactoring r c)
@@ -787,6 +820,15 @@ termToValue _ = Nothing
 
 class FromTerm a b where
   fromTerm :: a -> Maybe b
+
+class ToTerm a b where
+  toTerm :: a -> Term b
+
+instance bigIntegerToTerm :: ToTerm BigInteger BigInteger where
+  toTerm n = Term n zeroPosition zeroPosition
+
+instance stringToTerm :: ToTerm String String where
+  toTerm n = Term n zeroPosition zeroPosition
 
 instance slotMarloweType :: IsMarloweType Slot where
   marloweType _ = SlotType

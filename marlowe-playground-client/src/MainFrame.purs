@@ -46,18 +46,19 @@ import Language.Haskell.Interpreter (SourceCode(SourceCode), InterpreterError(Co
 import Marlowe (SPParams_)
 import Marlowe.Blockly as MB
 import Marlowe.Gists (mkNewGist, playgroundGistFile)
-import Marlowe.Holes (MarloweHole(..), doRefactoring, replaceInPositions)
+import Marlowe.Holes (MarloweHole(..), Refactoring(..), doRefactoring, getMetadata, mkMetadata, replaceInPositions)
 import Marlowe.Parser (contract, hole)
 import Marlowe.Pretty (pretty)
 import Marlowe.Semantics (ChoiceId, Input(..), inBounds)
 import MonadApp (class MonadApp, marloweEditorMoveCursorToPosition, applyTransactions, checkContractForWarnings, getGistByGistId, getOauthStatus, haskellEditorGetValue, haskellEditorGotoLine, haskellEditorSetAnnotations, haskellEditorSetValue, marloweEditorGetValue, marloweEditorSetValue, patchGistByGistId, postContractHaskell, postGist, preventDefault, readFileFromDragEvent, resetContract, resizeBlockly, runHalogenApp, saveBuffer, saveInitialState, saveMarloweBuffer, setBlocklyCode, updateContractInState, updateMarloweState)
 import Network.RemoteData (RemoteData(..), _Success, isLoading, isSuccess)
-import Prelude (Unit, add, bind, const, discard, not, one, pure, show, unit, zero, ($), (-), (<$>), (<<<), (<>), (==), (||))
+import Prelude (Unit, add, bind, const, discard, mempty, not, one, pure, show, unit, zero, ($), (-), (<$>), (<<<), (<>), (==), (||))
 import Servant.PureScript.Settings (SPSettings_)
 import Simulation (simulationPane)
 import StaticData as StaticData
 import Text.Parsing.Parser (runParser)
-import Types (ActionInput(..), ChildSlots, FrontendState(FrontendState), HAction(..), HQuery(..), View(..), WebsocketMessage, _analysisState, _authStatus, _blocklySlot, _compilationResult, _createGistResult, _currentContract, _gistUrl, _haskellEditorSlot, _marloweState, _oldContract, _pendingInputs, _possibleActions, _result, _selectedHole, _slot, _view, emptyMarloweState)
+import Text.Parsing.Parser.Pos (Position(..))
+import Types (ActionInput(..), ChildSlots, FrontendState(FrontendState), HAction(..), HQuery(..), View(..), WebsocketMessage, _accountIds, _analysisState, _authStatus, _blocklySlot, _compilationResult, _createGistResult, _currentContract, _gistUrl, _haskellEditorSlot, _marloweState, _oldContract, _pendingInputs, _possibleActions, _result, _selectedHole, _slot, _view, emptyMarloweState)
 import WebSocket (WebSocketResponseMessage(..))
 
 initialState :: FrontendState
@@ -74,8 +75,8 @@ initialState =
     , blocklyState: Nothing
     , analysisState: NotAsked
     , selectedHole: Nothing
-    , displayRefactoring: false
-    , accountIds: []
+    , accountIds: mempty
+    , parsedContract: Nothing
     }
 
 ------------------------------------------------------------
@@ -170,9 +171,9 @@ toEvent (SelectHole _) = Nothing
 
 toEvent (InsertHole _ _ _) = Nothing
 
-toEvent (SetAccountId _ _) = Nothing
+toEvent (SetAccountId _ _ _) = Nothing
 
-toEvent (ExtractAccountId _) = Nothing
+toEvent (Refactor _) = Nothing
 
 toEvent (HandleBlocklyMessage _) = Nothing
 
@@ -242,6 +243,7 @@ handleAction (LoadMarloweScript key) = do
       marloweEditorSetValue contents (Just 1)
       updateContractInState contents
       resetContract
+      modifying _accountIds mempty
 
 handleAction SendResult = do
   mContract <- use _compilationResult
@@ -346,22 +348,46 @@ handleAction (InsertHole constructor firstHole@(MarloweHole { start }) holes) = 
           withoutSuffix <- stripSuffix (Pattern ")") withoutPrefix
           pure withoutSuffix
 
-handleAction (SetAccountId _ _) = pure unit
-
-handleAction (ExtractAccountId refactoring) = do
-  -- assign _displayRefactoring true
+handleAction (SetAccountId oldName newName accountId) = do
+  modifying _accountIds (Map.delete oldName)
+  modifying _accountIds (Map.alter insertAccountId newName)
   mCurrContract <- marloweEditorGetValue
   case mCurrContract of
     Just currContract -> do
       case runParser currContract contract of
         Right contract -> do
           let
-            newContract = doRefactoring refactoring contract
+            newContract = doRefactoring (RenameConstant { oldName, newName }) contract
 
             prettyContract = show $ pretty newContract
           marloweEditorSetValue prettyContract (Just 1)
         Left _ -> pure unit
     Nothing -> pure unit
+  where
+  insertAccountId _ = Just accountId
+
+handleAction (Refactor (ExtractAccountId refactoring)) = do
+  mCurrContract <- marloweEditorGetValue
+  case mCurrContract of
+    Just currContract -> do
+      case runParser currContract contract of
+        Right contract -> do
+          let
+            newContract = doRefactoring (ExtractAccountId refactoring) contract
+
+            startPosition = Position { line: 0, column: 0 }
+
+            metadata = getMetadata (mkMetadata startPosition) newContract
+
+            prettyContract = show $ pretty newContract
+          modifying _accountIds (Map.alter insertAccountId refactoring.name)
+          marloweEditorSetValue prettyContract (Just 1)
+        Left _ -> pure unit
+    Nothing -> pure unit
+  where
+  insertAccountId _ = Just refactoring.accountId
+
+handleAction (Refactor _) = pure unit
 
 handleAction (HandleBlocklyMessage Initialized) = pure unit
 

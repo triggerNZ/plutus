@@ -29,7 +29,8 @@ import Gists (GistAction)
 import Halogen as H
 import Halogen.Blockly (BlocklyQuery, BlocklyMessage)
 import Language.Haskell.Interpreter (InterpreterError, InterpreterResult)
-import Marlowe.Holes (Constants, Holes, MarloweHole, Refactoring)
+import Marlowe.Holes (Constants, Holes, MarloweHole, Refactoring, Term(..))
+import Marlowe.Holes as Holes
 import Marlowe.Semantics (AccountId, Action(..), Ada, Bound, ChoiceId, ChosenNum, Contract, Environment(..), Input, Party, Payment, PubKey, Slot, SlotInterval(..), State, TransactionError, _minSlot, boundFrom, emptyState, evalValue)
 import Marlowe.Symbolic.Types.Response (Result)
 import Network.RemoteData (RemoteData)
@@ -70,8 +71,8 @@ data HAction
   | Undo
   | SelectHole (Maybe String)
   | InsertHole String MarloweHole (Array MarloweHole)
-  | ExtractAccountId Refactoring
-  | SetAccountId String AccountId
+  | Refactor Refactoring
+  | SetAccountId String String AccountId
   -- blockly
   | HandleBlocklyMessage BlocklyMessage
   | SetBlocklyCode
@@ -123,8 +124,8 @@ newtype FrontendState
   , blocklyState :: Maybe BlocklyState
   , analysisState :: RemoteData String Result
   , selectedHole :: Maybe String
-  , displayRefactoring :: Boolean
-  , accountIds :: Array Refactoring
+  , accountIds :: Map String AccountId
+  , parsedContract :: Maybe (Term Holes.Contract)
   }
 
 derive instance newtypeFrontendState :: Newtype FrontendState _
@@ -165,11 +166,11 @@ _analysisState = _Newtype <<< prop (SProxy :: SProxy "analysisState")
 _selectedHole :: Lens' FrontendState (Maybe String)
 _selectedHole = _Newtype <<< prop (SProxy :: SProxy "selectedHole")
 
-_displayRefactoring :: Lens' FrontendState Boolean
-_displayRefactoring = _Newtype <<< prop (SProxy :: SProxy "displayRefactoring")
-
-_accountIds :: Lens' FrontendState (Array Refactoring)
+_accountIds :: Lens' FrontendState (Map String AccountId)
 _accountIds = _Newtype <<< prop (SProxy :: SProxy "accountIds")
+
+_parsedContract :: Lens' FrontendState (Maybe (Term Holes.Contract))
+_parsedContract = _Newtype <<< prop (SProxy :: SProxy "parsedContract")
 
 -- editable
 _timestamp ::

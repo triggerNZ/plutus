@@ -8,33 +8,29 @@ import Halogen.HTML.Properties (ButtonType(..), classes, type_)
 import Halogen.HTML.Properties.ARIA (role)
 import Marlowe.Holes (Refactoring(..))
 import Marlowe.Semantics (AccountId)
-import Prelude (const, ($))
-import Simulation.AccountIdEditor (accountIdEditor)
-import Types (HAction)
-import Types as Types
+import Prelude (const, mempty, ($))
+import Types (HAction(..))
 
-refactoringPane :: forall p. Array AccountId -> Boolean -> Maybe Refactoring -> HTML p HAction
-refactoringPane accounts display refactoring =
+refactoringPane :: forall p. Array AccountId -> Maybe Refactoring -> HTML p HAction
+refactoringPane accounts refactoring =
   div
     [ classes [ ClassName "btn-group-vertical", ClassName "w-100" ]
     , role "group"
     ]
     ( [ div [ classes [ btn ] ]
           [ text "Refactorings"
-          , displayRefactoring display refactoring
+          , displayRefactoring refactoring
           ]
       ]
     )
 
-displayRefactoring :: forall p. Boolean -> Maybe Refactoring -> HTML p HAction
-displayRefactoring _ Nothing = text ""
-
-displayRefactoring false (Just r@(ExtractAccountId _)) =
+displayRefactoring :: forall p. Maybe Refactoring -> HTML p HAction
+displayRefactoring (Just r@(ExtractAccountId _)) =
   button
     [ classes [ btn, btnSecondary, ClassName "button-box" ]
     , type_ ButtonButton
-    , onClick $ const $ Just $ Types.ExtractAccountId r
+    , onClick $ const $ Just $ Refactor r
     ]
     [ text "Extract Account Id" ]
 
-displayRefactoring true (Just (ExtractAccountId { name, accountId, start, end })) = accountIdEditor name accountId start end
+displayRefactoring _ = text mempty

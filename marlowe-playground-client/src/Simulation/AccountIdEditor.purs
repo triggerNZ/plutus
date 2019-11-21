@@ -4,14 +4,13 @@ import Prelude hiding (div, min)
 import Bootstrap (col, colFormLabel, col_, formControl, formGroup, formRow_)
 import Data.BigInteger as BigInteger
 import Halogen.HTML (HTML, div, input, label, text)
-import Halogen.HTML.Events (onValueInput)
+import Halogen.HTML.Events (onValueChange)
 import Halogen.HTML.Properties (InputType(..), classes, min, placeholder, required, type_, value)
 import Marlowe.Semantics (AccountId(..))
-import Text.Parsing.Parser.Pos (Position)
 import Types (HAction(..))
 
-accountIdEditor :: forall p. String -> AccountId -> Position -> Position -> HTML p HAction
-accountIdEditor fieldName accountId start end =
+accountIdEditor :: forall p. String -> AccountId -> HTML p HAction
+accountIdEditor fieldName accountId =
   div []
     [ fieldNameRow fieldName accountId
     , accountNumberRow fieldName accountId
@@ -28,7 +27,7 @@ accountNumberRow fieldName (AccountId accNumber accName) =
     [ formRow_
         $ [ label
               [ classes [ col, colFormLabel ] ]
-              [ text fieldName
+              [ text "Account Number"
               ]
           , col_
               [ input
@@ -38,10 +37,10 @@ accountNumberRow fieldName (AccountId accNumber accName) =
                   , required true
                   , placeholder "Account Number"
                   , min zero
-                  , onValueInput
+                  , onValueChange
                       $ \str -> do
                           newAccNumber <- BigInteger.fromString str
-                          pure $ SetAccountId fieldName $ AccountId newAccNumber accName
+                          pure $ SetAccountId fieldName fieldName $ AccountId newAccNumber accName
                   ]
               ]
           ]
@@ -57,7 +56,7 @@ accountNameRow fieldName (AccountId accNumber accName) =
     [ formRow_
         $ [ label
               [ classes [ col, colFormLabel ] ]
-              [ text fieldName
+              [ text "Account Name"
               ]
           , col_
               [ input
@@ -67,7 +66,7 @@ accountNameRow fieldName (AccountId accNumber accName) =
                   , required true
                   , placeholder "Account Name"
                   , min zero
-                  , onValueInput $ \str -> pure $ SetAccountId fieldName $ AccountId accNumber str
+                  , onValueChange $ \str -> pure $ SetAccountId fieldName fieldName $ AccountId accNumber str
                   ]
               ]
           ]
@@ -83,7 +82,7 @@ fieldNameRow fieldName (AccountId accNumber accName) =
     [ formRow_
         $ [ label
               [ classes [ col, colFormLabel ] ]
-              [ text fieldName
+              [ text "Variable Name"
               ]
           , col_
               [ input
@@ -93,7 +92,7 @@ fieldNameRow fieldName (AccountId accNumber accName) =
                   , required true
                   , placeholder "Variable Name"
                   , min zero
-                  , onValueInput $ \str -> pure $ SetAccountId str $ AccountId accNumber accName
+                  , onValueChange $ \str -> pure $ SetAccountId fieldName str $ AccountId accNumber accName
                   ]
               ]
           ]

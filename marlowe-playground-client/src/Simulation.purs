@@ -6,12 +6,14 @@ import Ace.Editor as Editor
 import Ace.Halogen.Component (Autocomplete(Live), aceComponent)
 import Ace.Types (Editor)
 import Bootstrap (btn, btnInfo, btnSmall, col3, col9, empty, listGroupItem_, listGroup_, row_)
-import Control.Alternative ((<|>))
+import Control.Alternative (map, (<|>))
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Lens (to, view, (^.))
+import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Tuple (uncurry)
 import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
@@ -22,6 +24,7 @@ import Halogen.HTML.Properties.ARIA (role)
 import LocalStorage as LocalStorage
 import Marlowe.Semantics (AccountId)
 import Prelude (Unit, bind, const, discard, pure, unit, void, ($), (<$>), (<<<), (<>))
+import Simulation.AccountIdEditor (accountIdEditor)
 import Simulation.Analysis (analysisPane)
 import Simulation.Common (isContractValid, paneHeader)
 import Simulation.Holes (holesPane)
@@ -30,7 +33,7 @@ import Simulation.Refactoring (refactoringPane)
 import Simulation.StateTable (statePane, stateTitle)
 import Simulation.TransactionComposer (transactionComposerPane, transactionErrors)
 import StaticData as StaticData
-import Types (ChildSlots, FrontendState, HAction(..), MarloweError(..), _Head, _displayRefactoring, _holes, _marloweAccounts, _marloweCompileResult, _marloweEditorSlot, _marloweState, _refactoring, _selectedHole, _transactionError)
+import Types (ChildSlots, FrontendState, HAction(..), MarloweError(..), _Head, _accountIds, _holes, _marloweAccounts, _marloweCompileResult, _marloweEditorSlot, _marloweState, _refactoring, _selectedHole, _transactionError)
 
 simulationPane ::
   forall m.
@@ -73,8 +76,8 @@ simulationPane state =
                       [ slot _marloweEditorSlot unit (aceComponent initEditor (Just Live)) unit (Just <<< MarloweHandleEditorMessage) ]
                   , div [ class_ col3 ]
                       [ holesPane (view _selectedHole state) (view (_marloweState <<< _Head <<< _holes) state)
-                      , accountsPane (view (_marloweState <<< _Head <<< _marloweAccounts) state)
-                      , refactoringPane (view (_marloweState <<< _Head <<< _marloweAccounts) state) (view _displayRefactoring state) (view (_marloweState <<< _Head <<< _refactoring) state)
+                      , accountsPane (view _accountIds state)
+                      , refactoringPane (view (_marloweState <<< _Head <<< _marloweAccounts) state) (view (_marloweState <<< _Head <<< _refactoring) state)
                       ]
                   ]
               ]
@@ -110,14 +113,14 @@ initEditor editor =
         session <- Editor.getSession editor
         Session.setMode "ace/mode/haskell" session
 
-accountsPane :: forall p. Array AccountId -> HTML p HAction
-accountsPane accounts =
+accountsPane :: forall p. Map String AccountId -> HTML p HAction
+accountsPane accountIds =
   div
     [ classes [ ClassName "btn-group-vertical", ClassName "w-100" ]
     , role "group"
     ]
     ( [ div [ classes [ btn ] ] [ text "Accounts" ] ]
-        <> []
+        <> (map (uncurry accountIdEditor) $ Map.toUnfoldable accountIds)
     )
 
 demoScriptsPane :: forall p. HTML p HAction

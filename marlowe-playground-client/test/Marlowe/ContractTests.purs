@@ -1,24 +1,28 @@
 module Marlowe.ContractTests where
 
 import Prelude
+
 import Control.Monad.State (class MonadState, StateT, runState)
 import Data.Array (snoc)
 import Data.Either (Either(..))
 import Data.Identity (Identity)
 import Data.Integral (fromIntegral)
-import Data.Lens (modifying, over, use, (^.))
+import Data.Lens (modifying, over, set, use, (^.))
 import Data.List.NonEmpty as NEL
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.Tuple (Tuple(..))
 import Examples.Marlowe.Contracts as Contracts
+import Marlowe.Holes (Refactoring(..), doRefactoring)
+import Marlowe.Parser (contract, parseTerm)
 import Marlowe.Semantics (AccountId(..), Ada(..), ChoiceId(..), Contract(..), Input(..))
-import MonadApp (class MonadApp, applyTransactions, extendWith, marloweEditorSetAnnotations, updateContractInState, updateContractInStateP, updateMarloweState, updatePossibleActions, updateStateP)
+import MonadApp (class MonadApp, applyTransactions, errorToAnnotation, extendWith, marloweEditorSetAnnotations, updateContractInState, updateContractInStateP, updateMarloweState, updatePossibleActions, updateStateP)
 import Network.RemoteData (RemoteData(..))
 import Test.Unit (TestSuite, suite, test)
 import Test.Unit.Assert (equal)
+import Text.Parsing.Parser (runParser)
 import Text.Parsing.Parser.Pos as Parser
-import Types (FrontendState(..), View(..), _Head, _contract, _currentMarloweState, _editorErrors, _marloweState, _pendingInputs, _transactionError, emptyMarloweState)
+import Types (FrontendState(..), View(..), _Head, _accountIds, _contract, _currentMarloweState, _editorErrors, _holes, _marloweState, _pendingInputs, _transactionError, emptyMarloweState)
 
 -- | For these tests we only need to worry about the MarloweState that is being carried around
 --   However we can use similar techniques to mock other parts of the App
@@ -73,7 +77,14 @@ instance monadAppState :: MonadApp MockApp where
   checkContractForWarnings _ = pure unit
 
 updateContractInStateImpl :: String -> MockApp Unit
-updateContractInStateImpl contract = modifying _currentMarloweState (updatePossibleActions <<< updateContractInStateP (Parser.Position { line: 0, column: 0 }) contract)
+updateContractInStateImpl contractString = do
+  accountIds <- use _accountIds
+  let
+    parsedContract = map (doRefactoring (InjectAccountIds accountIds)) $ runParser contractString (parseTerm contract)
+    cursor = Parser.Position { line: 0, column: 0 }
+  case parsedContract of
+    Right contract' -> modifying _currentMarloweState (updatePossibleActions <<< updateContractInStateP cursor contract')
+    Left error -> modifying _currentMarloweState (set _editorErrors [ errorToAnnotation error ] <<< set _holes mempty)
 
 initialState :: FrontendState
 initialState =
@@ -89,7 +100,8 @@ initialState =
     , blocklyState: Nothing
     , analysisState: NotAsked
     , selectedHole: Nothing
-    , displayRefactoring: false
+    , accountIds: mempty
+    , parsedContract: Nothing
     }
 
 runTests :: forall a. MockApp a -> Tuple a FrontendState
