@@ -70,8 +70,8 @@ simulationPane state =
                       [ class_ col9
                       , onDragOver $ Just <<< MarloweHandleDragEvent
                       , onDrop $ Just <<< MarloweHandleDropEvent
-                      , onKeyUp $ Just <<< const MarloweEditorCursorMoved
-                      , onClick $ Just <<< const MarloweEditorCursorMoved
+                      , onKeyUp $ Just <<< MarloweEditorCursorMoved
+                      , onClick $ Just <<< const MarloweEditorFocus
                       ]
                       [ slot _marloweEditorSlot unit (aceComponent initEditor (Just Live)) unit (Just <<< MarloweHandleEditorMessage) ]
                   , div [ class_ col3 ]

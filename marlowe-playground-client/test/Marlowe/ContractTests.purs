@@ -13,7 +13,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.Tuple (Tuple(..))
 import Examples.Marlowe.Contracts as Contracts
-import Marlowe.Holes (Refactoring(..), doRefactoring)
+import Marlowe.Term (Refactoring(..), doRefactoring)
 import Marlowe.Parser (contract, parseTerm)
 import Marlowe.Semantics (AccountId(..), Ada(..), ChoiceId(..), Contract(..), Input(..))
 import MonadApp (class MonadApp, applyTransactions, errorToAnnotation, extendWith, marloweEditorSetAnnotations, updateContractInState, updateContractInStateP, updateMarloweState, updatePossibleActions, updateStateP)

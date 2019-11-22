@@ -29,15 +29,16 @@ import Gists (GistAction)
 import Halogen as H
 import Halogen.Blockly (BlocklyQuery, BlocklyMessage)
 import Language.Haskell.Interpreter (InterpreterError, InterpreterResult)
-import Marlowe.Holes (Constants, Holes, MarloweHole, Refactoring, Term(..))
-import Marlowe.Holes as Holes
 import Marlowe.Semantics (AccountId, Action(..), Ada, Bound, ChoiceId, ChosenNum, Contract, Environment(..), Input, Party, Payment, PubKey, Slot, SlotInterval(..), State, TransactionError, _minSlot, boundFrom, emptyState, evalValue)
 import Marlowe.Symbolic.Types.Response (Result)
+import Marlowe.Term (Constants, Holes, MarloweHole, Refactoring, Term)
+import Marlowe.Term as Term
 import Network.RemoteData (RemoteData)
 import Prelude (class Eq, class Ord, class Show, Unit, map, mempty, min, zero, (<<<))
 import Servant.PureScript.Ajax (AjaxError)
 import Type.Data.Boolean (kind Boolean)
 import Web.HTML.Event.DragEvent (DragEvent)
+import Web.UIEvent.KeyboardEvent (KeyboardEvent)
 
 _Head :: forall a. Lens (NonEmptyList a) (NonEmptyList a) a a
 _Head = lens NEL.head (\l new -> let { head, tail } = NEL.uncons l in NEL.cons' new tail)
@@ -53,7 +54,8 @@ data HAction
   | MarloweHandleDropEvent DragEvent
   | MarloweMoveToPosition Ace.Position
   | HaskellEditorAction EditorAction
-  | MarloweEditorCursorMoved
+  | MarloweEditorCursorMoved KeyboardEvent
+  | MarloweEditorFocus
   -- Gist support.
   | CheckAuthStatus
   | GistAction GistAction
@@ -125,7 +127,7 @@ newtype FrontendState
   , analysisState :: RemoteData String Result
   , selectedHole :: Maybe String
   , accountIds :: Map String AccountId
-  , parsedContract :: Maybe (Term Holes.Contract)
+  , parsedContract :: Maybe (Term Term.Contract)
   }
 
 derive instance newtypeFrontendState :: Newtype FrontendState _
@@ -169,7 +171,7 @@ _selectedHole = _Newtype <<< prop (SProxy :: SProxy "selectedHole")
 _accountIds :: Lens' FrontendState (Map String AccountId)
 _accountIds = _Newtype <<< prop (SProxy :: SProxy "accountIds")
 
-_parsedContract :: Lens' FrontendState (Maybe (Term Holes.Contract))
+_parsedContract :: Lens' FrontendState (Maybe (Term Term.Contract))
 _parsedContract = _Newtype <<< prop (SProxy :: SProxy "parsedContract")
 
 -- editable

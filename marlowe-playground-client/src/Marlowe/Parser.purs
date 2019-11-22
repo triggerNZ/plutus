@@ -13,7 +13,7 @@ import Data.Either (Either)
 import Data.List (List, some)
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (fromCharArray)
-import Marlowe.Holes (class FromTerm, AccountId(..), Action(..), Bound(..), Case(..), ChoiceId(..), Contract(..), Observation(..), Payee(..), Term(..), Value(..), ValueId(..), fromTerm)
+import Marlowe.Term (class FromTerm, AccountId(..), Action(..), Bound(..), Case(..), ChoiceId(..), Contract(..), Observation(..), Payee(..), Term(..), Value(..), ValueId(..), fromTerm)
 import Marlowe.Semantics (Ada(..), Party, PubKey, Slot(..), SlotInterval(..), Timeout, TransactionInput(..), TransactionWarning(..))
 import Marlowe.Semantics as S
 import Prelude ((<>), bind, const, discard, flip, pure, show, void, ($), (*>), (<$>), (<*), (<*>), (<<<))

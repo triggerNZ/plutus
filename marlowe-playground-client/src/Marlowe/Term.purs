@@ -1,4 +1,4 @@
-module Marlowe.Holes where
+module Marlowe.Term where
 
 import Prelude
 import Control.Alt ((<|>))

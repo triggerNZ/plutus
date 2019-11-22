@@ -39,8 +39,8 @@ import Language.Haskell.Interpreter (InterpreterError, InterpreterResult, Source
 import LocalStorage as LocalStorage
 import Marlowe (SPParams_)
 import Marlowe as Server
-import Marlowe.Holes (MarloweHole(..), Refactoring(..), Term, doRefactoring, fromTerm, getMetadata, mkMetadata)
-import Marlowe.Holes as Holes
+import Marlowe.Term (MarloweHole(..), Refactoring(..), Term, doRefactoring, fromTerm, getMetadata, mkMetadata)
+import Marlowe.Term as Term
 import Marlowe.Parser (parseTerm, contract)
 import Marlowe.Semantics (Contract(..), PubKey, SlotInterval(..), TransactionInput(..), TransactionOutput(..), choiceOwner, computeTransaction, extractRequiredActionsWithTxs, moneyInContract)
 import Network.RemoteData as RemoteData
@@ -238,7 +238,7 @@ withMarloweEditor ::
   HalogenApp m (Maybe a)
 withMarloweEditor = HalogenApp <<< Editor.withEditor _marloweEditorSlot unit
 
-updateContractInStateP :: Parser.Position -> Term Holes.Contract -> MarloweState -> MarloweState
+updateContractInStateP :: Parser.Position -> Term Term.Contract -> MarloweState -> MarloweState
 updateContractInStateP cursor contractTerm state = do
   let
     metadata = getMetadata (mkMetadata cursor) contractTerm

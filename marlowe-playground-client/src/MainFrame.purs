@@ -46,10 +46,10 @@ import Language.Haskell.Interpreter (SourceCode(SourceCode), InterpreterError(Co
 import Marlowe (SPParams_)
 import Marlowe.Blockly as MB
 import Marlowe.Gists (mkNewGist, playgroundGistFile)
-import Marlowe.Holes (MarloweHole(..), Refactoring(..), doRefactoring, getMetadata, mkMetadata, replaceInPositions)
 import Marlowe.Parser (contract, hole)
 import Marlowe.Pretty (pretty)
 import Marlowe.Semantics (ChoiceId, Input(..), inBounds)
+import Marlowe.Term (MarloweHole(..), Refactoring(..), doRefactoring, getMetadata, mkMetadata, replaceInPositions)
 import MonadApp (class MonadApp, marloweEditorMoveCursorToPosition, applyTransactions, checkContractForWarnings, getGistByGistId, getOauthStatus, haskellEditorGetValue, haskellEditorGotoLine, haskellEditorSetAnnotations, haskellEditorSetValue, marloweEditorGetValue, marloweEditorSetValue, patchGistByGistId, postContractHaskell, postGist, preventDefault, readFileFromDragEvent, resetContract, resizeBlockly, runHalogenApp, saveBuffer, saveInitialState, saveMarloweBuffer, setBlocklyCode, updateContractInState, updateMarloweState)
 import Network.RemoteData (RemoteData(..), _Success, isLoading, isSuccess)
 import Prelude (Unit, add, bind, const, discard, mempty, not, one, pure, show, unit, zero, ($), (-), (<$>), (<<<), (<>), (==), (||))
@@ -59,6 +59,7 @@ import StaticData as StaticData
 import Text.Parsing.Parser (runParser)
 import Text.Parsing.Parser.Pos (Position(..))
 import Types (ActionInput(..), ChildSlots, FrontendState(FrontendState), HAction(..), HQuery(..), View(..), WebsocketMessage, _accountIds, _analysisState, _authStatus, _blocklySlot, _compilationResult, _createGistResult, _currentContract, _gistUrl, _haskellEditorSlot, _marloweState, _oldContract, _pendingInputs, _possibleActions, _result, _selectedHole, _slot, _view, emptyMarloweState)
+import Web.UIEvent.Extra (keyLength)
 import WebSocket (WebSocketResponseMessage(..))
 
 initialState :: FrontendState
@@ -129,7 +130,9 @@ toEvent (HaskellEditorAction CompileProgram) = Just $ defaultEvent "CompileProgr
 
 toEvent (HaskellEditorAction (ScrollTo _)) = Nothing
 
-toEvent MarloweEditorCursorMoved = Nothing
+toEvent (MarloweEditorCursorMoved _) = Nothing
+
+toEvent MarloweEditorFocus = Nothing
 
 toEvent (MarloweHandleEditorMessage _) = Nothing
 
@@ -220,7 +223,13 @@ handleAction (MarloweMoveToPosition pos) = do
   marloweEditorMoveCursorToPosition pos
   assign _selectedHole Nothing
 
-handleAction MarloweEditorCursorMoved = do
+handleAction (MarloweEditorCursorMoved event) = do
+  let isWriting = keyLength event == 1
+  assign _selectedHole Nothing
+  currContract <- marloweEditorGetValue
+  updateContractInState $ fromMaybe "" currContract
+
+handleAction MarloweEditorFocus = do
   assign _selectedHole Nothing
   currContract <- marloweEditorGetValue
   updateContractInState $ fromMaybe "" currContract
