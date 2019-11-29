@@ -27,7 +27,7 @@ dynamicIntToStringName :: DynamicBuiltinName
 dynamicIntToStringName = DynamicBuiltinName "intToString"
 
 dynamicIntToStringMeaning :: DynamicBuiltinNameMeaning
-dynamicIntToStringMeaning = DynamicBuiltinNameMeaning sch show where
+dynamicIntToStringMeaning = DynamicBuiltinNameMeaning sch show (Mana 1) where
     sch = Proxy @Int `TypeSchemeArrow` TypeSchemeResult Proxy
 
 dynamicIntToString :: Term tyname name ()

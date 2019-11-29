@@ -34,7 +34,7 @@ dynamicFactorialName :: DynamicBuiltinName
 dynamicFactorialName = DynamicBuiltinName "factorial"
 
 dynamicFactorialMeaning :: DynamicBuiltinNameMeaning
-dynamicFactorialMeaning = DynamicBuiltinNameMeaning sch fac where
+dynamicFactorialMeaning = DynamicBuiltinNameMeaning sch fac (Mana 1) where
     sch = Proxy @Integer `TypeSchemeArrow` TypeSchemeResult Proxy
     fac n = product [1..n]
 
@@ -60,7 +60,7 @@ dynamicConstName :: DynamicBuiltinName
 dynamicConstName = DynamicBuiltinName "const"
 
 dynamicConstMeaning :: DynamicBuiltinNameMeaning
-dynamicConstMeaning = DynamicBuiltinNameMeaning sch Prelude.const where
+dynamicConstMeaning = DynamicBuiltinNameMeaning sch Prelude.const (Mana 1) where
     sch =
         TypeSchemeAllType @"a" @0 Proxy $ \a ->
         TypeSchemeAllType @"b" @1 Proxy $ \b ->
@@ -94,7 +94,7 @@ dynamicReverseName :: DynamicBuiltinName
 dynamicReverseName = DynamicBuiltinName "reverse"
 
 dynamicReverseMeaning :: DynamicBuiltinNameMeaning
-dynamicReverseMeaning = DynamicBuiltinNameMeaning sch (PlcList . Prelude.reverse . unPlcList) where
+dynamicReverseMeaning = DynamicBuiltinNameMeaning sch (PlcList . Prelude.reverse . unPlcList) (Mana 1) where
     sch =
         TypeSchemeAllType @"a" @0 Proxy $ \(_ :: Proxy a) ->
             Proxy @(PlcList a) `TypeSchemeArrow` TypeSchemeResult (Proxy @(PlcList a))

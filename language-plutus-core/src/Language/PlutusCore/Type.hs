@@ -29,7 +29,7 @@ module Language.PlutusCore.Type
     , DynamicBuiltinName (..)
     , StagedBuiltinName (..)
     , TypeBuiltin (..)
-    , Gas (..)
+    , Mana (..)
     -- * Base functors
     , TermF (..)
     , TypeF (..)
@@ -55,9 +55,11 @@ import           Instances.TH.Lift              ()
 import           GHC.Exts (Constraint)
 import           Language.Haskell.TH.Syntax     (Lift)
 
-newtype Gas = Gas
-    { unGas :: Natural
-    }
+newtype Mana = Mana
+    { unMana :: Integer
+    } deriving (Ord, Eq)
+
+deriving newtype instance Num Mana
 
 {- Note [Annotations and equality]
 Equality of two things does not depend on their annotations.

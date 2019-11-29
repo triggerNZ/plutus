@@ -31,6 +31,8 @@ import           Hedgehog                                                hiding 
 import qualified Hedgehog.Gen                                            as Gen
 import           System.FilePath                                         ((</>))
 
+import Debug.Trace
+
 -- | Generate a term using a given generator and check that it's well-typed and evaluates correctly.
 getSampleTermValue :: KnownType a => TermGen a -> IO (TermOf EvaluationResultDef)
 getSampleTermValue genTerm = Gen.sample $ unsafeTypeEvalCheck <$> genTerm

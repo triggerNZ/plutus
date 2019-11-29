@@ -22,6 +22,7 @@ module Language.PlutusCore.Constant.Typed
     , KnownType (..)
     , KnownTypeValue (..)
     , OpaqueTerm (..)
+    , Mana(..)
     , thoist
     , runEvaluateT
     , withEvaluator
@@ -111,7 +112,7 @@ final pipeline one has to supply a 'DynamicBuiltinNameMeaning' for each of the '
 -- | The meaning of a dynamic built-in name consists of its 'Type' represented as a 'TypeScheme'
 -- and its Haskell denotation.
 data DynamicBuiltinNameMeaning =
-    forall a r. DynamicBuiltinNameMeaning (TypeScheme a r) a
+    forall a r. DynamicBuiltinNameMeaning (TypeScheme a r) a Mana
 
 -- | The definition of a dynamic built-in consists of its name and meaning.
 data DynamicBuiltinNameDefinition =

@@ -15,7 +15,7 @@ module Language.PlutusCore.TypeCheck.Internal
     , TypeCheckM
     , tccDoNormTypes
     , tccDynamicBuiltinNameTypes
-    , tccMayGas
+    , tccMayMana
     , runTypeCheckM
     , kindOfTypeBuiltin
     , inferKindM
@@ -109,7 +109,7 @@ data TypeCheckConfig = TypeCheckConfig
     { _tccDoNormTypes             :: Bool
       -- ^ Whether to normalize type annotations.
     , _tccDynamicBuiltinNameTypes :: DynamicBuiltinNameTypes
-    , _tccMayGas                  :: Maybe Gas
+    , _tccMayMana                  :: Maybe Mana
       -- ^ The upper limit on the length of type reductions.
       -- If set to 'Nothing', type reductions will be unbounded.
     }
@@ -195,19 +195,19 @@ dummyType = TyVar () dummyTyName
 -- ########################
 
 -- | Run a 'NormalizeTypeT' computation in the 'TypeCheckM' context.
--- Depending on whether gas is finite or infinite, calls either
--- 'Norm.runNormalizeTypeFullM' or 'Norm.runNormalizeTypeGasM'.
--- Throws 'OutOfGas' if type normalization runs out of gas.
+-- Depending on whether mana is finite or infinite, calls either
+-- 'Norm.runNormalizeTypeFullM' or 'Norm.runNormalizeTypeManaM'.
+-- Throws 'OutOfMana' if type normalization runs out of mana.
 runNormalizeTypeTM
     :: (forall m. MonadQuote m => Norm.NormalizeTypeT m tyname ann1 a) -> TypeCheckM ann2 a
 runNormalizeTypeTM a = do
-    mayGas <- asks $ _tccMayGas . _tceTypeCheckConfig
-    case mayGas of
+    mayMana <- asks $ _tccMayMana . _tceTypeCheckConfig
+    case mayMana of
         Nothing  -> Norm.runNormalizeTypeFullM a
-        Just gas -> do
-            mayX <- Norm.runNormalizeTypeGasM gas a
+        Just mana -> do
+            mayX <- Norm.runNormalizeTypeManaM mana a
             case mayX of
-                Nothing -> throwing _TypeError OutOfGas
+                Nothing -> throwing _TypeError OutOfMana
                 Just x  -> pure x
 
 -- | Normalize a 'Type'.

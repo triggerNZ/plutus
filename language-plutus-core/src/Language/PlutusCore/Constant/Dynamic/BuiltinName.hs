@@ -24,11 +24,13 @@ import           Language.PlutusCore.Type
 import           Data.Proxy
 import           Debug.Trace                                    (trace)
 
+-- TODO actual costs
+
 dynamicCharToStringName :: DynamicBuiltinName
 dynamicCharToStringName = DynamicBuiltinName "charToString"
 
 dynamicCharToStringMeaning :: DynamicBuiltinNameMeaning
-dynamicCharToStringMeaning = DynamicBuiltinNameMeaning sch pure where
+dynamicCharToStringMeaning = DynamicBuiltinNameMeaning sch pure (Mana 1) where
     sch =
         Proxy @Char `TypeSchemeArrow`
         TypeSchemeResult (Proxy @String)
@@ -44,7 +46,7 @@ dynamicAppendName :: DynamicBuiltinName
 dynamicAppendName = DynamicBuiltinName "append"
 
 dynamicAppendMeaning :: DynamicBuiltinNameMeaning
-dynamicAppendMeaning = DynamicBuiltinNameMeaning sch (++) where
+dynamicAppendMeaning = DynamicBuiltinNameMeaning sch (++) (Mana 1) where
     sch =
         Proxy @String `TypeSchemeArrow`
         Proxy @String `TypeSchemeArrow`
@@ -61,7 +63,7 @@ dynamicTraceName :: DynamicBuiltinName
 dynamicTraceName = DynamicBuiltinName "trace"
 
 dynamicTraceMeaningMock :: DynamicBuiltinNameMeaning
-dynamicTraceMeaningMock = DynamicBuiltinNameMeaning sch (flip trace ()) where
+dynamicTraceMeaningMock = DynamicBuiltinNameMeaning sch (flip trace ()) (Mana 1) where
     sch =
         Proxy @String `TypeSchemeArrow`
         TypeSchemeResult (Proxy @())

@@ -56,7 +56,7 @@ data ConstAppResult a
     = ConstAppSuccess a
       -- ^ Successfully computed a value.
     | ConstAppFailure
-      -- ^ Not enough gas.
+      -- ^ Not enough mana.
     | ConstAppStuck
       -- ^ Not enough arguments.
     | ConstAppError ConstAppError

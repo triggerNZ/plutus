@@ -7,8 +7,8 @@ module Language.PlutusCore.TypeCheck
     , TypeCheckConfig (..)
     , tccDoNormTypes
     , tccDynamicBuiltinNameTypes
-    , tccMayGas
-    , defTypeCheckGas
+    , tccMayMana
+    , defTypeCheckMana
     , onChainConfig
     , offChainConfig
     , defOnChainConfig
@@ -36,12 +36,12 @@ import           Language.PlutusCore.TypeCheck.Internal
 
 import           Control.Monad.Except
 
--- | The default amount of gas to run the type checker with.
-defTypeCheckGas :: Gas
-defTypeCheckGas = Gas 1000
+-- | The default amount of mana to run the type checker with.
+defTypeCheckMana :: Mana
+defTypeCheckMana = Mana 1000
 
 -- | The 'TypeCheckConfig' used on the chain.
-onChainConfig :: DynamicBuiltinNameTypes -> Gas -> TypeCheckConfig
+onChainConfig :: DynamicBuiltinNameTypes -> Mana -> TypeCheckConfig
 onChainConfig tys = TypeCheckConfig False tys . Just
 
 -- | The 'TypeCheckConfig' used off the chain.
@@ -50,7 +50,7 @@ offChainConfig tys = TypeCheckConfig True tys Nothing
 
 -- | The default 'TypeCheckConfig' used on the chain.
 defOnChainConfig :: TypeCheckConfig
-defOnChainConfig = onChainConfig mempty defTypeCheckGas
+defOnChainConfig = onChainConfig mempty defTypeCheckMana
 
 -- | The default 'TypeCheckConfig' used off the chain.
 defOffChainConfig :: TypeCheckConfig

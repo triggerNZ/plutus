@@ -25,7 +25,7 @@ dynamicCallAssign
     -> DynamicBuiltinNameDefinition
 dynamicCallAssign name f =
     DynamicBuiltinNameDefinition name $
-        DynamicBuiltinNameMeaning dynamicCallTypeScheme (unsafePerformIO . f)
+        DynamicBuiltinNameMeaning dynamicCallTypeScheme (unsafePerformIO . f) (Mana 1) -- TODO Mana cost
 
 dynamicCall :: DynamicBuiltinName -> Term tyname name ()
 dynamicCall = dynamicBuiltinNameAsTerm

@@ -10,7 +10,7 @@ module Language.PlutusCore.Normalize.Internal
     ( NormalizeTypeT
     , runNormalizeTypeM
     , runNormalizeTypeFullM
-    , runNormalizeTypeGasM
+    , runNormalizeTypeManaM
     , withExtendedTypeVarEnv
     , normalizeTypeM
     , substNormalizeTypeM
@@ -80,8 +80,8 @@ Normalization is split in two parts:
 2. runners of those computations
 
 The reason for splitting the API is that this way the type-theoretic notion of normalization is
-separated from implementation-specific details like how to count gas (we hardcode *where* to count
-gas, but this can be generalized in case we need it). And this is important, because gas counting
+separated from implementation-specific details like how to count mana (we hardcode *where* to count
+mana, but this can be generalized in case we need it). And this is important, because mana counting
 requires access to different monads in different scenarios, so in the end we have a fine-grained API
 instead of a single function that reflects all possible effects from distinct scenarios in its type
 signature.
@@ -102,22 +102,22 @@ runNormalizeTypeM :: m () -> NormalizeTypeT m tyname ann a -> m a
 runNormalizeTypeM countStep (NormalizeTypeT a) =
     runReaderT a $ NormalizeTypeEnv mempty countStep
 
--- | Run a 'NormalizeTypeM' computation without dealing with gas.
+-- | Run a 'NormalizeTypeM' computation without dealing with mana.
 runNormalizeTypeFullM
     :: MonadQuote m => NormalizeTypeT m tyname ann a -> m a
 runNormalizeTypeFullM = runNormalizeTypeM $ pure ()
 
--- | Run a gas-consuming 'NormalizeTypeM' computation.
--- Count a single substitution step by subtracting @1@ from available gas or
--- fail when there is no available gas.
-runNormalizeTypeGasM
-    :: MonadQuote m => Gas -> NormalizeTypeT (StateT Gas (MaybeT m)) tyname ann a -> m (Maybe a)
-runNormalizeTypeGasM gas a = runMaybeT $ evalStateT (runNormalizeTypeM countSubst a) gas where
+-- | Run a mana-consuming 'NormalizeTypeM' computation.
+-- Count a single substitution step by subtracting @1@ from available mana or
+-- fail when there is no available mana.
+runNormalizeTypeManaM
+    :: MonadQuote m => Mana -> NormalizeTypeT (StateT Mana (MaybeT m)) tyname ann a -> m (Maybe a)
+runNormalizeTypeManaM mana a = runMaybeT $ evalStateT (runNormalizeTypeM countSubst a) mana where
     countSubst = do
-        Gas gas' <- get
-        if gas' == 0
+        Mana mana' <- get
+        if mana' == 0
             then mzero
-            else put . Gas $ gas' - 1
+            else put . Mana $ mana' - 1
 
 countTypeNormalizationStep :: NormalizeTypeT m tyname ann ()
 countTypeNormalizationStep = NormalizeTypeT $ ReaderT _normalizeTypeEnvCountStep

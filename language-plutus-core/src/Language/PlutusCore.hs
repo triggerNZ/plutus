@@ -47,7 +47,7 @@ module Language.PlutusCore
     , format
     , formatDoc
     -- * Processing
-    , Gas (..)
+    , Mana (..)
     , HasUniques
     , Rename (..)
     -- * Type checking
@@ -165,7 +165,7 @@ printNormalizeType
     -> m T.Text
 printNormalizeType norm bs = runQuoteT $ prettyPlcDefText <$> do
     scoped <- parseScoped bs
-    inferTypeOfProgram (TypeCheckConfig norm mempty $ Just defTypeCheckGas) scoped
+    inferTypeOfProgram (TypeCheckConfig norm mempty $ Just defTypeCheckMana) scoped
 
 -- | Parse and rewrite so that names are globally unique, not just unique within
 -- their scope.

@@ -28,6 +28,8 @@ data MachineError err
       -- ^ An attempt to evaluate an open term.
     | ConstAppMachineError ConstAppError
       -- ^ An attempt to compute a constant application resulted in 'ConstAppError'.
+    | OutOfManaError -- TODO put this into interpreter?
+      -- ^ No more Mana available to continue execution.
     | OtherMachineError err
     deriving (Eq)
 
@@ -50,6 +52,7 @@ instance ( PrettyBy config (Term TyName Name ())
         "Cannot evaluate an open term."
     prettyBy config (ConstAppMachineError constAppError)  =
         prettyBy config constAppError
+    prettyBy _      OutOfManaError = "Cannot continue - no more mana availble."
     prettyBy _      (OtherMachineError err)               =
         pretty err
 
