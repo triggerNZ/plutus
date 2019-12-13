@@ -54317,100 +54317,6 @@ description = "Plutus IR language";
 license = stdenv.lib.licenses.asl20;
 
 }) {};
-"plutus-playground-lib" = callPackage
-({
-  mkDerivation
-, aeson
-, base
-, bytestring
-, containers
-, cryptonite
-, deriving-compat
-, freer-simple
-, hedgehog
-, insert-ordered-containers
-, iots-export
-, lens
-, memory
-, mtl
-, newtype-generics
-, playground-common
-, plutus-contract
-, plutus-emulator
-, plutus-tx
-, plutus-wallet-api
-, prettyprinter
-, QuickCheck
-, recursion-schemes
-, row-types
-, serialise
-, servant
-, stdenv
-, tasty
-, tasty-hunit
-, template-haskell
-, text
-, transformers
-, unordered-containers
-, wl-pprint-text
-}:
-mkDerivation {
-
-pname = "plutus-playground-lib";
-version = "0.1.0.0";
-src = .././plutus-playground-lib;
-libraryHaskellDepends = [
-aeson
-base
-bytestring
-containers
-cryptonite
-deriving-compat
-freer-simple
-insert-ordered-containers
-iots-export
-lens
-memory
-mtl
-newtype-generics
-playground-common
-plutus-contract
-plutus-emulator
-plutus-tx
-plutus-wallet-api
-prettyprinter
-recursion-schemes
-row-types
-serialise
-servant
-template-haskell
-text
-transformers
-unordered-containers
-wl-pprint-text
-];
-testHaskellDepends = [
-aeson
-base
-containers
-hedgehog
-iots-export
-playground-common
-plutus-emulator
-plutus-tx
-plutus-wallet-api
-QuickCheck
-recursion-schemes
-tasty
-tasty-hunit
-template-haskell
-text
-];
-doHaddock = false;
-homepage = "https://github.com/iohk/plutus#readme";
-license = stdenv.lib.licenses.asl20;
-
-}) {};
 "plutus-playground-server" = callPackage
 ({
   mkDerivation
@@ -54423,6 +54329,7 @@ license = stdenv.lib.licenses.asl20;
 , cookie
 , cryptonite
 , data-default-class
+, deriving-compat
 , exceptions
 , file-embed
 , filepath
@@ -54434,6 +54341,7 @@ license = stdenv.lib.licenses.asl20;
 , iots-export
 , jwt
 , lens
+, memory
 , monad-logger
 , mtl
 , newtype-generics
@@ -54441,7 +54349,6 @@ license = stdenv.lib.licenses.asl20;
 , playground-common
 , plutus-contract
 , plutus-emulator
-, plutus-playground-lib
 , plutus-tx
 , plutus-wallet-api
 , process
@@ -54467,6 +54374,7 @@ license = stdenv.lib.licenses.asl20;
 , time
 , time-units
 , transformers
+, unordered-containers
 , wai
 , wai-cors
 , wai-extra
@@ -54488,6 +54396,7 @@ bytestring
 containers
 cookie
 cryptonite
+deriving-compat
 exceptions
 file-embed
 filepath
@@ -54499,13 +54408,13 @@ insert-ordered-containers
 iots-export
 jwt
 lens
+memory
 monad-logger
 mtl
 newtype-generics
 playground-common
 plutus-contract
 plutus-emulator
-plutus-playground-lib
 plutus-tx
 plutus-wallet-api
 process
@@ -54524,6 +54433,7 @@ text
 time
 time-units
 transformers
+unordered-containers
 ];
 executableHaskellDepends = [
 adjunctions
@@ -54544,7 +54454,6 @@ optparse-applicative
 playground-common
 plutus-contract
 plutus-emulator
-plutus-playground-lib
 plutus-tx
 plutus-wallet-api
 prometheus
@@ -54573,7 +54482,6 @@ iots-export
 mtl
 playground-common
 plutus-emulator
-plutus-playground-lib
 plutus-tx
 plutus-wallet-api
 tasty
@@ -54721,7 +54629,7 @@ license = stdenv.lib.licenses.asl20;
 , playground-common
 , plutus-contract
 , plutus-emulator
-, plutus-playground-lib
+, plutus-playground-server
 , plutus-tx
 , plutus-wallet-api
 , prettyprinter
@@ -54751,7 +54659,7 @@ mtl
 playground-common
 plutus-contract
 plutus-emulator
-plutus-playground-lib
+plutus-playground-server
 plutus-tx
 plutus-wallet-api
 prettyprinter

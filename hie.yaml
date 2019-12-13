@@ -70,17 +70,6 @@ cradle:
         cabal:
           component: "plutus-ir:plutus-ir-test"
 
-  - path: ./plutus-playground-lib/src
-    config:
-      cradle:
-        cabal:
-          component: "lib:plutus-playground-lib"
-  - path: ./plutus-playground-lib/test
-    config:
-      cradle:
-        cabal:
-          component: "plutus-playground-lib:plutus-playground-lib-test"
-
   - path: ./playground-common/src
     config:
       cradle:

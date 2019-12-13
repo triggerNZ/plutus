@@ -192,7 +192,6 @@ let
         # the playground uses ghc at runtime so it needs one packaged up with the dependencies it needs in one place
         runtimeGhc = haskellPackages.ghcWithPackages (ps: [
           playground-exe
-          haskellPackages.plutus-playground-lib
           haskellPackages.plutus-use-cases
         ]);
       in pkgs.runCommand "plutus-server-invoker" { buildInputs = [pkgs.makeWrapper]; } ''

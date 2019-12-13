@@ -46,6 +46,14 @@ library
         StarterSimulations
         Vesting
         VestingSimulations
+        Playground.Contract
+        Playground.Types
+        Schema
+        Playground.API
+    other-modules:
+        Playground.Interpreter.Util
+        Playground.Schema
+        Playground.TH
     hs-source-dirs:   src
                     , usecases
     default-language: Haskell2010
@@ -61,6 +69,7 @@ library
         containers -any,
         cookie -any,
         cryptonite -any,
+        deriving-compat -any,
         exceptions -any,
         file-embed -any,
         filepath -any,
@@ -71,18 +80,19 @@ library
         iots-export -any,
         jwt -any,
         lens -any,
+        memory -any,
         monad-logger -any,
         mtl -any,
         newtype-generics -any,
+        newtype-generics -any,
         playground-common -any,
-        plutus-emulator -any,
-        plutus-playground-lib -any,
-        plutus-wallet-api -any,
-        plutus-tx -any,
-        process -any,
-        regex-compat -any,
-        recursion-schemes -any,
         plutus-contract -any,
+        plutus-emulator -any,
+        plutus-tx -any,
+        plutus-wallet-api -any,
+        process -any,
+        recursion-schemes -any,
+        regex-compat -any,
         row-types -any,
         serialise -any,
         servant <0.16,
@@ -90,15 +100,18 @@ library
         servant-client-core -any,
         servant-purescript -any,
         servant-server -any,
-        temporary -any,
         template-haskell -any,
+        template-haskell -any,
+        temporary -any,
         text -any,
         time -any,
         time-units -any,
-        transformers -any
+        transformers -any,
+        unordered-containers -any
 
 library plutus-playground-usecases
-    hs-source-dirs: usecases
+    hs-source-dirs: src
+                  , usecases
     other-modules:
         Crowdfunding
         CrowdfundingSimulations
@@ -106,6 +119,12 @@ library plutus-playground-usecases
         ErrorHandlingSimulations
         Game
         GameSimulations
+        Playground.Contract
+        Playground.Interpreter.Util
+        Playground.Schema
+        Playground.TH
+        Playground.Types
+        Schema
         SimulationUtils
         Starter
         StarterSimulations
@@ -122,23 +141,28 @@ library plutus-playground-usecases
     build-depends:
         aeson -any,
         base >=4.7 && <5,
-        lens -any,
         bytestring -any,
         containers -any,
+        cryptonite -any,
+        deriving-compat -any,
         insert-ordered-containers -any,
         iots-export -any,
+        lens -any,
+        memory -any,
         mtl -any,
+        newtype-generics -any,
         playground-common -any,
         plutus-contract -any,
         plutus-emulator -any,
-        plutus-playground-lib -any,
         plutus-tx -any,
         plutus-wallet-api -any,
         recursion-schemes -any,
         row-types -any,
+        template-haskell -any,
         text -any,
         time-units -any,
-        transformers -any
+        transformers -any,
+        unordered-containers -any
 
     if flag(defer-plugin-errors)
         ghc-options: -fplugin-opt Language.PlutusTx.Plugin:defer-errors
@@ -186,7 +210,6 @@ executable plutus-playground-server
         mtl -any,
         optparse-applicative -any,
         plutus-tx -any,
-        plutus-playground-lib -any,
         plutus-playground-server -any,
         plutus-playground-usecases -any,
         prometheus >=2,
@@ -234,7 +257,6 @@ test-suite plutus-playground-server-test
         playground-common -any,
         iots-export -any,
         mtl -any,
-        plutus-playground-lib -any,
         plutus-playground-server -any,
         plutus-tx -any,
         plutus-wallet-api -any,

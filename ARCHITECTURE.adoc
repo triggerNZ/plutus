@@ -158,10 +158,6 @@ anyone outside the team has interacted with out product!
 This package contains some library code which is shared between the Plutus and
 Marlowe Playgrounds.
 
-=== `plutus-playground-lib`
-
-This package contains some library code for the Plutus Playground.
-
 === `plutus-playground-server` and `marlowe-playground-server`
 
 These packages contain the servers that back the Plutus/Marlowe Playgrounds by
