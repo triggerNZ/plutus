@@ -183,10 +183,9 @@ merklisationStatistics program =
         s2 = serialise prunedProgram
         hash1 = merkleHash $ fromCoreProgram program
         hash2 = merkleHash prunedProgram
-        scr =  prettyPlcClassicDef program
 
         messages = [
-         "Script: " ++ show scr,
+--         "Script: " ++ prettyPlcClassicDef program
          "\nBefore Merklisation",
          " AST size: " ++ (show $ PLCSize.astInfo program),
          " Serialised size = " ++ (show $ BSL.length s1) ++ " bytes",

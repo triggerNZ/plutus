@@ -14,7 +14,7 @@ module AstCompression (main) where
 import qualified Language.PlutusCore                                           as PLC
 import qualified Language.PlutusCore.CBOR                                      as PLC ()
 
-import qualified Language.PlutusCore.Erasure.Untyped.CBOR2                     as U ()
+import qualified Language.PlutusCore.Erasure.Untyped.CBOR                      as U ()
 import           Language.PlutusCore.Erasure.Untyped.Term                      as U
 
 import qualified Language.PlutusCore.DeBruijn                                  as D

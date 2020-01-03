@@ -46,6 +46,36 @@ import           Language.PlutusTx.Coordination.Contracts.Vesting              a
 
 import qualified Language.PlutusTx                                             as PlutusTx
 
+
+-- Estimate Merklisation overhead
+printHeader1 :: IO ()
+printHeader1 = do
+  putStrLn "| Contract | Number of nodes | Serialised size (bytes) | 512-bit blocks | Merkle hash overhead |"
+  putStrLn "| :---: | ---: | ---: | ---: | ---: |"
+
+
+divup :: Integer -> Integer -> Integer
+divup a b =
+    let q = a `div` b
+        a' = b*q
+    in if a == a' then q else q+1
+
+
+estimateOverhead :: String -> PlutusTx.CompiledCode a -> IO ()
+estimateOverhead name code = do
+    let prog = PlutusTx.getPlc code
+        numnodes = PLCSize.programSize prog
+        s1 = serialise prog
+        numbytes = B.length s1
+        numblocks = divup (fromIntegral numbytes) 64  -- 64 bytes = 512 bits
+    putStr $ "| " ++ name
+    putStr $ " | " ++ show numnodes
+    putStr $ " | " ++ show numbytes
+    putStr $ " | " ++ show numblocks
+    putStrLn $ " | " ++ Numeric.showFFloat (Just 1) (overhead numnodes numblocks) "x" ++ " |"
+        where overhead a b = (fromIntegral a) / (fromIntegral b) :: Float
+
+
 --- Merklise types away
 
 translateKind :: P.Kind ann -> M.Kind ann
@@ -96,6 +126,7 @@ merkliseProgramTypes (P.Program x version body) = M.Program x version (merkliseT
 
    We'd need an mempty for Digest, which seems improbable.
 -}
+
 
 data CompressionMode = Uncompressed | Compressed
 data PrintFormat = Alone | WithPercentage
