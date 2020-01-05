@@ -130,46 +130,68 @@ type NumSet = Data.Set.Set Integer
 typeId :: PLC.Type PLC.TyName Integer -> Integer
 typeId = PLC.tyLoc
 
-pruneType :: NumSet -> PLC.Type PLC.TyName Integer -> Type PLC.TyName ()
-pruneType used ty0 =
+
+-- A generic type of type-pruning funtions.
+-- In our case, all types will be unused, so pruners will always be applied.
+type TypePruner = NumSet -> PLC.Type PLC.TyName Integer -> Type PLC.TyName ()
+
+
+pruneAllTypes :: TypePruner
+pruneAllTypes used ty0 =
+    if not $ Data.Set.member (typeId ty0) used
+    then TyPruned () (merkleHash (fromCoreType $ () <$ ty0))
+    else case ty0 of
+      PLC.TyVar     _ tn      -> TyVar     () (unann tn)
+      PLC.TyFun     _ ty ty'  -> TyFun     () (pruneAllTypes used ty) (pruneAllTypes used ty')
+      PLC.TyIFix    _ ty ty'  -> TyIFix    () (pruneAllTypes used ty) (pruneAllTypes used ty')
+      PLC.TyForall  _ tn k ty -> TyForall  () (unann tn) (unann $ fromCoreKind k) (pruneAllTypes used ty)
+      PLC.TyBuiltin _ tb      -> TyBuiltin () tb
+      PLC.TyLam     _ tn k ty -> TyLam     () (unann tn) (unann $ fromCoreKind k) (pruneAllTypes used ty)
+      PLC.TyApp     _ ty ty'  -> TyApp     () (pruneAllTypes used ty) (pruneAllTypes used ty')
+
+pruneBigTypes :: TypePruner
+pruneBigTypes used ty0 =
     if not $ Data.Set.member (typeId ty0) used
     then
-        let ty1 = () <$ (fromCoreType ty0)
+        let ty1 = fromCoreType $ () <$ ty0
         in if (BSL.length $ serialise ty1) <= 32
-         -- ** ATTENTION!  ** We're only Merklising large types here.  We may ultimately want to do something else.
            then ty1
            else TyPruned () (merkleHash (fromCoreType $ unann ty0))
     else case ty0 of
       PLC.TyVar     _ tn      -> TyVar     () (unann tn)
-      PLC.TyFun     _ ty ty'  -> TyFun     () (pruneType used ty) (pruneType used ty')
-      PLC.TyIFix    _ ty ty'  -> TyIFix    () (pruneType used ty) (pruneType used ty')
-      PLC.TyForall  _ tn k ty -> TyForall  () (unann tn) (unann $ fromCoreKind k) (pruneType used ty)
+      PLC.TyFun     _ ty ty'  -> TyFun     () (pruneBigTypes used ty) (pruneBigTypes used ty')
+      PLC.TyIFix    _ ty ty'  -> TyIFix    () (pruneBigTypes used ty) (pruneBigTypes used ty')
+      PLC.TyForall  _ tn k ty -> TyForall  () (unann tn) (unann $ fromCoreKind k) (pruneBigTypes used ty)
       PLC.TyBuiltin _ tb      -> TyBuiltin () tb
-      PLC.TyLam     _ tn k ty -> TyLam     () (unann tn) (unann $ fromCoreKind k) (pruneType used ty)
-      PLC.TyApp     _ ty ty'  -> TyApp     () (pruneType used ty) (pruneType used ty')
+      PLC.TyLam     _ tn k ty -> TyLam     () (unann tn) (unann $ fromCoreKind k) (pruneBigTypes used ty)
+      PLC.TyApp     _ ty ty'  -> TyApp     () (pruneBigTypes used ty) (pruneBigTypes used ty')
 
+dontPrune :: TypePruner
+dontPrune _used ty = fromCoreType $ () <$ ty
 
 termId :: PLC.Term PLC.TyName PLC.Name Integer -> Integer
 termId = PLC.termLoc  -- We should rename termLoc since this isn't a location
 
-pruneTerm :: NumSet -> PLC.Term PLC.TyName PLC.Name Integer -> Term PLC.TyName PLC.Name ()
-pruneTerm used t0 =
-    if not $ Data.Set.member (termId t0) used
+pruneTerm :: NumSet -> TypePruner -> PLC.Term PLC.TyName PLC.Name Integer -> Term PLC.TyName PLC.Name ()
+pruneTerm used pruneType t0 =
+    let pruneTerm' = pruneTerm used pruneType
+        pruneType' = pruneType used
+    in if not $ Data.Set.member (termId t0) used
     then Prune () (merkleHash (fromCoreTerm $ unann t0))
     else case t0 of
-      PLC.Var      _ n         -> Var      () (unann n)
-      PLC.LamAbs   _ n ty t    -> LamAbs   () (unann n) (pruneType used ty) (pruneTerm used t)
-      PLC.TyInst   _ t ty      -> TyInst   () (pruneTerm used t) (pruneType used ty)
-      PLC.IWrap    _ ty1 ty2 t -> IWrap    () (pruneType used ty1) (pruneType used ty2) (pruneTerm used t)
-      PLC.TyAbs    _ tn k t    -> TyAbs    () (unann tn) (unann $ fromCoreKind k) (pruneTerm used t)
-      PLC.Apply    _ t1 t2     -> Apply    () (pruneTerm used t1) (pruneTerm used t2)
-      PLC.Unwrap   _ t         -> Unwrap   () (pruneTerm used t)
-      PLC.Error    _ ty        -> Error    () (pruneType used ty)
-      PLC.Constant _ c         -> Constant () (unann $ fromCoreConstant c)
-      PLC.Builtin  _ b         -> Builtin  () (unann $ fromCoreBuiltin b)
+           PLC.Var      _ n         -> Var      () (unann n)
+           PLC.LamAbs   _ n ty t    -> LamAbs   () (unann n) (pruneType' ty) (pruneTerm' t)
+           PLC.TyInst   _ t ty      -> TyInst   () (pruneTerm' t) (pruneType' ty)
+           PLC.IWrap    _ ty1 ty2 t -> IWrap    () (pruneType' ty1) (pruneType' ty2) (pruneTerm' t)
+           PLC.TyAbs    _ tn k t    -> TyAbs    () (unann tn) (unann $ fromCoreKind k) (pruneTerm' t)
+           PLC.Apply    _ t1 t2     -> Apply    () (pruneTerm' t1) (pruneTerm' t2)
+           PLC.Unwrap   _ t         -> Unwrap   () (pruneTerm' t)
+           PLC.Error    _ ty        -> Error    () (pruneType' ty)
+           PLC.Constant _ c         -> Constant () (unann $ fromCoreConstant c)
+           PLC.Builtin  _ b         -> Builtin  () (unann $ fromCoreBuiltin b)
 
-pruneProgram :: Data.Set.Set Integer -> PLC.Program PLC.TyName PLC.Name Integer -> Program PLC.TyName PLC.Name ()
-pruneProgram used (PLC.Program _ v t) = Program () (unann v) (pruneTerm used t)
+pruneProgram :: Data.Set.Set Integer -> TypePruner -> PLC.Program PLC.TyName PLC.Name Integer -> Program PLC.TyName PLC.Name ()
+pruneProgram used pruneType (PLC.Program _ v t) = Program () (unann v) (pruneTerm used pruneType t)
 
 ----- The following stuff should be somewhere else
 
@@ -205,7 +227,7 @@ merklisationStatistics0 program =
         PLC.Program progAnn _ numberedBody = numberedProgram
         bodyAnn = PLC.termLoc numberedBody
         usedNodes =  getUsedNodes $ CekMarker.runCekWithStringBuiltins numberedProgram
-        prunedProgram = pruneProgram usedNodes numberedProgram
+        prunedProgram = pruneProgram usedNodes pruneAllTypes numberedProgram
         s2 = serialise prunedProgram
         hash1 = merkleHash $ fromCoreProgram program
         hash2 = merkleHash prunedProgram
@@ -238,6 +260,26 @@ merklisationStatistics0 program =
 --  uncompressed versions for both.  Number of nodes before and after
 --  pruning in a seaparate table?
 
+-- | Count the number of pruned nodes in a term.
+prunedTerms :: Term tyname name ann -> Integer
+prunedTerms = cata a where
+    a VarF{}              = 0
+    a (TyAbsF _ _ k t)    = t
+    a (ApplyF _ t t')     = t + t'
+    a (LamAbsF _ _ ty t)  = t
+    a ConstantF{}         = 0
+    a BuiltinF{}          = 0
+    a (TyInstF _ t ty)    = t
+    a (UnwrapF _ t)       = t
+    a (IWrapF _ ty ty' t) = t
+    a (ErrorF _ ty)       = 0
+    a (PruneF _ _)        = 1
+
+-- | Count the number of AST nodes in a program.
+progPrunedTerms :: Program tyname name ann -> Integer
+progPrunedTerms (Program _ _ t) = prunedTerms t
+
+
 merklisationStatistics :: PLC.Program PLC.TyName PLC.Name () -> String
 merklisationStatistics program =
     let numberedProgram = numberProgram program
@@ -246,19 +288,30 @@ merklisationStatistics program =
         usedNodes =  getUsedNodes $ CekMarker.runCekWithStringBuiltins numberedProgram
         numTermNodes = PLCSize.programNumTermNodes program
         numUsedNodes = Data.Set.size usedNodes
-        prunedProgram = pruneProgram usedNodes numberedProgram
+        prunedProgram1 = pruneProgram usedNodes pruneAllTypes numberedProgram
+        prunedProgram2 = pruneProgram usedNodes pruneBigTypes numberedProgram
+        prunedProgram3 = pruneProgram usedNodes dontPrune numberedProgram
         strippedProgram       = C.deBruijnToIntProgram . C.deBruijnUntypedProgram . C.erasePLCProgram $ program
-        strippedPrunedProgram = C.deBruijnToIntProgram . C.deBruijnUntypedProgram . C.eraseMerkleProgram $ prunedProgram
+        strippedPrunedProgram = C.deBruijnToIntProgram . C.deBruijnUntypedProgram . C.eraseMerkleProgram $ prunedProgram1
+        -- When we strip a pruned program, all types are discarded so it's irrelevant what pruning method we used
         clen = BSL.length . compress
 
         s1 = serialise program
         s2 = serialise strippedProgram
-        s3 = serialise prunedProgram
+        s3a = serialise prunedProgram1
+        s3b = serialise prunedProgram2
+        s3c = serialise prunedProgram3
         s4 = serialise strippedPrunedProgram
-    in "\n" ++ show numTermNodes ++ " " ++ show numUsedNodes ++ " "
-         ++ (show $ BSL.length s1) ++ " " ++ (show $ BSL.length s2)
-         ++ " " ++ (show $ BSL.length s3)  ++ " " ++ (show $ BSL.length s4)
-         ++ "\n" ++ " - - " ++ (show $ clen s1) ++ " "  ++ (show $ clen s2) ++ " "
-         ++ (show $ clen s3) ++ " "  ++ (show $ clen s4)
+    in "\n"
+         ++ "* | " ++ show numTermNodes ++ " | " ++ show numUsedNodes ++ " | "
+         ++ (show $ BSL.length s1) ++ " | " ++ (show $ BSL.length s2)
+         ++ " | " ++ (show $ BSL.length s3a) ++ " | " ++ (show $ BSL.length s3b) ++ " | " ++ (show $ BSL.length s3c)
+         ++ " | " ++ (show $ BSL.length s4)
+         ++ " | \n"
+         ++ "* | (compressed) | - | "
+         ++ (show $ clen s1) ++ " | "  ++ (show $ clen s2) ++ " | "
+         ++ (show $ clen s3a) ++ " | "  ++ (show $ clen s3b) ++ " | "  ++ (show $ clen s3c)
+         ++ " | "  ++ (show $ clen s4) ++ " |"
+         ++ "\nPruned term nodes in program: " ++ show (progPrunedTerms prunedProgram1)
 
 

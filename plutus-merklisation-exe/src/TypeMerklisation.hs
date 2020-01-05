@@ -95,6 +95,8 @@ translateConstant = \case
      P.BuiltinStr x s -> M.BuiltinStr x s
 
 
+-- Crudely replace all types with their Merklised versions.
+-- There are more refined verions in Language.PlutusCore.Merkle.Merklise.
 
 merkliseType :: Merklisable ann => P.Type P.TyName ann -> M.Type P.TyName ann
 merkliseType ty = M.TyPruned (P.tyLoc ty) (merkleHash ty)
