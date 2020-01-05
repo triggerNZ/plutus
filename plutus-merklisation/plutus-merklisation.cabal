@@ -44,6 +44,8 @@ library
                    Language.PlutusCore.Erasure.Untyped
                    Language.PlutusCore.Erasure.Untyped.CBOR
                    Language.PlutusCore.Erasure.Untyped.CBOR2
+                   Language.PlutusCore.Erasure.Untyped.Convert
+                   Language.PlutusCore.Erasure.Untyped.DeBruijn
                    Language.PlutusCore.Erasure.Untyped.Term
                    Language.PlutusCore.Erasure.Untyped.Instance.Pretty
                    Language.PlutusCore.Evaluation.Machine.Untyped.Cek
@@ -85,6 +87,7 @@ library
                -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas
   build-depends:
         base <5
+      , bimap -any
       , bytestring
       , cborg -any
       , containers -any

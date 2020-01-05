@@ -15,9 +15,7 @@ import qualified Language.PlutusCore                                           a
 import qualified Language.PlutusCore.CBOR                                      as PLC ()
 
 import qualified Language.PlutusCore.Erasure.Untyped.CBOR                      as U ()
-import           Language.PlutusCore.Erasure.Untyped.Term                      as U
-
-import qualified Language.PlutusCore.DeBruijn                                  as D
+import           Language.PlutusCore.Erasure.Untyped.Convert                   as C
 
 import qualified Language.PlutusCore.Merkle.CBOR                               as M ()
 
@@ -38,7 +36,6 @@ import           Language.PlutusTx                                             a
 
 import qualified Codec.Compression.GZip                                        as G
 import           Codec.Serialise                                               (serialise)
-import           Control.Monad.Trans.Except                                    (runExceptT)
 import qualified Data.ByteString.Lazy                                          as B
 import           GHC.Int                                                       (Int64)
 import           Numeric
@@ -54,15 +51,6 @@ printSeparator :: IO ()
 printSeparator = do
   putStrLn "| |"  -- This is to separate entries in a table.  Two bars seems to be enough (but not one on GitHub).
   putStrLn "| |"  -- A thicker line or something would be better, but I don't think you can do that.
-
-deBrProg :: PLC.Program PLC.TyName PLC.Name ann -> PLC.Program D.TyDeBruijn D.DeBruijn ann
-deBrProg p =
-   case runExceptT $ D.deBruijnProgram p of
-     Left e -> error e
-     Right y ->
-         case y of
-           Left freeVarError -> error ("Error: " ++ show freeVarError)
-           Right t           -> t
 
 data CompressionMode = Uncompressed | Compressed
 data PrintFormat = Alone | WithPercentage
@@ -102,11 +90,11 @@ printInfo fullSize entries = do
 analyseCompression :: String -> PLC.Program PLC.TyName PLC.Name () -> IO ()
 analyseCompression name prog = do
   let s1 = serialise prog
-      s2 = serialise $ U.removeNameStrings prog
-      s3 = serialise $ U.eraseProgram prog
-      s4 = serialise $ U.eraseProgram $ U.removeNameStrings prog
-      s5 = serialise $ U.nameToIntProgram $ U.eraseProgram prog
-      s6 = serialise $ U.deBruijnToIntProgram $ U.eraseProgram $ deBrProg prog
+      s2 = serialise $ C.removeNameStrings prog
+      s3 = serialise $ C.erasePLCProgram prog
+      s4 = serialise $ C.erasePLCProgram $ C.removeNameStrings prog
+      s5 = serialise $ C.nameToIntProgram $ C.erasePLCProgram prog
+      s6 = serialise $ C.deBruijnToIntProgram $ C.erasePLCProgram $ C.deBruijnPLCProgram prog
   putStr $ "| " ++ name ++ " | "
   printInfo (B.length s1) [(s1, Alone), (s2, Alone), (s3, Alone), (s4, Alone), (s5, WithPercentage), (s6, WithPercentage)]
 

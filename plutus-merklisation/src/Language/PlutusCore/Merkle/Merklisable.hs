@@ -12,7 +12,7 @@ import           Codec.Serialise                 (serialise)
 import           Crypto.Hash
 import qualified Data.ByteArray                  as B
 import qualified Data.ByteString.Lazy            as BSL
-import qualified Data.Text                       as D
+import qualified Data.Text                       as T
 import           Data.Text.Encoding              (encodeUtf8)
 import           GHC.Natural                     (Natural)
 import qualified Language.PlutusCore             as P
@@ -27,7 +27,7 @@ instance Merklisable [Hash]
     where merkleHash l = hashFinalize $ hashUpdates (hashInit) l
 
 instance Merklisable String where
-    merkleHash s = hashWith SHA256 (encodeUtf8 $ D.pack s)
+    merkleHash s = hashWith SHA256 (encodeUtf8 $ T.pack s)
 
 instance Merklisable () where
     merkleHash _ = merkleHash "()"
@@ -44,8 +44,8 @@ instance Merklisable GHC.Natural.Natural where
 instance Merklisable BSL.ByteString where
     merkleHash = merkleHash . show   -- FIXME
 
-instance Merklisable D.Text where
-    merkleHash = merkleHash . D.unpack
+instance Merklisable T.Text where
+    merkleHash = merkleHash . T.unpack
 
 instance Merklisable P.Unique where
     merkleHash = merkleHash . P.unUnique

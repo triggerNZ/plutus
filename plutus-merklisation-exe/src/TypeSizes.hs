@@ -261,33 +261,37 @@ merklisationAnalysis _name code = do
       numberedProgram = M.numberProgram program
       P.Program progAnn _ numberedBody = numberedProgram
       bodyAnn = P.termLoc numberedBody
+      numTermNodes = PLCSize.programNumTermNodes program
       usedNodes =  getUsedNodes $ CekMarker.runCekWithStringBuiltins numberedProgram
       prunedProgram = M.pruneProgram usedNodes numberedProgram
       s2 = serialise prunedProgram
       hash1 = M.merkleHash $ M.fromCoreProgram program
       hash2 = M.merkleHash prunedProgram
 
+  putStrLn $ show numTermNodes ++ " " ++ show (Set.size usedNodes) ++ " "
+               ++ (show $ BSL.length s1) ++ " " ++ (show $ BSL.length s2)
+              
 --  T.putStrLn $ P.prettyPlcDefText numberedProgram
 --  putStrLn $ show numberedProgram
 --  T.putStrLn $ M.prettyPlcDefText prunedProgram
 --  putStrLn $ show prunedProgram
-  putStrLn "\nBefore Merklisation"
-  putStrLn $ " AST size: " ++ (show $ PLCSize.astInfo program)
-  putStrLn $ " Serialised size = " ++ (show $ BSL.length s1) ++ " bytes"
-  putStrLn $ " Compressed size = " ++ (show $ BSL.length (compress s1)) ++ " bytes"
-  putStrLn ""
-  putStrLn "After Merklisation"
-  putStrLn $ " Number of terms used during execution = " ++ (show $ Set.size usedNodes)  ---
+  -- putStrLn "\nBefore Merklisation"
+  -- putStrLn $ " AST size: " ++ (show $ PLCSize.astInfo program)
+  -- putStrLn $ " Serialised size = " ++ (show $ BSL.length s1) ++ " bytes"
+  -- putStrLn $ " Compressed size = " ++ (show $ BSL.length (compress s1)) ++ " bytes"
+  -- putStrLn ""
+  -- putStrLn "After Merklisation"
+  -- putStrLn $ " Number of terms used during execution = " ++ (show $ Set.size usedNodes)  ---
 --  putStrLn $ "Used nodes: " ++ (show usedNodes)
 --  putStrLn $ "Prog ann = " ++ ( show progAnn)
 --  putStrLn $ "Body ann = " ++ ( show bodyAnn)
-  putStrLn $ " Remaining nodes: " ++ (show $ M.programSize prunedProgram)
-  putStrLn $ " AST size: " ++ (show $ M.astInfo prunedProgram)
-  putStrLn $ " Serialised size = " ++ (show $ BSL.length s2) ++ " bytes"
-  putStrLn $ " Compressed size = " ++ (show $ BSL.length (compress s2)) ++ " bytes"
-  putStrLn ""
-  putStrLn $ "Merkle hash before pruning: " ++ (show $ hash1)
-  putStrLn $ "Merkle hash after  pruning: " ++ (show $ hash2)
+  -- putStrLn $ " Remaining nodes: " ++ (show $ M.programSize prunedProgram)
+  -- putStrLn $ " AST size: " ++ (show $ M.astInfo prunedProgram)
+  -- putStrLn $ " Serialised size = " ++ (show $ BSL.length s2) ++ " bytes"
+  -- putStrLn $ " Compressed size = " ++ (show $ BSL.length (compress s2)) ++ " bytes"
+  -- putStrLn ""
+  -- putStrLn $ "Merkle hash before pruning: " ++ (show $ hash1)
+  -- putStrLn $ "Merkle hash after  pruning: " ++ (show $ hash2)
 
 {- We only mark nodes which are touched by the evaluator.  This means that
    types are never marked, so they are all Merklised away.  For the examples
@@ -310,7 +314,7 @@ main = do
 -}
     --  addressTest
 --  dumpFlatTerm Future.exportedValidator
-  let process = \_ prog -> analyseTypes $ PlutusTx.getPlc prog
+  let process = \name prog -> merklisationAnalysis name prog
   process    "Crowdfunding"         Crowdfunding.exportedValidator
   printSeparator
   process    "Currrency"            Currrency.exportedValidator

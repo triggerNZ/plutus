@@ -15,6 +15,7 @@ module Language.PlutusCore.Erasure.Untyped.Constant.Dynamic.Instances
 
 import           Language.PlutusCore.Erasure.Untyped.Constant.Make
 import           Language.PlutusCore.Erasure.Untyped.Constant.Typed
+import           Language.PlutusCore.Erasure.Untyped.Convert
 import           Language.PlutusCore.Erasure.Untyped.Evaluation.Result
 import           Language.PlutusCore.Erasure.Untyped.Instance.Pretty
 import           Language.PlutusCore.Erasure.Untyped.MkPlc
@@ -130,7 +131,7 @@ instance KnownType [Char] where
 instance KnownType Bool where
     toTypeAst _ = ()
 
-    makeKnown b = if b then erase true else erase false
+    makeKnown b = if b then erasePLCTerm true else erasePLCTerm false
 
     readKnown eval b = do
         let asInt = Constant () . BuiltinInt ()
@@ -158,9 +159,9 @@ instance KnownType a => KnownType (() -> a) where
     toTypeAst _ = undefined -- TyFun () unit $ toTypeAst @a Proxy
 
     -- Note that we can't just prepend a 'LamAbs' to the result due to name shadowing issues.
-    makeKnown f = Apply () (erase Plc.const) $ makeKnown $ f ()
+    makeKnown f = Apply () (erasePLCTerm Plc.const) $ makeKnown $ f ()
 
-    readKnown eval df = const <$> readKnown eval (Apply () df (erase unitval))
+    readKnown eval df = const <$> readKnown eval (Apply () df (erasePLCTerm unitval))
 
     prettyKnown f = "\\() ->" Doc.<+> prettyKnown (f ())
 

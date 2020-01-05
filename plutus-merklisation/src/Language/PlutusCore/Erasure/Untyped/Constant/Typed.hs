@@ -38,6 +38,7 @@ import           Language.PlutusCore.Name
 import           Language.PlutusCore.Erasure.Untyped.Instance.Pretty ()
 import           Language.PlutusCore.StdLib.Data.Unit
 import           Language.PlutusCore.Erasure.Untyped.Term
+import           Language.PlutusCore.Erasure.Untyped.Convert
 import qualified Language.PlutusCore.Core as PLC
 
 import           PlutusPrelude
@@ -376,6 +377,6 @@ instance KnownType () where
     -- We need this matching, because otherwise Haskell expressions are thrown away rather than being
     -- evaluated and we use 'unsafePerformIO' for logging, so we want to compute the '()' just
     -- for side effects that the evaluation may cause.
-    makeKnown () = erase unitval
+    makeKnown () = erasePLCTerm unitval
 
     readKnown _eval _term = pure ()

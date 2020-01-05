@@ -18,6 +18,7 @@ import           Data.Functor.Foldable                                  hiding (
 
 import qualified Language.PlutusCore.Core                               as PLC
 import           Language.PlutusCore.DeBruijn
+import           Language.PlutusCore.Erasure.Untyped.Convert
 import           Language.PlutusCore.Erasure.Untyped.Instance.Recursive
 import           Language.PlutusCore.Erasure.Untyped.Term
 import           Language.PlutusCore.Name

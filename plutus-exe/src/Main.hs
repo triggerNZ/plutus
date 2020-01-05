@@ -8,7 +8,6 @@ module Main (main) where
 
 import qualified Language.PlutusCore                                      as PLC
 import qualified Language.PlutusCore.CBOR                                 as PLC ()
-import qualified Language.PlutusCore.DeBruijn                             as D
 import qualified Language.PlutusCore.Evaluation.Machine.Cek               as PLC
 import qualified Language.PlutusCore.Evaluation.Machine.Ck                as PLC
 import qualified Language.PlutusCore.Evaluation.Machine.L                 as PLC
@@ -22,9 +21,9 @@ import qualified Language.PlutusCore.StdLib.Data.Integer                  as PLC
 import qualified Language.PlutusCore.StdLib.Data.Unit                     as PLC
 
 import qualified Language.PlutusCore.Erasure.Untyped.CBOR                 as U ()
+import qualified Language.PlutusCore.Erasure.Untyped.Convert              as C
 import qualified Language.PlutusCore.Erasure.Untyped.Evaluation.CkMachine as U
 import           Language.PlutusCore.Erasure.Untyped.Instance.Pretty      ()
-import qualified Language.PlutusCore.Erasure.Untyped.Term                 as U
 import qualified Language.PlutusCore.Evaluation.Machine.Untyped.Cek       as U
 
 import           Codec.CBOR.FlatTerm                                      (toFlatTerm)
@@ -194,8 +193,8 @@ runEval (EvalOptions inp mode) = do
     if (mode == UCK || mode == UCEK)
     then
         let evalFn = case mode of
-                       UCK  -> U.runCk . U.eraseProgram
-                       UCEK -> U.unsafeRunCek mempty . U.eraseProgram
+                       UCK  -> U.runCk . C.erasePLCProgram
+                       UCEK -> U.unsafeRunCek mempty . C.erasePLCProgram
                        _    -> undefined  -- oh dear
         in case evalFn . void <$> PLC.runQuoteT (PLC.parseScoped bsContents) of
           Left (e :: PLC.Error PLC.AlexPosn) ->
@@ -265,25 +264,17 @@ serialisationMode = subparser (
   )
 
 
-deBrProg :: PLC.Program PLC.TyName PLC.Name ann -> PLC.Program D.TyDeBruijn D.DeBruijn ann
-deBrProg p =
-   case runExceptT $ D.deBruijnProgram p of
-     Left e -> error e
-     Right y -> case y of
-                  Left freeVarError -> error ("Error: " ++ show freeVarError)
-                  Right t           -> t
-
 runSerialise :: SerialisationOptions -> IO ()
 runSerialise (SerialisationOptions is mode) = do
     contents <- getInput is
     let bsContents = (BSL.fromStrict . encodeUtf8 . T.pack) contents
     let serialiseFn = case mode of
                         Typed               -> serialise
-                        TypedAnon           -> serialise . U.anonProgram
-                        Untyped             -> serialise . U.eraseProgram
-                        UntypedAnon         -> serialise . U.eraseProgram . U.anonProgram
-                        UntypedAnon2        -> serialise . U.nameToIntProgram . U.eraseProgram
-                        UntypedAnonDeBruijn -> serialise . U.deBruijnToIntProgram . U.eraseProgram . deBrProg
+                        TypedAnon           -> serialise . C.anonProgram
+                        Untyped             -> serialise . C.erasePLCProgram
+                        UntypedAnon         -> serialise . C.erasePLCProgram . C.anonProgram
+                        UntypedAnon2        -> serialise . C.nameToIntProgram . C.erasePLCProgram
+                        UntypedAnonDeBruijn -> serialise . C.deBruijnToIntProgram . C.erasePLCProgram . C.deBruijnPLCProgram
     case serialiseFn . void <$> PLC.runQuoteT (PLC.parseScoped bsContents) of
       Left (e :: PLC.Error PLC.AlexPosn) ->
           do
@@ -300,11 +291,11 @@ runSerialiseFlat (SerialisationOptions is mode) = do
     let bsContents = (BSL.fromStrict . encodeUtf8 . T.pack) contents
     let encodeFn = case mode of
                         Typed               -> encode
-                        TypedAnon           -> encode . U.anonProgram
-                        Untyped             -> encode . U.eraseProgram
-                        UntypedAnon         -> encode . U.eraseProgram . U.anonProgram
-                        UntypedAnon2        -> encode . U.nameToIntProgram . U.eraseProgram
-                        UntypedAnonDeBruijn -> encode . U.deBruijnToIntProgram . U.eraseProgram . deBrProg
+                        TypedAnon           -> encode . C.anonProgram
+                        Untyped             -> encode . C.erasePLCProgram
+                        UntypedAnon         -> encode . C.erasePLCProgram . C.anonProgram
+                        UntypedAnon2        -> encode . C.nameToIntProgram . C.erasePLCProgram
+                        UntypedAnonDeBruijn -> encode . C.deBruijnToIntProgram . C.erasePLCProgram . C.deBruijnPLCProgram
     case encodeFn . void <$> PLC.runQuoteT (PLC.parseScoped bsContents) of
       Left (e :: PLC.Error PLC.AlexPosn) ->
           do
