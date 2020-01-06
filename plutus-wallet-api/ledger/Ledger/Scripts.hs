@@ -80,7 +80,7 @@ import           Language.PlutusTx.Builtins               as Builtins
 import           LedgerBytes                              (LedgerBytes (..))
 import           Ledger.Orphans                           ()
 
-import Language.PlutusCore.Merkle.Merklise                (merklisationStatistics, componentStatistics)
+import Language.PlutusCore.Merkle.Merklise                (merklisationStatistics)
 
 import Debug.Trace
     

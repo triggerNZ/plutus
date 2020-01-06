@@ -8,6 +8,7 @@ module Language.PlutusCore.Merkle.PLCSize
     , kindSize
     , programSize
     , programNumTypeNodes
+    , termNumTermNodes
     , programNumTermNodes
     , programNumNames
     , astInfo

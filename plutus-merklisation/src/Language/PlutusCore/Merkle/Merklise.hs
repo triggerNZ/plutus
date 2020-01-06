@@ -35,10 +35,14 @@ import qualified Language.PlutusCore.Merkle.Evaluation.CekMarker as CekMarker
 import qualified Language.PlutusCore.Merkle.Evaluation.Result    as M
 import           Language.PlutusCore.Merkle.Merklisable
 import qualified Language.PlutusCore.Merkle.PLCSize              as PLCSize
+import qualified Language.PlutusCore.Merkle.Size                 as Size
 import qualified Language.PlutusCore.Merkle.Size                 as M
 import           Language.PlutusCore.Merkle.Type
 import           Language.PlutusCore.Pretty
 import qualified Language.PlutusTx.Builtins                      as B
+
+import           Debug.Trace
+
 
 {- Numbering nodes.  We replace the annotations in an AST with unique
    Integers.  We do this by passing in a tree containing all the
@@ -177,7 +181,19 @@ pruneTerm used pruneType t0 =
     let pruneTerm' = pruneTerm used pruneType
         pruneType' = pruneType used
     in if not $ Data.Set.member (termId t0) used
-    then Prune () (merkleHash (fromCoreTerm $ unann t0))
+    then
+        let t1 = fromCoreTerm $ () <$ t0
+            threshold = 36
+            -- ^ Don't Merklise anything smaller than this; note that a pruned node serialises to 36 bytes
+            n = Size.termSize t1
+            s = serialise (Prune () (merkleHash t1) :: Term PLC.TyName PLC.Name () )
+
+            l = -- Debug.Trace.trace ("================================================================") $
+                -- Debug.Trace.trace (show $ prettyPlcClassicDebug t0) $
+                BSL.length (serialise t1)
+        in if  l > threshold
+           then Prune () (merkleHash t1)
+           else t1
     else case t0 of
            PLC.Var      _ n         -> Var      () (unann n)
            PLC.LamAbs   _ n ty t    -> LamAbs   () (unann n) (pruneType' ty) (pruneTerm' t)
@@ -233,7 +249,6 @@ merklisationStatistics0 program =
         hash2 = merkleHash prunedProgram
 
         messages = [
---         "Script: " ++ prettyPlcClassicDef program
          "\nBefore Merklisation",
          " AST size: " ++ (show $ PLCSize.astInfo program),
          " Serialised size = " ++ (show $ BSL.length s1) ++ " bytes",
@@ -241,16 +256,13 @@ merklisationStatistics0 program =
          "",
          "After Merklisation",
          " Number of terms used during execution = " ++ (show $ Data.Set.size usedNodes) ,
---         "Used nodes: " ++ (show usedNodes),
---         "Prog ann = " ++ ( show progAnn),
---         "Body ann = " ++ ( show bodyAnn),
          " Remaining nodes: " ++ (show $ M.programSize prunedProgram),
          " AST size: " ++ (show $ M.astInfo prunedProgram),
          " Serialised size = " ++ (show $ BSL.length s2) ++ " bytes",
          " Compressed size = " ++ (show $ BSL.length (compress s2)) ++ " bytes",
          "",
-         "Merkle hash: " ++ (show $ hash1)
---         "Merkle hash after  pruning: " ++ (show $ hash2)
+         "Merkle hash: " ++ (show hash1),
+         "Merkle hash after  pruning: " ++ (show hash2)
          ]
     in Data.List.intercalate "\n" messages
 
