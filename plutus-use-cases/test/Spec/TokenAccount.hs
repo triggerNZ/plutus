@@ -16,7 +16,7 @@ import           Language.PlutusTx.Coordination.Contracts.TokenAccount (Account 
 import qualified Language.PlutusTx.Coordination.Contracts.TokenAccount as Accounts
 
 tests :: TestTree
-tests = testGroup "*** token account ***"
+tests = testGroup "**Token account**"
     [ checkPredicate @TokenAccountSchema @ContractError "Create a token account"
         tokenAccountContract
         (assertNoFailedTransactions

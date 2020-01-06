@@ -15,7 +15,7 @@ import qualified Language.PlutusTx.Coordination.Contracts.Currency as Cur
 import           Test.Tasty
 
 tests :: TestTree
-tests = testGroup "*** currency ***"
+tests = testGroup "**Currency**"
     [ checkPredicate "can create a new currency"
         theContract
         (assertDone w1 (const True) "currency contract not done")

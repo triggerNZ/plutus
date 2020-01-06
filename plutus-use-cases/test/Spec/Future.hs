@@ -31,7 +31,7 @@ import           Language.PlutusTx.Lattice
 
 tests :: TestTree
 tests =
-    testGroup "*** futures ***"
+    testGroup "**Futures**"
     [ checkPredicate @FutureSchema "can initialise and obtain tokens"
         (F.futureContract theFuture)
         (walletFundsChange w1 (scale (-1) (F.initialMargin theFuture) <> F.tokenFor Short accounts)
