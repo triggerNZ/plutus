@@ -178,6 +178,7 @@ executable plutus-playground-server
         exceptions -any,
         data-default-class -any,
         filepath -any,
+        haddock-api -any,
         http-types -any,
         iots-export -any,
         playground-common -any,
