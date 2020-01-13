@@ -23,10 +23,8 @@ import           Numeric
 import qualified Language.PlutusCore                                           as P
 import           Language.PlutusCore.Pretty
 
-import qualified Language.PlutusCore.Merkle.CBOR                               as M
 import           Language.PlutusCore.Merkle.Merklisable                        (Merklisable, merkleHash)
 import qualified Language.PlutusCore.Merkle.PLCSize                            as PLCSize
-import qualified Language.PlutusCore.Merkle.Size                               as M
 import qualified Language.PlutusCore.Merkle.Size                               as M
 import qualified Language.PlutusCore.Merkle.Type                               as M
 
@@ -156,6 +154,9 @@ printEntry fullSize s mode cmode = do
         putStr $ " (" ++ Numeric.showFFloat (Just 1) (percentage len) "%" ++ ")"
         where percentage n = 100.0 * (fromIntegral n) / (fromIntegral fullSize) :: Float
 
+
+-- *** NB ***: The serialisation method is determined by
+-- the import of Erasure.Untyped.CBOR in Merkle.Merklise.
 
 analyseProg :: String -> PlutusTx.CompiledCode a -> IO()
 analyseProg name code = do

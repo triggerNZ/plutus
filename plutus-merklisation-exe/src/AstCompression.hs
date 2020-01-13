@@ -14,10 +14,7 @@ module AstCompression (main) where
 import qualified Language.PlutusCore                                           as PLC
 import qualified Language.PlutusCore.CBOR                                      as PLC ()
 
-import qualified Language.PlutusCore.Erasure.Untyped.CBOR                      as U ()
 import           Language.PlutusCore.Erasure.Untyped.Convert                   as C
-
-import qualified Language.PlutusCore.Merkle.CBOR                               as M ()
 
 import           Language.PlutusTx.Coordination.Contracts.Crowdfunding         as Crowdfunding
 import           Language.PlutusTx.Coordination.Contracts.Currency             as Currrency
@@ -44,8 +41,9 @@ import           Numeric
 
 printHeader :: IO ()
 printHeader = do
-  putStrLn "| Contract | Compression | Typed | Typed, stringless names | Untyped | Untyped, stringless names | Untyped, integer IDs only | Untyped, de Bruijn | Untyped, de Bruijn, annotations not serialised"
-  putStrLn "| :---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
+  putStrLn "| Contract | Compression | Typed | Typed, stringless names | Untyped | Untyped, stringless names | Untyped, integer IDs only | Untyped, de Bruijn |"
+  putStrLn "| :---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
+-- ^ The original table had a column at the end for "annotations not serialised".
 
 printSeparator :: IO ()
 printSeparator = do
@@ -84,17 +82,19 @@ printInfo fullSize entries = do
 
 
 -- Print out various compression statistics for a program.  By
--- default, serialisation will include units.  Replace the import of
--- Erasure.Untyped.CBOR above by Erasure.Untyped.CBOR2 to omit unit annotations.
+-- default, serialisation will include units.  To omit units, replace
+-- the import Erasure.Untyped.CBOR by Erasure.Untyped.CBOR2 in
+-- Language.PlutusCore.Merkle.Merklise This will entail a lot of
+-- recompilation.
 
 analyseCompression :: String -> PLC.Program PLC.TyName PLC.Name () -> IO ()
 analyseCompression name prog = do
-  let s1 = serialise prog
-      s2 = serialise $ C.removeNameStrings prog
-      s3 = serialise $ C.erasePLCProgram prog
-      s4 = serialise $ C.erasePLCProgram $ C.removeNameStrings prog
-      s5 = serialise $ C.nameToIntProgram $ C.erasePLCProgram prog
-      s6 = serialise $ C.deBruijnToIntProgram $ C.erasePLCProgram $ C.deBruijnPLCProgram prog
+  let s1 = serialise prog  -- This will use
+      s2 = serialise . C.removeNameStrings $ prog
+      s3 = serialise . C.erasePLCProgram $ prog
+      s4 = serialise . C.erasePLCProgram . C.removeNameStrings $ prog
+      s5 = serialise . C.nameToIntProgram . C.erasePLCProgram $ prog
+      s6 = serialise . C.deBruijnToIntProgram . C.erasePLCProgram . C.deBruijnPLCProgram $ prog
   putStr $ "| " ++ name ++ " | "
   printInfo (B.length s1) [(s1, Alone), (s2, Alone), (s3, Alone), (s4, Alone), (s5, WithPercentage), (s6, WithPercentage)]
 
