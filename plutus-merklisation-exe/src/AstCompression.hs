@@ -9,10 +9,13 @@
 --{-# OPTIONS_GHC -fno-warn-unused-local-binds #-}
 --{-# OPTIONS_GHC -fno-warn-unused-matches #-}
 
+{- Typed compression instances are determined in Language.PlutusCore,
+   untyped ones in Merkle.Merklise (use CBOR for serilisation including
+   unit annotations, CBOR for serilisation omitting units. -}
+
 module AstCompression (main) where
 
 import qualified Language.PlutusCore                                           as PLC
-import qualified Language.PlutusCore.CBOR                                      as PLC ()
 
 import           Language.PlutusCore.Erasure.Untyped.Convert                   as C
 
@@ -44,6 +47,11 @@ printHeader = do
   putStrLn "| Contract | Compression | Typed | Typed, stringless names | Untyped | Untyped, stringless names | Untyped, integer IDs only | Untyped, de Bruijn |"
   putStrLn "| :---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
 -- ^ The original table had a column at the end for "annotations not serialised".
+
+printHeader2 :: IO ()
+printHeader2 = do
+  putStrLn "| Contract | Compression | Typed | Typed, minimised |"
+  putStrLn "| :---: | ---: | ---: | ---: |"
 
 printSeparator :: IO ()
 printSeparator = do
@@ -102,6 +110,19 @@ analyseCompression name prog = do
 analyseProg :: String -> CompiledCode a -> IO ()
 analyseProg name prg = do
   analyseCompression name $ PlutusTx.getPlc prg
+
+
+analyseCompression2 :: String -> PLC.Program PLC.TyName PLC.Name () -> IO ()
+analyseCompression2 name prog = do
+  let s1 = serialise prog
+      s2 = serialise . C.deBruijnToIntPLCProgram . C.deBruijnPLCProgram $ prog
+  putStr $ "| " ++ name ++ " | "
+  printInfo (B.length s1) [(s1, Alone), (s2, WithPercentage)]
+
+
+analyseProg2 :: String -> CompiledCode a -> IO ()
+analyseProg2 name prg = do
+  analyseCompression2 name $ PlutusTx.getPlc prg
 
 
 main :: IO ()

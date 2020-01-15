@@ -18,7 +18,9 @@ module Language.PlutusCore.Erasure.Untyped.Convert (
                                 , StringlessName (..)
                                 , StringlessTyName (..)
                                 , nameToIntProgram
+                                , nameToIntPLCProgram
                                 , deBruijnToIntProgram
+                                , deBruijnToIntPLCProgram
                                 , deBruijnPLCProgram
                                 , deBruijnUntypedProgram
                                 ) where
@@ -195,6 +197,13 @@ nameToIntProgram :: Program N.Name a -> Program IntName a
 nameToIntProgram = changeNamesUntyped nameToInt
 
 
+tyNameToInt :: N.TyName a -> IntName a
+tyNameToInt (N.TyName n) = nameToInt n
+
+nameToIntPLCProgram :: PLC.Program N.TyName N.Name a -> PLC.Program IntName IntName a
+nameToIntPLCProgram = changeNamesProgram nameToInt tyNameToInt
+
+
 {- To get plc source for the use cases,  add
 
     --ghc-options: -fplugin-opt  Language.PlutusTx.Plugin:dump-plc
@@ -245,4 +254,9 @@ deBruijnUntypedProgram p =
            Right t           -> t
 
 
+tyDeBruijnToInt :: D.TyDeBruijn ann -> IntName ann
+tyDeBruijnToInt (D.TyDeBruijn n) = deBruijnToInt n
+
+deBruijnToIntPLCProgram :: PLC.Program D.TyDeBruijn D.DeBruijn ann -> PLC.Program IntName IntName ann
+deBruijnToIntPLCProgram = changeNamesProgram deBruijnToInt tyDeBruijnToInt
 

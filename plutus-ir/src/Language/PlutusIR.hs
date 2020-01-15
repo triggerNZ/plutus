@@ -33,7 +33,7 @@ import           PlutusPrelude
 
 import           Language.PlutusCore        (Kind, Name, TyName, Type (..), typeSubtypes)
 import qualified Language.PlutusCore        as PLC
-import           Language.PlutusCore.CBOR   ()
+--import           Language.PlutusCore.CBOR   ()
 import           Language.PlutusCore.MkPlc  (Def (..), TermLike (..), TyVarDecl (..), VarDecl (..))
 import qualified Language.PlutusCore.Pretty as PLC
 
@@ -58,7 +58,7 @@ terms can thus be used as backwards compatibility is not required.
 data Datatype tyname name a = Datatype a (TyVarDecl tyname a) [TyVarDecl tyname a] (name a) [VarDecl tyname name a]
     deriving (Functor, Show, Generic)
 
-instance (Serialise a, Serialise (tyname a) , Serialise (name a)) => Serialise (Datatype tyname name a)
+instance (Serialise (tyname ()) , Serialise (name ())) => Serialise (Datatype tyname name ())
 
 varDeclNameString :: VarDecl name Name a -> String
 varDeclNameString = T.unpack . PLC.nameString . varDeclName
@@ -86,7 +86,7 @@ data Binding tyname name a = TermBind a Strictness (VarDecl tyname name a) (Term
                            | DatatypeBind a (Datatype tyname name a)
     deriving (Functor, Show, Generic)
 
-instance (Serialise a, Serialise (tyname a), Serialise (name a)) => Serialise (Binding tyname name a)
+instance (Serialise (tyname ()), Serialise (name ())) => Serialise (Binding tyname name ())
 
 {-# INLINE bindingSubterms #-}
 -- | Get all the direct child 'Term's of the given 'Binding'.
@@ -157,7 +157,7 @@ data Term tyname name a =
                         | Unwrap a (Term tyname name a)
                         deriving (Functor, Show, Generic)
 
-instance (Serialise a, Serialise (tyname a), Serialise (name a)) => Serialise (Term tyname name a)
+instance (Serialise (tyname ()), Serialise (name ())) => Serialise (Term tyname name ())
 
 instance TermLike (Term tyname name) tyname name where
     var      = Var
@@ -215,7 +215,7 @@ termBindings f = \case
 -- no version as PIR is not versioned
 data Program tyname name a = Program a (Term tyname name a) deriving Generic
 
-instance (Serialise a, Serialise (tyname a), Serialise (name a)) => Serialise (Program tyname name a)
+instance (Serialise (tyname ()), Serialise (name ())) => Serialise (Program tyname name ())
 
 -- Pretty-printing
 

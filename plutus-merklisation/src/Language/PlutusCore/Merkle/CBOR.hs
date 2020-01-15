@@ -8,8 +8,9 @@
 -- before touching anything in this file.
 module Language.PlutusCore.Merkle.CBOR () where
 
-import           Language.PlutusCore.CBOR         ()
-import           Language.PlutusCore.Merkle.Error
+import           Language.PlutusCore.Core         (BuiltinName (..), DynamicBuiltinName (..), TypeBuiltin (..),
+                                                   Version (..))
+--import           Language.PlutusCore.Merkle.Error
 import           Language.PlutusCore.Merkle.MkPlc (TyVarDecl (..), VarDecl (..))
 import           Language.PlutusCore.Merkle.Type
 import           Language.PlutusCore.Name         ()
@@ -97,6 +98,68 @@ decodeDigest = do
         Nothing -> error $ "Couldn't decode SHA256 Digest: " ++ show d
         Just v  -> pure v
 
+instance Serialise TypeBuiltin where
+    encode bi = case bi of
+        TyByteString -> encodeConstructorTag 0
+        TyInteger    -> encodeConstructorTag 1
+        TyString     -> encodeConstructorTag 2
+
+    decode = go =<< decodeConstructorTag
+        where go 0 = pure TyByteString
+              go 1 = pure TyInteger
+              go 2 = pure TyString
+              go _ = fail "Failed to decode TypeBuiltin"
+
+instance Serialise BuiltinName where
+    encode bi =
+        let i = case bi of
+                AddInteger           -> 0
+                SubtractInteger      -> 1
+                MultiplyInteger      -> 2
+                DivideInteger        -> 3
+                RemainderInteger     -> 4
+                LessThanInteger      -> 5
+                LessThanEqInteger    -> 6
+                GreaterThanInteger   -> 7
+                GreaterThanEqInteger -> 8
+                EqInteger            -> 9
+                Concatenate          -> 10
+                TakeByteString       -> 11
+                DropByteString       -> 12
+                SHA2                 -> 13
+                SHA3                 -> 14
+                VerifySignature      -> 15
+                EqByteString         -> 16
+                QuotientInteger      -> 17
+                ModInteger           -> 18
+                LtByteString         -> 19
+                GtByteString         -> 20
+        in encodeConstructorTag i
+
+    decode = go =<< decodeConstructorTag
+        where go 0  = pure AddInteger
+              go 1  = pure SubtractInteger
+              go 2  = pure MultiplyInteger
+              go 3  = pure DivideInteger
+              go 4  = pure RemainderInteger
+              go 5  = pure LessThanInteger
+              go 6  = pure LessThanEqInteger
+              go 7  = pure GreaterThanInteger
+              go 8  = pure GreaterThanEqInteger
+              go 9  = pure EqInteger
+              go 10 = pure Concatenate
+              go 11 = pure TakeByteString
+              go 12 = pure DropByteString
+              go 13 = pure SHA2
+              go 14 = pure SHA3
+              go 15 = pure VerifySignature
+              go 16 = pure EqByteString
+              go 17 = pure QuotientInteger
+              go 18 = pure ModInteger
+              go 19 = pure LtByteString
+              go 20 = pure GtByteString
+              go _  = fail "Failed to decode BuiltinName"
+
 instance Serialise ann => Serialise (Kind ann) where
     encode = cata a where
         a (TypeF ann)           = encodeConstructorTag 0 <> encode ann
@@ -128,6 +191,10 @@ instance (Serialise ann, Serialise (tyname ann)) => Serialise (Type tyname ann) 
               go 6 = TyApp <$> decode <*> decode <*> decode
               go 7 = TyPruned <$> decode <*> decodeDigest
               go _ = fail "Failed to decode Type TyName ()"
+
+instance Serialise DynamicBuiltinName where
+    encode (DynamicBuiltinName name) = encode name
+    decode = DynamicBuiltinName <$> decode
 
 instance Serialise ann => Serialise (Builtin ann) where
     encode (BuiltinName ann bn)     = encodeConstructorTag 0 <> encode ann <> encode bn
@@ -191,6 +258,10 @@ instance (Serialise ann, Serialise (tyname ann))  => Serialise (TyVarDecl tyname
     encode (TyVarDecl t tyname kind) = encode t <> encode tyname <> encode kind
     decode = TyVarDecl <$> decode <*> decode <*> decode
 
+instance Serialise ann => Serialise (Version ann) where
+    encode (Version ann n n' n'') = fold [ encode ann, encode n, encode n', encode n'' ]
+    decode = Version <$> decode <*> decode <*> decode <*> decode
+
 instance ( Serialise ann
          , Serialise (tyname ann)
          , Serialise (name ann)
@@ -200,7 +271,7 @@ instance ( Serialise ann
 
 deriving newtype instance (Serialise a) => Serialise (Normalized a)
 
-instance (Serialise ann) => Serialise (ParseError ann)
+{-instance (Serialise ann) => Serialise (ParseError ann)
 instance (Serialise (tyname ann), Serialise ann) => Serialise (ValueRestrictionError tyname ann)
 instance (Serialise (tyname ann), Serialise (name ann), Serialise ann) =>
             Serialise (NormCheckError tyname name ann)
@@ -208,4 +279,5 @@ instance (Serialise ann) => Serialise (UniqueError ann)
 instance Serialise UnknownDynamicBuiltinNameError
 instance (Serialise ann) => Serialise (InternalTypeError ann)
 instance (Serialise ann) => Serialise (TypeError ann)
-instance (Serialise ann) => Serialise (Error ann)
+instance Serialise (Error ())
+-}
