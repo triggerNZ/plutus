@@ -311,9 +311,10 @@ runScript
 --    Debug.Trace.trace (componentStatistics (unScript validator) (unScript . fromCompiledCode $ liftCode dataValue)
 --                       (unScript . fromCompiledCode $ liftCode redeemer) (unScript . fromCompiledCode $ liftCode valData)) $
 runScript checking (ValidationData valData) (Validator validator) (DataValue dataValue) (RedeemerValue redeemer) = do
-    let appliedValidator = ((validator `applyScript` (fromCompiledCode $ liftCode dataValue))
-                            `applyScript` (fromCompiledCode $ liftCode redeemer))
-                            `applyScript` (fromCompiledCode $ liftCode valData)
+    let dataValue'  = fromCompiledCode $ liftCode dataValue
+        redeemer'   = fromCompiledCode $ liftCode redeemer
+        valData'    = fromCompiledCode $ liftCode valData
+        appliedValidator = ((validator `applyScript` dataValue') `applyScript` redeemer') `applyScript` valData'
     Debug.Trace.trace (merklisationStatistics (unScript appliedValidator)) $
          evaluateScript checking appliedValidator
 
