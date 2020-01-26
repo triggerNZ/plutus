@@ -23,10 +23,10 @@ import qualified Data.Map
 import qualified Data.Set
 
 import qualified Language.PlutusCore                             as PLC
-import qualified Language.PlutusCore.Erasure.Untyped.CBOR        as U ()
-import qualified Language.PlutusCore.Erasure.Untyped.Convert     as C
-import qualified Language.PlutusCore.Erasure.Untyped.DeBruijn    as D
-import qualified Language.PlutusCore.Erasure.Untyped.Term        as U
+import qualified Language.PlutusCore.Untyped.CBOR        as U ()
+import qualified Language.PlutusCore.Untyped.Convert     as C
+import qualified Language.PlutusCore.Untyped.DeBruijn    as D
+import qualified Language.PlutusCore.Untyped.Term        as U
 import qualified Language.PlutusCore.Merkle.CBOR                 as M
 import qualified Language.PlutusCore.Merkle.Constant.Typed       as M
 import           Language.PlutusCore.Merkle.Convert

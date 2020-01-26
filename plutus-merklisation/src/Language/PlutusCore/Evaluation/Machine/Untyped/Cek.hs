@@ -25,12 +25,12 @@ module Language.PlutusCore.Evaluation.Machine.Untyped.Cek
     ) where
 
 import qualified Language.PlutusCore                                             as PLC
-import           Language.PlutusCore.Erasure.Untyped.Constant
-import           Language.PlutusCore.Erasure.Untyped.Constant.Typed
-import           Language.PlutusCore.Erasure.Untyped.Evaluation.MachineException
-import           Language.PlutusCore.Erasure.Untyped.Evaluation.Result
-import           Language.PlutusCore.Erasure.Untyped.Term
-import           Language.PlutusCore.Erasure.Untyped.View
+import           Language.PlutusCore.Untyped.Constant
+import           Language.PlutusCore.Untyped.Constant.Typed
+import           Language.PlutusCore.Untyped.Evaluation.MachineException
+import           Language.PlutusCore.Untyped.Evaluation.Result
+import           Language.PlutusCore.Untyped.Term
+import           Language.PlutusCore.Untyped.View
 import           Language.PlutusCore.Name
 
 import           PlutusPrelude
