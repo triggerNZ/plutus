@@ -6,42 +6,42 @@
 
 module Main (main) where
 
-import qualified Language.PlutusCore                                      as PLC
-import qualified Language.PlutusCore.CBOR                                 as PLC ()
-import qualified Language.PlutusCore.Evaluation.Machine.Cek               as PLC
-import qualified Language.PlutusCore.Evaluation.Machine.Ck                as PLC
-import qualified Language.PlutusCore.Evaluation.Machine.L                 as PLC
-import qualified Language.PlutusCore.Generators                           as PLC
-import qualified Language.PlutusCore.Generators.Interesting               as PLC
-import qualified Language.PlutusCore.Generators.Test                      as PLC
-import qualified Language.PlutusCore.Pretty                               as PLC
-import qualified Language.PlutusCore.StdLib.Data.Bool                     as PLC
-import qualified Language.PlutusCore.StdLib.Data.ChurchNat                as PLC
-import qualified Language.PlutusCore.StdLib.Data.Integer                  as PLC
-import qualified Language.PlutusCore.StdLib.Data.Unit                     as PLC
+import qualified Language.PlutusCore                                as PLC
+import qualified Language.PlutusCore.CBOR                           as PLC ()
+import qualified Language.PlutusCore.Evaluation.Machine.Cek         as PLC
+import qualified Language.PlutusCore.Evaluation.Machine.Ck          as PLC
+import qualified Language.PlutusCore.Evaluation.Machine.L           as PLC
+import qualified Language.PlutusCore.Generators                     as PLC
+import qualified Language.PlutusCore.Generators.Interesting         as PLC
+import qualified Language.PlutusCore.Generators.Test                as PLC
+import qualified Language.PlutusCore.Pretty                         as PLC
+import qualified Language.PlutusCore.StdLib.Data.Bool               as PLC
+import qualified Language.PlutusCore.StdLib.Data.ChurchNat          as PLC
+import qualified Language.PlutusCore.StdLib.Data.Integer            as PLC
+import qualified Language.PlutusCore.StdLib.Data.Unit               as PLC
 
-import qualified Language.PlutusCore.Erasure.Untyped.CBOR                 as U ()
-import qualified Language.PlutusCore.Erasure.Untyped.Convert              as C
-import qualified Language.PlutusCore.Erasure.Untyped.Evaluation.CkMachine as U
-import           Language.PlutusCore.Erasure.Untyped.Instance.Pretty      ()
-import qualified Language.PlutusCore.Evaluation.Machine.Untyped.Cek       as U
+import qualified Language.PlutusCore.Evaluation.Machine.Untyped.Cek as U
+import qualified Language.PlutusCore.Untyped.CBOR                   as U ()
+import qualified Language.PlutusCore.Untyped.Convert                as C
+import qualified Language.PlutusCore.Untyped.Evaluation.CkMachine   as U
+import           Language.PlutusCore.Untyped.Instance.Pretty        ()
 
-import           Codec.CBOR.FlatTerm                                      (toFlatTerm)
-import           Codec.Serialise                                          (encode, serialise)
+import           Codec.CBOR.FlatTerm                                (toFlatTerm)
+import           Codec.Serialise                                    (encode, serialise)
 import           Control.Lens
 import           Control.Monad
-import           Control.Monad.Trans.Except                               (runExceptT)
-import           Data.Bifunctor                                           (second)
-import           Data.Foldable                                            (traverse_)
+import           Control.Monad.Trans.Except                         (runExceptT)
+import           Data.Bifunctor                                     (second)
+import           Data.Foldable                                      (traverse_)
 
-import qualified Data.ByteString.Lazy                                     as BSL
-import qualified Data.ByteString.Lazy.Char8                               as BSC
-import qualified Data.Text                                                as T
-import           Data.Text.Encoding                                       (encodeUtf8)
-import qualified Data.Text.IO                                             as T
+import qualified Data.ByteString.Lazy                               as BSL
+import qualified Data.ByteString.Lazy.Char8                         as BSC
+import qualified Data.Text                                          as T
+import           Data.Text.Encoding                                 (encodeUtf8)
+import qualified Data.Text.IO                                       as T
 import           Data.Text.Prettyprint.Doc
 
-import           Numeric                                                  (showFFloat)
+import           Numeric                                            (showFFloat)
 import           Options.Applicative
 import           System.Exit
 import           System.FilePath
