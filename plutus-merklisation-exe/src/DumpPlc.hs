@@ -40,8 +40,8 @@ import qualified Data.ByteString.Lazy                                  as BSL
 
 newtype IntName a = IN Int
 instance Serialise (IntName ())
-b     where encode = undefined
-          decode = undefined
+     where encode = undefined
+           decode = undefined
 
 testprog :: U.Program IntName ()
 testprog = U.Program () (PLC.Version () 1 2 3) (U.Error ())

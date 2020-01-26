@@ -89,6 +89,7 @@ executable compression-analysis
     , cryptonite -any
     , language-plutus-core -any
     , lens -any
+    , marlowe -any
     , memory -any
     , mmorph -any
     , mtl -any

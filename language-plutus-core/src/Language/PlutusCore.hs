@@ -99,7 +99,7 @@ module Language.PlutusCore
 
 import           PlutusPrelude
 
-import           Language.PlutusCore.CBOR2                 ()
+import           Language.PlutusCore.CBOR                  ()
 import qualified Language.PlutusCore.Check.Normal          as Normal
 import qualified Language.PlutusCore.Check.Uniques         as Uniques
 import qualified Language.PlutusCore.Check.Value           as VR

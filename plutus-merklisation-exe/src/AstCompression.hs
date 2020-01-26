@@ -16,6 +16,8 @@
 module AstCompression (main) where
 
 import qualified Language.PlutusCore                                           as PLC
+import qualified Ledger.Crypto
+import qualified Ledger.Validation
 
 import           Language.PlutusCore.Erasure.Untyped.Convert                   as C
 
@@ -31,6 +33,8 @@ import           Language.PlutusTx.Coordination.Contracts.PubKey               a
 import           Language.PlutusTx.Coordination.Contracts.Swap                 as Swap
 import           Language.PlutusTx.Coordination.Contracts.TokenAccount         as TokenAccount
 import           Language.PlutusTx.Coordination.Contracts.Vesting              as Vesting
+
+import           Language.Marlowe.Semantics                                    as Marlowe
 
 import           Language.PlutusTx                                             as PlutusTx
 
@@ -124,6 +128,11 @@ analyseProg2 :: String -> CompiledCode a -> IO ()
 analyseProg2 name prg = do
   analyseCompression2 name $ PlutusTx.getPlc prg
 
+compiledMarloweValidator :: CompiledCode (Ledger.Crypto.PubKey
+                                     -> MarloweData -> [Input]
+                                     -> Ledger.Validation.PendingTx -> Bool)
+
+compiledMarloweValidator = $$(PlutusTx.compile [|| Marlowe.marloweValidator ||])
 
 main :: IO ()
 main = do
@@ -151,7 +160,25 @@ main = do
   analyseProg    "TokenAccount"         TokenAccount.exportedValidator
   printSeparator
   analyseProg    "Vesting"              Vesting.exportedValidator
+  printSeparator
+  analyseProg    "Marlowe"              compiledMarloweValidator
 
 -- Current validator is a little different for Future and PubKey
 
 -- See plutus-use-cases/bench/Bench.hs for examples of manipulating PLC code
+
+
+{-
+
+-- PlutusCore with CBOR
+| Contract | Compression  | Typed  | Typed, stringless | Untyped | Untyped, stringless | Untyped, integer IDs only | Untyped, de Bruijn |
+
+| Marlowe |  Uncompressed | 449965 | 245720 | 141513 | 71233 | 61048 (13.6%) | 46584 (10.4%) | 
+|         |    Compressed |  72878 |  58568 |  30425 | 22760 |  22511 (5.0%) |   7882 (1.8%) | 
+
+-- PlutusCore with CBOR2
+
+| Marlowe |  Uncompressed | 354910 | 182853 | 131328 | 71233 | 61048 (17.2%) | 46584 (13.1%) | 
+|         |    Compressed |  69715 |  55922 |  30010 | 22760 |  22511 (6.3%) |   7882 (2.2%) | 
+
+-}

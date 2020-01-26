@@ -6,7 +6,7 @@ import           Language.PlutusCore.Constant.Dynamic
 import           Language.PlutusCore.Evaluation.Machine.Cek hiding (evaluateCek, unsafeEvaluateCek)
 
 import           Control.Exception
-
+import           System.CPUTime
 import           System.IO.Unsafe
 
 stringBuiltins :: DynamicBuiltinNameMeanings
@@ -27,6 +27,20 @@ unsafeEvaluateCek = unsafeRunCek stringBuiltins
 
 -- TODO: pretty sure we shouldn't need the unsafePerformIOs here, we should expose a pure interface even if it has IO hacks under the hood
 
+
+
+
+time :: Show t => IO t -> IO t
+time a = do
+  start <- getCPUTime
+  v <- a
+  putStrLn $ "Result: " ++ show v
+  end   <- getCPUTime
+  let microsecs = (1000000 :: Integer)
+      diff = (end - start) `div` microsecs
+  putStrLn $ "Computation time (microseconds): " ++ show diff
+  return v
+
 -- | Evaluate a program in the CEK machine with the usual string dynamic builtins and tracing, additionally
 -- returning the trace output.
 evaluateCekTrace
@@ -37,4 +51,5 @@ evaluateCekTrace p =
         let logName       = dynamicTraceName
             logDefinition = dynamicCallAssign logName emit
             env  = insertDynamicBuiltinNameDefinition logDefinition stringBuiltins
-        evaluate $ runCek env p
+        r <- time $ evaluate $ runCek env p
+        return r
