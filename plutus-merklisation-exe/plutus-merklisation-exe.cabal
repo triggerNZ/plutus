@@ -75,12 +75,12 @@ executable ast-analysis
 ---------------- compression-analysis ----------------
 
 executable compression-analysis
-  main-is: AstCompression.hs
+  main-is: CompressionAnalysis.hs
   hs-source-dirs:
       src
   ghc-options: -Wall -Wincomplete-uni-patterns
                -Wincomplete-record-updates -Wredundant-constraints -Widentities
-               -main-is AstCompression
+               -main-is CompressionAnalysis
   build-depends:
       base <5
     , bytestring

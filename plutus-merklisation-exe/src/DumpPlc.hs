@@ -16,9 +16,9 @@
 module DumpPlc (main) where
 
 import           Language.PlutusCore                                   as PLC (Version (..))
-import           Language.PlutusCore.Erasure.Untyped.CBOR
---import qualified Language.PlutusCore.Erasure.Untyped.Convert           as C
-import qualified Language.PlutusCore.Erasure.Untyped.Term              as U
+import           Language.PlutusCore.Untyped.CBOR
+--import qualified Language.PlutusCore.Untyped.Convert           as C
+import qualified Language.PlutusCore.Untyped.Term                      as U
 -- import           Language.PlutusCore.Merkle.Merklisable
 -- import qualified Language.PlutusCore.Merkle.Merklise                   as M
 

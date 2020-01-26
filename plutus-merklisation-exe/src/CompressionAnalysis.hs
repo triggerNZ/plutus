@@ -13,13 +13,13 @@
    untyped ones in Merkle.Merklise (use CBOR for serilisation including
    unit annotations, CBOR for serilisation omitting units. -}
 
-module AstCompression (main) where
+module CompressionAnalysis (main) where
 
 import qualified Language.PlutusCore                                           as PLC
 import qualified Ledger.Crypto
 import qualified Ledger.Validation
 
-import           Language.PlutusCore.Erasure.Untyped.Convert                   as C
+import           Language.PlutusCore.Untyped.Convert                   as C
 
 import           Language.PlutusTx.Coordination.Contracts.Crowdfunding         as Crowdfunding
 import           Language.PlutusTx.Coordination.Contracts.Currency             as Currrency
