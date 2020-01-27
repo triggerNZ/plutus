@@ -41,15 +41,15 @@ library
                    Language.PlutusCore.Merkle.Constant.Name
                    Language.PlutusCore.Merkle.Constant.Typed
                    Language.PlutusCore.Merkle.Convert
-                   Language.PlutusCore.Erasure.Untyped
-                   Language.PlutusCore.Erasure.Untyped.CBOR
-                   Language.PlutusCore.Erasure.Untyped.CBOR2
-                   Language.PlutusCore.Erasure.Untyped.Convert
-                   Language.PlutusCore.Erasure.Untyped.DeBruijn
-                   Language.PlutusCore.Erasure.Untyped.Term
-                   Language.PlutusCore.Erasure.Untyped.Instance.Pretty
+                   Language.PlutusCore.Untyped
+                   Language.PlutusCore.Untyped.CBOR
+                   Language.PlutusCore.Untyped.CBOR2
+                   Language.PlutusCore.Untyped.Convert
+                   Language.PlutusCore.Untyped.DeBruijn
+                   Language.PlutusCore.Untyped.Term
+                   Language.PlutusCore.Untyped.Instance.Pretty
                    Language.PlutusCore.Evaluation.Machine.Untyped.Cek
-                   Language.PlutusCore.Erasure.Untyped.Evaluation.CkMachine
+                   Language.PlutusCore.Untyped.Evaluation.CkMachine
   other-modules:
                    Language.PlutusCore.Merkle.Constant.Dynamic
                    Language.PlutusCore.Merkle.Constant.Dynamic.BuiltinName
@@ -57,23 +57,23 @@ library
                    Language.PlutusCore.Merkle.Constant.Dynamic.Emit
                    Language.PlutusCore.Merkle.Constant.Dynamic.OffChain
                    Language.PlutusCore.Merkle.Constant.Dynamic.OnChain
-                   Language.PlutusCore.Erasure.Untyped.Constant
-                   Language.PlutusCore.Erasure.Untyped.Constant.Apply
-                   Language.PlutusCore.Erasure.Untyped.Constant.Dynamic.Instances
-                   Language.PlutusCore.Erasure.Untyped.Constant.Make
-                   Language.PlutusCore.Erasure.Untyped.Constant.Name
-                   Language.PlutusCore.Erasure.Untyped.Constant.Typed
-                   Language.PlutusCore.Erasure.Untyped.Evaluation.MachineException
-                   Language.PlutusCore.Erasure.Untyped.Evaluation.Result
-                   Language.PlutusCore.Erasure.Untyped.MkPlc
-                   Language.PlutusCore.Erasure.Untyped.View
-                   Language.PlutusCore.Erasure.Untyped.Instance.Pretty.Classic
-                   Language.PlutusCore.Erasure.Untyped.Instance.Pretty.Common
-                   Language.PlutusCore.Erasure.Untyped.Instance.Pretty.Default
-                   Language.PlutusCore.Erasure.Untyped.Instance.Pretty.Plc
-                   Language.PlutusCore.Erasure.Untyped.Instance.Pretty.Readable
-                   Language.PlutusCore.Erasure.Untyped.Instance.Recursive
-                   Language.PlutusCore.Erasure.Untyped.Instance.Eq
+                   Language.PlutusCore.Untyped.Constant
+                   Language.PlutusCore.Untyped.Constant.Apply
+                   Language.PlutusCore.Untyped.Constant.Dynamic.Instances
+                   Language.PlutusCore.Untyped.Constant.Make
+                   Language.PlutusCore.Untyped.Constant.Name
+                   Language.PlutusCore.Untyped.Constant.Typed
+                   Language.PlutusCore.Untyped.Evaluation.MachineException
+                   Language.PlutusCore.Untyped.Evaluation.Result
+                   Language.PlutusCore.Untyped.MkPlc
+                   Language.PlutusCore.Untyped.View
+                   Language.PlutusCore.Untyped.Instance.Pretty.Classic
+                   Language.PlutusCore.Untyped.Instance.Pretty.Common
+                   Language.PlutusCore.Untyped.Instance.Pretty.Default
+                   Language.PlutusCore.Untyped.Instance.Pretty.Plc
+                   Language.PlutusCore.Untyped.Instance.Pretty.Readable
+                   Language.PlutusCore.Untyped.Instance.Recursive
+                   Language.PlutusCore.Untyped.Instance.Eq
 
   default-language: Haskell2010
   default-extensions: ExplicitForAll ScopedTypeVariables
