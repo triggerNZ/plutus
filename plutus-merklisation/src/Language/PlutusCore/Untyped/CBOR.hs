@@ -60,6 +60,11 @@ encodeConstructorTag = encodeWord
 decodeConstructorTag :: Decoder s Word
 decodeConstructorTag = decodeWord
 
+data Empty = Empty
+
+instance Serialise Empty where
+    encode Empty = mempty
+    decode = pure Empty
 
 
 instance Serialise PLC.TypeBuiltin where

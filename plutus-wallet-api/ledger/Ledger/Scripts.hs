@@ -14,9 +14,12 @@
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE RankNTypes  #-}
 {-# LANGUAGE DerivingVia  #-}
+
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-specialise #-}
 {-# OPTIONS_GHC -fno-ignore-interface-pragmas #-}
+
 -- | Functions for working with scripts on the ledger.
 module Ledger.Scripts(
     -- * Scripts
@@ -80,7 +83,7 @@ import           Language.PlutusTx.Builtins               as Builtins
 import           LedgerBytes                              (LedgerBytes (..))
 import           Ledger.Orphans                           ()
 
-import Language.PlutusCore.Merkle.Merklise                (merklisationStatistics)
+import Language.PlutusCore.Merkle.Merklise                (merklisationStatistics, merklisationStatistics2)
 
 import Debug.Trace
     
@@ -315,7 +318,7 @@ runScript checking (ValidationData valData) (Validator validator) (DataValue dat
         redeemer'   = fromCompiledCode $ liftCode redeemer
         valData'    = fromCompiledCode $ liftCode valData
         appliedValidator = ((validator `applyScript` dataValue') `applyScript` redeemer') `applyScript` valData'
-    Debug.Trace.trace (merklisationStatistics (unScript appliedValidator)) $
+    Debug.Trace.trace (merklisationStatistics2 (unScript validator) (unScript dataValue') (unScript redeemer') (unScript valData')) $
          evaluateScript checking appliedValidator
 
 -- | @()@ as a data script.

@@ -190,6 +190,8 @@ instance Serialise (IntName a) where
 instance Show (IntName a) where
     show (IntName n) = show n
 
+deriving instance Functor IntName
+
 nameToInt :: N.Name a -> IntName a
 nameToInt (N.Name _ _ (N.Unique uniq)) = IntName uniq
 

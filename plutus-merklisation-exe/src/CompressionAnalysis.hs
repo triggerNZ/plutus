@@ -7,7 +7,7 @@
 
 --{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 --{-# OPTIONS_GHC -fno-warn-unused-local-binds #-}
---{-# OPTIONS_GHC -fno-warn-unused-matches #-}
+--{-# OPTIONS_GHC -fno-warn-unused-matcnhes #-}
 
 {- Typed compression instances are determined in Language.PlutusCore,
    untyped ones in Merkle.Merklise (use CBOR for serilisation including
@@ -44,6 +44,12 @@ import qualified Data.ByteString.Lazy                                          a
 import           GHC.Int                                                       (Int64)
 import           Numeric
 
+
+data X = X
+instance Serialise X where
+    encode = mempty
+    decode = pure ()
+             
 {----------------- Analysis -----------------}
 
 printHeader :: IO ()

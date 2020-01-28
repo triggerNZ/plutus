@@ -9,7 +9,7 @@
 module TypeMerklisation where
 
 import qualified Codec.Compression.GZip                                        as G
-import           Codec.Serialise                                               (serialise)
+import           Codec.Serialise
 import           Crypto.Hash
 import qualified Data.ByteArray                                                as BA
 import qualified Data.ByteString.Lazy                                          as B
@@ -44,6 +44,13 @@ import           Language.PlutusTx.Coordination.Contracts.Vesting              a
 
 import qualified Language.PlutusTx                                             as PlutusTx
 
+data X = X
+instance Serialise X where
+    encode = mempty
+    decode = pure X
+
+instance Merklisable X where
+    merkleHash _ = merkleHash "X"
 
 -- Estimate Merklisation overhead
 printHeader1 :: IO ()
@@ -160,7 +167,7 @@ printEntry fullSize s mode cmode = do
 
 analyseProg :: String -> PlutusTx.CompiledCode a -> IO()
 analyseProg name code = do
-    let prog = PlutusTx.getPlc code
+    let prog = X <$ PlutusTx.getPlc code
         numNodes = PLCSize.programSize prog
         numTypeNodes = PLCSize.programNumTypeNodes prog
         s1 = serialise prog

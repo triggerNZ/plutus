@@ -12,7 +12,7 @@ module Language.PlutusCore.Merkle.Merklise where
 
 import qualified Codec.Compression.GZip                          as G
 import qualified Codec.Compression.GZip                          as G
-import           Codec.Serialise                                 (serialise)
+import           Codec.Serialise
 import           Control.Monad
 import           Control.Monad.Trans.Except                      (runExceptT)
 import           Crypto.Hash
@@ -23,10 +23,6 @@ import qualified Data.Map
 import qualified Data.Set
 
 import qualified Language.PlutusCore                             as PLC
-import qualified Language.PlutusCore.Untyped.CBOR        as U ()
-import qualified Language.PlutusCore.Untyped.Convert     as C
-import qualified Language.PlutusCore.Untyped.DeBruijn    as D
-import qualified Language.PlutusCore.Untyped.Term        as U
 import qualified Language.PlutusCore.Merkle.CBOR                 as M
 import qualified Language.PlutusCore.Merkle.Constant.Typed       as M
 import           Language.PlutusCore.Merkle.Convert
@@ -38,6 +34,10 @@ import qualified Language.PlutusCore.Merkle.Size                 as Size
 import qualified Language.PlutusCore.Merkle.Size                 as M
 import           Language.PlutusCore.Merkle.Type
 import           Language.PlutusCore.Pretty
+import qualified Language.PlutusCore.Untyped.CBOR                as U ()
+import qualified Language.PlutusCore.Untyped.Convert             as C
+import qualified Language.PlutusCore.Untyped.DeBruijn            as D
+import qualified Language.PlutusCore.Untyped.Term                as U
 import qualified Language.PlutusTx.Builtins                      as B
 
 import           Debug.Trace
@@ -191,7 +191,8 @@ pruneTerm used pruneType t0 =
                 -- Debug.Trace.trace (show $ prettyPlcClassicDebug t0) $
                 BSL.length (serialise t1)
         in if  l > threshold
-           then Prune () (merkleHash t1)
+           then Debug.Trace.trace ("Pruned term of size " ++ show l ++ ": " ++ show (PLCSize.termNumTermNodes t0) ++ " term nodes") $
+                Prune () (merkleHash t1)
            else t1
     else case t0 of
            PLC.Var      _ n         -> Var      () (unann n)
@@ -235,7 +236,7 @@ compress :: B.ByteString -> B.ByteString
 compress = G.compressWith G.defaultCompressParams {G.compressLevel = G.bestCompression}
 
 -- TODO: test that if we choose a random node and prune it, the Merkle hash of the AST doesn't change.
-merklisationStatistics0 :: PLC.Program PLC.TyName PLC.Name () -> String
+merklisationStatistics0 :: Prog -> String
 merklisationStatistics0 program =
     let s1 = serialise program
         numberedProgram = numberProgram program
@@ -266,7 +267,6 @@ merklisationStatistics0 program =
     in Data.List.intercalate "\n" messages
 
 
-
 --  Want raw, raw & erased, pruned, pruned & erased.  Compressed and
 --  uncompressed versions for both.  Number of nodes before and after
 --  pruning in a seaparate table?
@@ -291,7 +291,7 @@ progPrunedTerms :: Program tyname name ann -> Integer
 progPrunedTerms (Program _ _ t) = prunedTerms t
 
 
-merklisationStatistics :: PLC.Program PLC.TyName PLC.Name () -> String
+merklisationStatistics ::Prog -> String
 merklisationStatistics program =
     let numberedProgram = numberProgram program
         PLC.Program progAnn _ numberedBody = numberedProgram
@@ -326,3 +326,67 @@ merklisationStatistics program =
          ++ "\nPruned term nodes in program: " ++ show (progPrunedTerms prunedProgram1)
 
 
+-- 1. Run applied validator, use results to Merklise unapplied validator and see what happens
+-- 2. Repeatedly Merklise away terms (and/or types?) in descending order of serialised size and see
+--    if we ever win.
+
+-- Merklising types is always unproductive.
+-- It looks as if we can sometimes do a bit better than minimisation and compression
+-- if we only Merklise really big types; the uncompressed untyped Merklised version
+-- can be smaller than the non-Merklised version, but it's never close to the compressed size.
+-- Maybe if w care about in-memory size that'll be useful.  From the security point of view,
+-- we'd presumably have to Merklise all of the unused stuff to be sure that we weren't giving
+-- anything away, but that's bad from a size point of view.
+
+
+apply :: Prog -> Prog -> Prog
+apply = PLC.applyProgram
+
+apply2 :: PLC.Program tyname name Integer -> PLC.Program tyname name Integer -> PLC.Program tyname name Integer
+apply2 (PLC.Program _ _ t1) (PLC.Program _ _ t2) = PLC.Program (-1) (PLC.defaultVersion (-1)) (PLC.Apply (-1) t1 t2)
+
+num :: PLC.Program PLC.TyName PLC.Name () -> PLC.Program PLC.TyName PLC.Name Integer
+num p = (-1) <$ p
+
+data X = X
+instance Serialise X where
+    encode = mempty
+    decode = pure X
+
+instance Merklisable X where
+    merkleHash _ = merkleHash "X"
+
+merklisationStatistics2 ::Prog -> Prog -> Prog -> Prog -> String
+merklisationStatistics2 validator dataVal redeemer valData =
+    let appliedValidator = apply (apply (apply validator dataVal) redeemer) valData
+        numberedValidator = numberProgram validator
+        program = numberedValidator `apply2` (num dataVal) `apply2` (num redeemer) `apply2` (num valData)
+
+        usedNodes =  getUsedNodes $ CekMarker.runCekWithStringBuiltins program
+        numTermNodes = PLCSize.programNumTermNodes validator
+        numUsedNodes = Data.Set.size usedNodes
+        prunedValidator1 = pruneProgram usedNodes pruneAllTypes numberedValidator
+        prunedValidator2 = pruneProgram usedNodes pruneBigTypes numberedValidator
+        prunedValidator3 = pruneProgram usedNodes     dontPrune numberedValidator
+        strippedValidator       = C.deBruijnToIntProgram . C.deBruijnUntypedProgram . C.erasePLCProgram $ numberedValidator
+        strippedPrunedValidator = C.deBruijnToIntProgram . C.deBruijnUntypedProgram . C.eraseMerkleProgram $ prunedValidator1
+       -- When we strip a pruned program, all types are discarded so it's irrelevant what pruning method we used
+        clen = BSL.length . compress
+
+        s1  = serialise (validator)
+        s2  = serialise (X <$ strippedValidator)
+        s3a = serialise (X <$ prunedValidator1)
+        s3b = serialise (X <$ prunedValidator2)
+        s3c = serialise (X <$ prunedValidator3)
+        s4  = serialise (X <$ strippedPrunedValidator)
+   in "\n"
+         ++ "* | " ++ show numTermNodes ++ " | " ++ show numUsedNodes ++ " | "
+         ++ (show $ BSL.length s1) ++ " | " ++ (show $ BSL.length s2)
+         ++ " | " ++ (show $ BSL.length s3a) ++ " | " ++ (show $ BSL.length s3b) ++ " | " ++ (show $ BSL.length s3c)
+         ++ " | " ++ (show $ BSL.length s4)
+         ++ " | \n"
+         ++ "* | (compressed) | - | "
+         ++ (show $ clen s1) ++ " | "  ++ (show $ clen s2) ++ " | "
+         ++ (show $ clen s3a) ++ " | "  ++ (show $ clen s3b) ++ " | "  ++ (show $ clen s3c)
+         ++ " | "  ++ (show $ clen s4) ++ " |"
+         ++ "\nPruned term nodes in program: " ++ show (progPrunedTerms prunedValidator1)

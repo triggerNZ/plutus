@@ -29,7 +29,6 @@ import qualified Language.PlutusTx                                     as Plutus
 
 import           Codec.Serialise                                       (Serialise, decode, deserialise, encode,
                                                                         serialise)
-
 -- import Language.PlutusCore.Merkle.Merklise                (merklisationStatistics)
 
 -- The use cases import Scripts.hs, which imports Merklise.hs, which
