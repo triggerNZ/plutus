@@ -50,6 +50,7 @@ library
     Language.Marlowe
     Language.Marlowe.Semantics
     Language.Marlowe.Client
+    Language.Marlowe.Client2
     Language.Marlowe.Util
     Language.Marlowe.Pretty
   other-modules:
@@ -75,6 +76,7 @@ test-suite marlowe-test
       -- Spec.Common
         Spec.Marlowe.Common
         Spec.Marlowe.Marlowe
+        Spec.Marlowe.Marlowe2
       -- Spec.Actus
     build-depends:
         base >=4.9 && <5,
@@ -92,6 +94,8 @@ test-suite marlowe-test
         cborg,
         plutus-wallet-api -any,
         plutus-emulator -any,
+        plutus-contract,
+        plutus-contract-tasty,
         marlowe,
         plutus-tx -any,
         template-haskell -any
