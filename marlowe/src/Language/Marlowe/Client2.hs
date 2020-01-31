@@ -21,6 +21,7 @@ module Language.Marlowe.Client2 where
 import           Control.Monad              (Monad (..), void)
 import           Control.Monad.Error.Class  (MonadError (..))
 import           Control.Monad.Error.Lens   (throwing)
+import           Control.Lens
 import           Data.Map                   (Map)
 import qualified Data.Map                   as Map
 import           Data.Maybe                 (maybeToList)
@@ -32,11 +33,12 @@ import           Language.Marlowe.Semantics hiding (Contract)
 import qualified Language.Marlowe.Semantics as Marlowe
 import qualified Language.PlutusTx          as PlutusTx
 import qualified Language.PlutusTx.Prelude  as P
-import           Ledger                     (DataValue (..), PubKeyHash (..), pubKeyHash, Slot (..), Tx, TxOut (..), interval,
+import           Ledger                     (DataValue (..), PubKeyHash (..), pubKeyHash, Slot (..), Tx, TxOut (..), TxOutTx (..), interval,
 
                                              mkValidatorScript, pubKeyHashTxOut, scriptAddress, scriptTxIn, scriptTxOut,
-                                             txOutRefs)
+                                             txOutRefs, txOutTxData)
 import           Ledger.Ada                 (adaValueOf)
+import           Ledger.AddressMap                 (outRefMap)
 import           Ledger.Scripts             (RedeemerValue (..), Validator)
 import qualified Ledger.Typed.Scripts       as Scripts
 import qualified Ledger.Value               as Val
@@ -44,20 +46,23 @@ import qualified Ledger.Value               as Val
 type MarloweSchema =
     BlockchainActions
         .\/ Endpoint "create" Marlowe.Contract
-        .\/ Endpoint "apply-inputs" (Address, [Input])
+        .\/ Endpoint "apply-inputs" (PubKeyHash, [Input])
 
 
 marloweContract2 :: forall e. (AsContractError e)
     => Contract MarloweSchema e ()
-marloweContract2 = create >> apply
+marloweContract2 = do
+    create <|> apply
   where
     create = do
         cont <- endpoint @"create" @Marlowe.Contract @MarloweSchema
         createContract cont
     apply = do
         (creator, inputs) <- endpoint @"apply-inputs" @(PubKeyHash, [Input]) @MarloweSchema
-
-
+        MarloweData{..} <- applyInputs creator inputs
+        case marloweContract of
+            Close -> pure ()
+            _ -> void apply
 
 
 {-| Create a Marlowe contract.
@@ -65,7 +70,7 @@ marloweContract2 = create >> apply
  -}
 createContract :: (AsContractError e)
     => Marlowe.Contract
-    -> Contract MarloweSchema e PubKeyHash
+    -> Contract MarloweSchema e ()
 createContract contract = do
     slot <- awaitSlot 0
     creator <- pubKeyHash <$> ownPubKey
@@ -83,35 +88,34 @@ createContract contract = do
     let slotRange = interval slot (slot + 10)
     let tx = payToScript payValue address ds
              <> mustBeValidIn slotRange
+    -- void $ watchAddressUntil address (Slot $ contractLifespanUpperBound contract)
     void $ submitTx tx
-    pure creator
 
 
 applyInputs :: (AsContractError e)
     => PubKeyHash
     -> [Input]
-    -> Contract MarloweSchema e ()
+    -> Contract MarloweSchema e MarloweData
 applyInputs creator inputs = do
     let redeemer = mkRedeemer inputs
-        validator = validatorScript marloweCreator
-        dataValue = DataValue (PlutusTx.toData marloweData)
+        validator = validatorScript creator
         address = scriptAddress validator
     slot <- awaitSlot 0
-    utxo <- utxoAt address
+
+    utxo <- watchAddressUntil address (Slot 1000)
+    let [(ref, out)] = Map.toList (outRefMap utxo)
 
 
-    let find _ tx = case txOutTxData tx of
-            Just dv -> case PlutusTx.fromData dv of
-                Just marloweData ->
-    let tx = collectFromScriptFilter find utxo validator inputs
-    let asdf = foldl ()
-    let ourUtxo = Map.filterWithKey flt utxo
-        mkIn :: TxOutRef -> DataValue -> TxIn
-        mkIn ref = scriptTxIn ref vls red
-        inputs =
-            fmap (\(ref, dat, val) -> (mkIn ref dat, val)) $
-            mapMaybe (\(ref, out) -> (ref,,txOutValue $ txOutTxOut out) <$> txOutTxData out) $
-            Map.toList ourUtxo
+    let convert :: TxOutRef -> TxOutTx -> Maybe (TxOutRef, Val.Value, DataValue, MarloweData)
+        convert ref out = case txOutTxData out of
+            Just dv -> case PlutusTx.fromData (getDataScript dv) of
+                Just marloweData -> Just (ref, txOutValue (txOutTxOut out), dv, marloweData)
+                _ -> Nothing
+            _ -> Nothing
+
+    (ref, value, dataValue, marloweData@MarloweData{..}) <- case convert ref out of
+        Just r -> pure r
+        Nothing -> throwing _OtherError $ (Text.pack $ "Not found")
 
     -- For now, we expect a transaction to happen whithin 10 slots from now.
     -- That's about 3 minutes, should be fine.
@@ -122,7 +126,7 @@ applyInputs creator inputs = do
 
     let computedResult = computeTransaction txInput marloweState marloweContract
 
-    tx <- case computedResult of
+    (tx, md) <- case computedResult of
         TransactionOutput {txOutPayments, txOutState, txOutContract} -> do
 
             let marloweData = MarloweData {
@@ -140,10 +144,13 @@ applyInputs creator inputs = do
                         scriptOut = payToScript finalBalance address dataValue
                         in scriptOut <> txWithPayouts
 
-            return (deducedTxOutputs)
+            return (deducedTxOutputs, marloweData)
         Error txError -> throwing _OtherError $ (Text.pack $ show txError)
 
-    void $ submitTx (tx <> mustBeValidIn slotRange)
+    let scriptIn = scriptTxIn ref validator redeemer dataValue
+    let finalTx = tx <> mustSpendInput scriptIn <> mustBeValidIn slotRange
+    void $ submitTx finalTx
+    pure marloweData
   where
     collectDeposits (IDeposit _ _ (Token cur tok) amount) = Val.singleton cur tok amount
     collectDeposits _                    = P.zero

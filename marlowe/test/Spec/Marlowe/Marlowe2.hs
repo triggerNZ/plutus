@@ -22,7 +22,6 @@ import           Language.Plutus.Contract.Test
 import           Language.PlutusTx.Lattice
 import           Ledger
 import           Ledger.Ada                 (adaValueOf)
-import           Ledger.Value                                          (TokenName, Value)
 
 
 tests :: TestTree
@@ -41,12 +40,9 @@ tests = testGroup "token account"
 zeroCouponBondTest :: TestTree
 zeroCouponBondTest = checkPredicate @MarloweSchema @ContractError "ZCB" marloweContract2
     (assertNoFailedTransactions
-    /\ assertNotDone w1 "contract should not have any errors"
+    /\ assertDone w1 (const True) "contract should close"
     /\ walletFundsChange alice (adaValueOf (150))
     ) $ do
-    callEndpoint @"create" w1 Close
-    handleBlockchainEvents w1
-
     -- Init a contract
     let alicePk = pubKeyHash $ walletPubKey alice
         aliceAcc = AccountId 0 alicePk
@@ -63,10 +59,23 @@ zeroCouponBondTest = checkPredicate @MarloweSchema @ContractError "ZCB" marloweC
                 ))] (Slot 100) Close
 
     callEndpoint @"create" alice zeroCouponBond
-    callEndpoint @"apply-inputs" alice [IDeposit aliceAcc (alicePk) ada 850_000_000]
-    callEndpoint @"apply-inputs" bob [IDeposit aliceAcc ( bobPk) ada 1000_000_000]
+    addBlocks 10
     handleBlockchainEvents alice
     handleBlockchainEvents bob
+    notifySlot alice
+    notifySlot bob
+    callEndpoint @"apply-inputs" alice (alicePk, [IDeposit aliceAcc (alicePk) ada 850_000_000])
+    addBlocks 10
+    handleBlockchainEvents alice
+    handleBlockchainEvents bob
+    notifySlot alice
+    notifySlot bob
+    callEndpoint @"apply-inputs" bob (alicePk, [IDeposit aliceAcc ( bobPk) ada 1000_000_000])
+    addBlocks 10
+    handleBlockchainEvents alice
+    handleBlockchainEvents bob
+    notifySlot alice
+    notifySlot bob
 
 
 
