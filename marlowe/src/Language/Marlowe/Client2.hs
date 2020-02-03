@@ -36,24 +36,33 @@ import qualified Language.PlutusTx.Prelude  as P
 import           Ledger                     (DataValue (..), PubKeyHash (..), pubKeyHash, Slot (..), Tx, TxOut (..), TxOutTx (..), interval,
 
                                              mkValidatorScript, pubKeyHashTxOut, scriptAddress, scriptTxIn, scriptTxOut,
-                                             txOutRefs, txOutTxData)
+                                             txOutRefs, txOutTxData, pubKeyAddress)
 import           Ledger.Ada                 (adaValueOf)
 import           Ledger.AddressMap                 (outRefMap)
 import           Ledger.Scripts             (RedeemerValue (..), Validator)
 import qualified Ledger.Typed.Scripts       as Scripts
 import qualified Ledger.Value               as Val
+import Debug.Trace
 
 type MarloweSchema =
     BlockchainActions
         .\/ Endpoint "create" Marlowe.Contract
         .\/ Endpoint "apply-inputs" (PubKeyHash, [Input])
+        .\/ Endpoint "sub" PubKeyHash
 
 
 marloweContract2 :: forall e. (AsContractError e)
     => Contract MarloweSchema e ()
 marloweContract2 = do
-    create <|> apply
+    create <|> apply <|> void sub
   where
+    sub = do
+        creator <- endpoint @"sub" @PubKeyHash @MarloweSchema
+        pk <- ownPubKey
+        let validator = validatorScript creator
+            address = Ledger.scriptAddress validator
+        void $ utxoAt address
+        utxoAt (pubKeyAddress pk)
     create = do
         cont <- endpoint @"create" @Marlowe.Contract @MarloweSchema
         createContract cont
@@ -61,7 +70,7 @@ marloweContract2 = do
         (creator, inputs) <- endpoint @"apply-inputs" @(PubKeyHash, [Input]) @MarloweSchema
         MarloweData{..} <- applyInputs creator inputs
         case marloweContract of
-            Close -> pure ()
+            Close -> void apply --pure ()
             _ -> void apply
 
 
@@ -88,7 +97,6 @@ createContract contract = do
     let slotRange = interval slot (slot + 10)
     let tx = payToScript payValue address ds
              <> mustBeValidIn slotRange
-    -- void $ watchAddressUntil address (Slot $ contractLifespanUpperBound contract)
     void $ submitTx tx
 
 
@@ -100,9 +108,15 @@ applyInputs creator inputs = do
     let redeemer = mkRedeemer inputs
         validator = validatorScript creator
         address = scriptAddress validator
+    traceM "Here"
     slot <- awaitSlot 0
-
-    utxo <- watchAddressUntil address (Slot 1000)
+    traceM "Here1"
+    pk <- ownPubKey
+    traceM "Here2"
+    void $ utxoAt (pubKeyAddress pk)
+    traceM "Here3"
+    utxo <- utxoAt address
+    traceM "Here4"
     let [(ref, out)] = Map.toList (outRefMap utxo)
 
 
@@ -113,10 +127,10 @@ applyInputs creator inputs = do
                 _ -> Nothing
             _ -> Nothing
 
-    (ref, value, dataValue, marloweData@MarloweData{..}) <- case convert ref out of
+    (ref, value, dataValue, MarloweData{..}) <- case convert ref out of
         Just r -> pure r
         Nothing -> throwing _OtherError $ (Text.pack $ "Not found")
-
+    traceM "Here5"
     -- For now, we expect a transaction to happen whithin 10 slots from now.
     -- That's about 3 minutes, should be fine.
     let slotRange = interval slot (slot + Slot 10)
@@ -125,7 +139,7 @@ applyInputs creator inputs = do
             txInputs = inputs }
 
     let computedResult = computeTransaction txInput marloweState marloweContract
-
+    traceM "Here6"
     (tx, md) <- case computedResult of
         TransactionOutput {txOutPayments, txOutState, txOutContract} -> do
 
@@ -146,11 +160,13 @@ applyInputs creator inputs = do
 
             return (deducedTxOutputs, marloweData)
         Error txError -> throwing _OtherError $ (Text.pack $ show txError)
-
+    traceM "Here7"
     let scriptIn = scriptTxIn ref validator redeemer dataValue
     let finalTx = tx <> mustSpendInput scriptIn <> mustBeValidIn slotRange
+    traceM ("AAAAAAA" <> show finalTx)
+    throwing _OtherError $ (Text.pack $ show finalTx)
     void $ submitTx finalTx
-    pure marloweData
+    pure md
   where
     collectDeposits (IDeposit _ _ (Token cur tok) amount) = Val.singleton cur tok amount
     collectDeposits _                    = P.zero

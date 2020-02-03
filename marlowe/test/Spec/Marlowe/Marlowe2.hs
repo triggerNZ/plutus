@@ -19,6 +19,8 @@ import           Language.Marlowe.Util
 import           Language.Marlowe.Client2
 import           Language.Plutus.Contract hiding (Contract)
 import           Language.Plutus.Contract.Test
+import qualified Language.Plutus.Contract.Effects.OwnPubKey        as OwnPubKey
+import qualified Wallet.Emulator.Wallet                            as EM
 import           Language.PlutusTx.Lattice
 import           Ledger
 import           Ledger.Ada                 (adaValueOf)
@@ -41,6 +43,7 @@ zeroCouponBondTest :: TestTree
 zeroCouponBondTest = checkPredicate @MarloweSchema @ContractError "ZCB" marloweContract2
     (assertNoFailedTransactions
     /\ assertDone w1 (const True) "contract should close"
+    /\ walletFundsChange bob (adaValueOf (-150))
     /\ walletFundsChange alice (adaValueOf (150))
     ) $ do
     -- Init a contract
@@ -59,19 +62,26 @@ zeroCouponBondTest = checkPredicate @MarloweSchema @ContractError "ZCB" marloweC
                 ))] (Slot 100) Close
 
     callEndpoint @"create" alice zeroCouponBond
+    notifyInterestingAddresses alice
+    notifyInterestingAddresses bob
     addBlocks 10
     handleBlockchainEvents alice
     handleBlockchainEvents bob
     notifySlot alice
     notifySlot bob
-    callEndpoint @"apply-inputs" alice (alicePk, [IDeposit aliceAcc (alicePk) ada 850_000_000])
+    -- callEndpoint @"sub" alice (alicePk)
+    -- callEndpoint @"sub" bob (alicePk)
+    callEndpoint @"apply-inputs" alice (alicePk, [IDeposit aliceAcc alicePk ada 850_000_000])
+    notifyInterestingAddresses alice
+    notifyInterestingAddresses bob
     addBlocks 10
     handleBlockchainEvents alice
     handleBlockchainEvents bob
     notifySlot alice
     notifySlot bob
-    callEndpoint @"apply-inputs" bob (alicePk, [IDeposit aliceAcc ( bobPk) ada 1000_000_000])
-    addBlocks 10
+    -- callEndpoint @"sub" alice (alicePk)
+    -- callEndpoint @"sub" bob (alicePk)
+    callEndpoint @"apply-inputs" bob (alicePk, [IDeposit aliceAcc bobPk ada 1000_000_000])
     handleBlockchainEvents alice
     handleBlockchainEvents bob
     notifySlot alice
