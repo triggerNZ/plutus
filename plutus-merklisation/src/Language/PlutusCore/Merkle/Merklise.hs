@@ -18,6 +18,7 @@ import           Control.Monad.Trans.Except                      (runExceptT)
 import           Crypto.Hash
 import qualified Data.ByteString.Lazy                            as BSL
 import           Data.Functor.Foldable
+
 import qualified Data.List
 import qualified Data.Map
 import qualified Data.Set
@@ -30,8 +31,7 @@ import qualified Language.PlutusCore.Merkle.Evaluation.CekMarker as CekMarker
 import qualified Language.PlutusCore.Merkle.Evaluation.Result    as M
 import           Language.PlutusCore.Merkle.Merklisable
 import qualified Language.PlutusCore.Merkle.PLCSize              as PLCSize
-import qualified Language.PlutusCore.Merkle.Size                 as Size
-import qualified Language.PlutusCore.Merkle.Size                 as M
+import qualified Language.PlutusCore.Merkle.Size                 as U
 import           Language.PlutusCore.Merkle.Type
 import           Language.PlutusCore.Pretty
 import qualified Language.PlutusCore.Untyped.CBOR                as U ()
@@ -184,14 +184,13 @@ pruneTerm used pruneType t0 =
         let t1 = fromCoreTerm $ () <$ t0
             threshold = 36
             -- ^ Don't Merklise anything smaller than this; note that a pruned node serialises to 36 bytes
-            n = Size.termSize t1
             s = serialise (Prune () (merkleHash t1) :: Term PLC.TyName PLC.Name () )
 
             l = -- Debug.Trace.trace ("================================================================") $
                 -- Debug.Trace.trace (show $ prettyPlcClassicDebug t0) $
                 BSL.length (serialise t1)
         in if  l > threshold
-           then Debug.Trace.trace ("Pruned term of size " ++ show l ++ ": " ++ show (PLCSize.termNumTermNodes t0) ++ " term nodes") $
+           then -- Debug.Trace.trace ("Pruned term of size " ++ show l ++ ": " ++ show (PLCSize.termNumTermNodes t0) ++ " term nodes") $
                 Prune () (merkleHash t1)
            else t1
     else case t0 of
@@ -209,7 +208,103 @@ pruneTerm used pruneType t0 =
 pruneProgram :: Data.Set.Set Integer -> TypePruner -> PLC.Program PLC.TyName PLC.Name Integer -> Program PLC.TyName PLC.Name ()
 pruneProgram used pruneType (PLC.Program _ v t) = Program () (unann v) (pruneTerm used pruneType t)
 
+pruneTypeWithThreshold :: Int -> PLC.Type PLC.TyName b -> Type PLC.TyName ()
+pruneTypeWithThreshold threshold ty0 =
+    let pruneType' = pruneTypeWithThreshold threshold
+        ty1 = X <$ ty0
+        l = fromIntegral $ BSL.length (serialise ty1)
+    in if l > threshold
+       then TyPruned () (merkleHash (fromCoreType $ () <$ ty0))
+    else case ty0 of
+      PLC.TyVar     _ tn      -> TyVar     () (unann tn)
+      PLC.TyFun     _ ty ty'  -> TyFun     () (pruneType' ty) (pruneType' ty')
+      PLC.TyIFix    _ ty ty'  -> TyIFix    () (pruneType' ty) (pruneType' ty')
+      PLC.TyForall  _ tn k ty -> TyForall  () (unann tn) (unann $ fromCoreKind k) (pruneType' ty)
+      PLC.TyBuiltin _ tb      -> TyBuiltin () tb
+      PLC.TyLam     _ tn k ty -> TyLam     () (unann tn) (unann $ fromCoreKind k) (pruneType' ty)
+      PLC.TyApp     _ ty ty'  -> TyApp     () (pruneType' ty) (pruneType' ty')
+
+pruneTypesWithThreshold :: Int -> PLC.Term PLC.TyName PLC.Name Integer -> Term PLC.TyName PLC.Name ()
+pruneTypesWithThreshold threshold t0 =
+    let pruneTerm' = pruneTypesWithThreshold threshold
+        pruneType' = pruneTypeWithThreshold  threshold
+    in case t0 of
+           PLC.Var      _ n         -> Var      () (unann n)
+           PLC.LamAbs   _ n ty t    -> LamAbs   () (unann n) (pruneType' ty) (pruneTerm' t)
+           PLC.TyInst   _ t ty      -> TyInst   () (pruneTerm' t) (pruneType' ty)
+           PLC.IWrap    _ ty1 ty2 t -> IWrap    () (pruneType' ty1) (pruneType' ty2) (pruneTerm' t)
+           PLC.TyAbs    _ tn k t    -> TyAbs    () (unann tn) (unann $ fromCoreKind k) (pruneTerm' t)
+           PLC.Apply    _ t1 t2     -> Apply    () (pruneTerm' t1) (pruneTerm' t2)
+           PLC.Unwrap   _ t         -> Unwrap   () (pruneTerm' t)
+           PLC.Error    _ ty        -> Error    () (pruneType' ty)
+           PLC.Constant _ c         -> Constant () (unann $ fromCoreConstant c)
+           PLC.Builtin  _ b         -> Builtin  () (unann $ fromCoreBuiltin b)
+
+pruneProgramTypesWithThreshold :: Int -> PLC.Program PLC.TyName PLC.Name Integer -> Program PLC.TyName PLC.Name ()
+pruneProgramTypesWithThreshold threshold (PLC.Program _ v t) = Program () (unann v) (pruneTypesWithThreshold threshold t)
+
+incrementalTypeMerklisationStatistics ::Prog -> Prog -> Prog -> Prog -> String
+incrementalTypeMerklisationStatistics validator dataVal redeemer valData =
+    let appliedValidator = apply (apply (apply validator dataVal) redeemer) valData
+        numberedValidator = numberProgram validator
+        program = numberedValidator `apply2` (num dataVal) `apply2` (num redeemer) `apply2` (num valData)
+
+        thresholds = map (50*) [0..100]
+        doSerialise thr = serialise $ pruneProgramTypesWithThreshold thr program
+        clen = BSL.length . compress
+        getInfo threshold =
+            let  s = doSerialise threshold
+            in show threshold ++ " " ++ show (BSL.length s) ++ " " ++ show (clen s)
+        statistics = map getInfo thresholds
+     in "\n"
+        ++ Data.List.intercalate "\n" statistics
+
+
 ----- The following stuff should be somewhere else
+
+pruneUntypedTermWithThreshold :: Int -> NumSet -> U.Term C.IntName Integer ->  U.Term C.IntName X
+pruneUntypedTermWithThreshold threshold used = prune
+    where prune (t0 :: U.Term C.IntName Integer) =
+              if not $ Data.Set.member (U.termLoc t0) used
+              then
+                  let t1 = X <$ t0
+                      l = fromIntegral $ BSL.length (serialise t1)
+                  in if  l > threshold
+                     then U.Prune X (merkleHash t1)
+                     else t1
+              else case t0 of
+                     U.Var      _ n     -> U.Var      X (X <$ n)
+                     U.LamAbs   _ n t   -> U.LamAbs   X (X <$ n) (prune t)
+                     U.Apply    _ t1 t2 -> U.Apply    X (prune t1) (prune t2)
+                     U.Error    _       -> U.Error    X
+                     U.Constant _ c     -> U.Constant X (X <$ c)
+                     U.Builtin  _ b     -> U.Builtin  X (X <$ b)
+                     U.Prune    _ p     -> U.Prune    X p
+
+pruneUntypedProgramWithThreshold :: Int -> Data.Set.Set Integer -> U.Program C.IntName Integer -> U.Program C.IntName X
+pruneUntypedProgramWithThreshold threshold used (U.Program _ v t) =
+    U.Program X (X <$ v) (pruneUntypedTermWithThreshold threshold used t)
+
+
+incrementalMerklisationStatistics ::Prog -> Prog -> Prog -> Prog -> String
+incrementalMerklisationStatistics validator dataVal redeemer valData =
+    let appliedValidator = apply (apply (apply validator dataVal) redeemer) valData
+        numberedValidator = numberProgram validator
+        program = numberedValidator `apply2` (num dataVal) `apply2` (num redeemer) `apply2` (num valData)
+        usedNodes =  getUsedNodes $ CekMarker.runCekWithStringBuiltins program
+
+        numTermNodes = PLCSize.programNumTermNodes validator
+        numUsedNodes = Data.Set.size usedNodes
+        strippedValidator       = C.deBruijnToIntProgram . C.deBruijnUntypedProgram . C.erasePLCProgram $ numberedValidator
+        thresholds = [0..400] -- map (50*) [0..100]
+        doSerialise thr = serialise $ pruneUntypedProgramWithThreshold thr usedNodes strippedValidator
+        clen = BSL.length . compress
+        getInfo threshold =
+            let  s = doSerialise threshold
+            in show threshold ++ " " ++ show (BSL.length s) ++ " " ++ show (clen s)
+        statistics = map getInfo thresholds
+     in "\n"
+        ++ Data.List.intercalate "\n" statistics
 
 
 type Prog = PLC.Program PLC.TyName PLC.Name ()
@@ -256,8 +351,8 @@ merklisationStatistics0 program =
          "",
          "After Merklisation",
          " Number of terms used during execution = " ++ (show $ Data.Set.size usedNodes) ,
-         " Remaining nodes: " ++ (show $ M.programSize prunedProgram),
-         " AST size: " ++ (show $ M.astInfo prunedProgram),
+         " Remaining nodes: " ++ (show $ U.programSize prunedProgram),
+         " AST size: " ++ (show $ U.astInfo prunedProgram),
          " Serialised size = " ++ (show $ BSL.length s2) ++ " bytes",
          " Compressed size = " ++ (show $ BSL.length (compress s2)) ++ " bytes",
          "",
@@ -356,6 +451,10 @@ instance Serialise X where
 instance Merklisable X where
     merkleHash _ = merkleHash "X"
 
+stringOfProg :: PrettyBy PrettyConfigPlc a => a -> String
+stringOfProg prog = show . prettyPlcClassicDef $ prog
+
+
 merklisationStatistics2 ::Prog -> Prog -> Prog -> Prog -> String
 merklisationStatistics2 validator dataVal redeemer valData =
     let appliedValidator = apply (apply (apply validator dataVal) redeemer) valData
@@ -379,7 +478,7 @@ merklisationStatistics2 validator dataVal redeemer valData =
         s3b = serialise (X <$ prunedValidator2)
         s3c = serialise (X <$ prunedValidator3)
         s4  = serialise (X <$ strippedPrunedValidator)
-   in "\n"
+   in "\n" -- ++ stringOfProg validator
          ++ "* | " ++ show numTermNodes ++ " | " ++ show numUsedNodes ++ " | "
          ++ (show $ BSL.length s1) ++ " | " ++ (show $ BSL.length s2)
          ++ " | " ++ (show $ BSL.length s3a) ++ " | " ++ (show $ BSL.length s3b) ++ " | " ++ (show $ BSL.length s3c)
@@ -390,3 +489,13 @@ merklisationStatistics2 validator dataVal redeemer valData =
          ++ (show $ clen s3a) ++ " | "  ++ (show $ clen s3b) ++ " | "  ++ (show $ clen s3c)
          ++ " | "  ++ (show $ clen s4) ++ " |"
          ++ "\nPruned term nodes in program: " ++ show (progPrunedTerms prunedValidator1)
+
+
+{- Once we've got the used nodes, traverse the AST;  when we find a used node,
+   save its serialised size together with its number.  When we've got all these
+   pairs, sort them by the serialised size, then incrementally prune more and more
+   nodes, measuring the uncompressed and compressed sizes. -}
+
+{- Remember div/mod / quot/rem / whatever -}
+
+

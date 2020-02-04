@@ -83,7 +83,8 @@ import           Language.PlutusTx.Builtins               as Builtins
 import           LedgerBytes                              (LedgerBytes (..))
 import           Ledger.Orphans                           ()
 
-import Language.PlutusCore.Merkle.Merklise                (merklisationStatistics, merklisationStatistics2)
+import Language.PlutusCore.Merkle.Merklise                (merklisationStatistics, merklisationStatistics2,
+                                                           incrementalMerklisationStatistics, incrementalTypeMerklisationStatistics)
 
 import Debug.Trace
     
@@ -318,7 +319,8 @@ runScript checking (ValidationData valData) (Validator validator) (DataValue dat
         redeemer'   = fromCompiledCode $ liftCode redeemer
         valData'    = fromCompiledCode $ liftCode valData
         appliedValidator = ((validator `applyScript` dataValue') `applyScript` redeemer') `applyScript` valData'
-    Debug.Trace.trace (merklisationStatistics2 (unScript validator) (unScript dataValue') (unScript redeemer') (unScript valData')) $
+    Debug.Trace.trace (incrementalTypeMerklisationStatistics
+                       (unScript validator) (unScript dataValue') (unScript redeemer') (unScript valData')) $
          evaluateScript checking appliedValidator
 
 -- | @()@ as a data script.

@@ -8,15 +8,17 @@
 
 module Language.PlutusCore.Merkle.Merklisable where
 
-import           Codec.Serialise                 (serialise)
+import           Codec.Serialise                     (serialise)
 import           Crypto.Hash
-import qualified Data.ByteArray                  as B
-import qualified Data.ByteString.Lazy            as BSL
-import qualified Data.Text                       as T
-import           Data.Text.Encoding              (encodeUtf8)
-import           GHC.Natural                     (Natural)
-import qualified Language.PlutusCore             as P
-import qualified Language.PlutusCore.Merkle.Type as M
+import qualified Data.ByteArray                      as B
+import qualified Data.ByteString.Lazy                as BSL
+import qualified Data.Text                           as T
+import           Data.Text.Encoding                  (encodeUtf8)
+import           GHC.Natural                         (Natural)
+import qualified Language.PlutusCore                 as P
+import qualified Language.PlutusCore.Merkle.Type     as M
+import qualified Language.PlutusCore.Untyped.Convert as C
+import qualified Language.PlutusCore.Untyped.Term    as U
 
 type Hash = Digest SHA256
 
@@ -105,7 +107,7 @@ instance Merklisable ann => Merklisable (P.Term P.TyName P.Name ann) where
       P.LamAbs   x n ty t    -> merkleHash [merkleHash "LamAbs",   merkleHash x, merkleHash n, merkleHash ty, merkleHash t]
       P.Apply    x t1 t2     -> merkleHash [merkleHash "Apply",    merkleHash x, merkleHash t1, merkleHash t2]
       P.Constant x c         -> merkleHash [merkleHash "Constant", merkleHash x, merkleHash c]
-      P.Builtin  x b         -> merkleHash [merkleHash "Builtin",  merkleHash x, merkleHash x, merkleHash b]
+      P.Builtin  x b         -> merkleHash [merkleHash "Builtin",  merkleHash x, merkleHash b]
       P.TyInst   x t ty      -> merkleHash [merkleHash "TyInst",   merkleHash x, merkleHash t, merkleHash ty]
       P.Unwrap   x t         -> merkleHash [merkleHash "Unwrap",   merkleHash x, merkleHash t]
       P.IWrap    x ty1 ty2 t -> merkleHash [merkleHash "IWrap",    merkleHash x, merkleHash ty1, merkleHash ty2, merkleHash t]
@@ -159,7 +161,7 @@ instance Merklisable ann => Merklisable (M.Term P.TyName P.Name ann) where
       M.LamAbs   x n ty t    -> merkleHash [merkleHash "LamAbs",   merkleHash x, merkleHash n, merkleHash ty, merkleHash t]
       M.Apply    x t1 t2     -> merkleHash [merkleHash "Apply",    merkleHash x, merkleHash t1, merkleHash t2]
       M.Constant x c         -> merkleHash [merkleHash "Constant", merkleHash x, merkleHash c]
-      M.Builtin  x b         -> merkleHash [merkleHash "Builtin",  merkleHash x, merkleHash x, merkleHash b]
+      M.Builtin  x b         -> merkleHash [merkleHash "Builtin",  merkleHash x, merkleHash b]
       M.TyInst   x t ty      -> merkleHash [merkleHash "TyInst",   merkleHash x, merkleHash t, merkleHash ty]
       M.Unwrap   x t         -> merkleHash [merkleHash "Unwrap",   merkleHash x, merkleHash t]
       M.IWrap    x ty1 ty2 t -> merkleHash [merkleHash "IWrap",    merkleHash x, merkleHash ty1, merkleHash ty2, merkleHash t]
@@ -167,5 +169,35 @@ instance Merklisable ann => Merklisable (M.Term P.TyName P.Name ann) where
       M.Prune    _ h         -> h  -- Careful here.
 instance Merklisable ann => Merklisable (M.Program P.TyName P.Name ann) where
     merkleHash (M.Program x version body) = merkleHash [merkleHash "Program", merkleHash x, merkleHash version, merkleHash body]
+
+
+-- Untyped terms
+
+instance Merklisable (C.IntName ann) where
+    merkleHash (C.IntName n) = merkleHash [merkleHash "IntName", merkleHash n]
+
+instance Merklisable ann => Merklisable (U.Builtin ann) where
+    merkleHash = \case
+       U.BuiltinName x name -> merkleHash [merkleHash "BuiltinName", merkleHash x, merkleHash "name"]  -- FIXME
+       U.DynBuiltinName x name -> merkleHash [merkleHash "DynBuiltinName", merkleHash x, merkleHash "name"] --FIXME
+
+instance Merklisable ann => Merklisable (U.Constant ann) where
+    merkleHash = \case
+      U.BuiltinInt x n  -> merkleHash [merkleHash x, merkleHash "BuiltinInt", merkleHash n]
+      U.BuiltinBS  x bs -> merkleHash [merkleHash x, merkleHash "BuiltinBS",  merkleHash bs]
+      U.BuiltinStr x s  -> merkleHash [merkleHash x, merkleHash "BuiltinSer", merkleHash s]
+
+instance Merklisable ann => Merklisable (U.Term C.IntName ann) where
+    merkleHash = \case
+      U.Var      x n         -> merkleHash [merkleHash "Var",      merkleHash x, merkleHash n]
+      U.LamAbs   x n t       -> merkleHash [merkleHash "LamAbs",   merkleHash x, merkleHash n, merkleHash t]
+      U.Apply    x t1 t2     -> merkleHash [merkleHash "Apply",    merkleHash x, merkleHash t1, merkleHash t2]
+      U.Constant x c         -> merkleHash [merkleHash "Constant", merkleHash x, merkleHash c]
+      U.Builtin  x b         -> merkleHash [merkleHash "Builtin",  merkleHash x, merkleHash b]
+      U.Error    x           -> merkleHash [merkleHash "Error",    merkleHash x]
+      U.Prune    _ h         -> h  -- Careful here.
+
+instance Merklisable ann => Merklisable (U.Program C.IntName ann) where
+    merkleHash (U.Program x version body) = merkleHash [merkleHash "Program", merkleHash x, merkleHash version, merkleHash body]
 
 

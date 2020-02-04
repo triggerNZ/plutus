@@ -51,5 +51,6 @@ evaluateCekTrace p =
         let logName       = dynamicTraceName
             logDefinition = dynamicCallAssign logName emit
             env  = insertDynamicBuiltinNameDefinition logDefinition stringBuiltins
-        r <- time $ evaluate $ runCek env p
+--        r <- time $ evaluate $ runCek env p
+        r <- evaluate $ runCek env p
         return r
