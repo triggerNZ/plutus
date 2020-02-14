@@ -286,6 +286,11 @@ pruneUntypedProgramWithThreshold threshold used (U.Program _ v t) =
     U.Program X (X <$ v) (pruneUntypedTermWithThreshold threshold used t)
 
 
+{- Once we've got the used nodes, traverse the AST;  when we find a used node,
+   save its serialised size together with its number.  When we've got all these
+   pairs, sort them by the serialised size, then incrementally prune more and more
+   nodes, measuring the uncompressed and compressed sizes. -}
+
 incrementalMerklisationStatistics ::Prog -> Prog -> Prog -> Prog -> String
 incrementalMerklisationStatistics validator dataVal redeemer valData =
     let appliedValidator = apply (apply (apply validator dataVal) redeemer) valData
@@ -308,6 +313,7 @@ incrementalMerklisationStatistics validator dataVal redeemer valData =
 
 
 type Prog = PLC.Program PLC.TyName PLC.Name ()
+
 componentStatistics ::  Prog -> Prog -> Prog -> Prog -> String
 componentStatistics validator dataVal redeemer ptx =
     let sizes prog = show (PLCSize.astInfo prog) ++ "/" ++ show (BSL.length (serialise prog))
@@ -490,12 +496,62 @@ merklisationStatistics2 validator dataVal redeemer valData =
          ++ " | "  ++ (show $ clen s4) ++ " |"
          ++ "\nPruned term nodes in program: " ++ show (progPrunedTerms prunedValidator1)
 
-
-{- Once we've got the used nodes, traverse the AST;  when we find a used node,
-   save its serialised size together with its number.  When we've got all these
-   pairs, sort them by the serialised size, then incrementally prune more and more
-   nodes, measuring the uncompressed and compressed sizes. -}
-
 {- Remember div/mod / quot/rem / whatever -}
 
+
+sizeStatistics ::Prog -> Prog -> Prog -> Prog -> String
+sizeStatistics validator _dataVal _redeemer _valData =
+    let
+        k = C.deBruijnPLCProgram  validator
+        minimisedTypedValidator   = C.deBruijnToIntPLCProgram  k
+        minimisedUntypedValidator = C.deBruijnToIntProgram . C.deBruijnUntypedProgram . C.erasePLCProgram $ validator
+
+        s1 = serialise (X <$ validator)
+        s2 = serialise (X <$ minimisedTypedValidator)
+        s3 = serialise (X <$ minimisedUntypedValidator)
+        clen = BSL.length . compress
+   in "\n" -- ++ stringOfProg validator
+         ++ "| | Uncompressed | "
+         ++ (show $ BSL.length s1) ++ " | "
+         ++ (show $ BSL.length s2) ++ " | "
+         ++ (show $ BSL.length s3) ++ " | "
+         ++ "\n"
+         ++ "| | Compressed | "
+         ++ (show $ clen s1) ++ " | "
+         ++ (show $ clen s2) ++ " | "
+         ++ (show $ clen s3) ++ " | "
+         ++ "\n"
+
+
+finalMerklisationStatistics ::Prog -> Prog -> Prog -> Prog -> String
+finalMerklisationStatistics validator dataVal redeemer valData =
+    let appliedValidator = apply (apply (apply validator dataVal) redeemer) valData
+        numberedValidator = numberProgram validator
+        program = numberedValidator `apply2` (num dataVal) `apply2` (num redeemer) `apply2` (num valData)
+
+        usedNodes =  getUsedNodes $ CekMarker.runCekWithStringBuiltins program
+        numTermNodes = PLCSize.programNumTermNodes validator
+        numUsedNodes = Data.Set.size usedNodes
+
+        minimisedValidator = C.deBruijnToIntProgram . C.deBruijnUntypedProgram . C.erasePLCProgram $ numberedValidator
+
+        erasedValidator = C.deBruijnToIntProgram . C.deBruijnUntypedProgram . C.erasePLCProgram $ numberedValidator
+        prunedValidator1 = pruneUntypedProgramWithThreshold  34 usedNodes erasedValidator
+        prunedValidator2 = pruneUntypedProgramWithThreshold 150 usedNodes erasedValidator
+
+        clen = BSL.length . compress
+
+        unerased = serialise (X <$ validator)
+        erased  = serialise (X <$ erasedValidator)  -- Unmerklised validator
+        spv1 = serialise (X <$ prunedValidator1)    -- Merklised, optimal threshold for uncompressed code
+        spv2 = serialise (X <$ prunedValidator2)    -- Merklised, optimal threshold for compressed code
+   in "\n" -- ++ stringOfProg validator
+         ++ "* | "  ++ (show $ BSL.length unerased)
+         ++ " | " ++ show numTermNodes
+         ++ " | "  ++ show numUsedNodes
+         ++ " | "  ++ (show $ BSL.length erased)
+         ++ " | "  ++ (show $ BSL.length spv1)
+         ++ " | "  ++ (show $ clen erased)
+         ++ " | " ++ (show $ clen spv2)
+         ++ " | \n"
 
