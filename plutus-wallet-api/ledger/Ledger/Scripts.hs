@@ -88,6 +88,7 @@ import Language.PlutusCore.Merkle.Merklise                (merklisationStatistic
                                                            incrementalMerklisationStatistics,
                                                            incrementalTypeMerklisationStatistics,
                                                            sizeStatistics,
+                                                           totalMerklisationOverhead,
                                                            finalMerklisationStatistics)
 
 import Debug.Trace
@@ -323,7 +324,7 @@ runScript checking (ValidationData valData) (Validator validator) (DataValue dat
         redeemer'   = fromCompiledCode $ liftCode redeemer
         valData'    = fromCompiledCode $ liftCode valData
         appliedValidator = ((validator `applyScript` dataValue') `applyScript` redeemer') `applyScript` valData'
-    Debug.Trace.trace (finalMerklisationStatistics
+    Debug.Trace.trace (incrementalMerklisationStatistics
                        (unScript validator) (unScript dataValue') (unScript redeemer') (unScript valData')) $
          evaluateScript checking appliedValidator
 
