@@ -261,4 +261,3 @@ tyDeBruijnToInt (D.TyDeBruijn n) = deBruijnToInt n
 
 deBruijnToIntPLCProgram :: PLC.Program D.TyDeBruijn D.DeBruijn ann -> PLC.Program IntName IntName ann
 deBruijnToIntPLCProgram = changeNamesProgram deBruijnToInt tyDeBruijnToInt
-
