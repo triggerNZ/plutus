@@ -51,6 +51,7 @@ library
     Language.Marlowe.Client
     Language.Marlowe.Util
     Language.Marlowe.Pretty
+    Language.Marlowe.DSL
   other-modules:
   ghc-options:
     -Wall -Wnoncanonical-monad-instances
