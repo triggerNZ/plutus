@@ -6,9 +6,8 @@
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
 
-module Language.PlutusCore.Merkle.Merklise where
-
-
+module Language.PlutusCore.Merkle.Merklise (analyseScripts)
+where
 
 import qualified Codec.Compression.GZip                          as G
 import qualified Codec.Compression.GZip                          as G
@@ -218,6 +217,9 @@ pruneTerm used pruneType t0 =
 pruneProgram :: Data.Set.Set Integer -> TypePruner -> PLC.Program PLC.TyName PLC.Name Integer -> Program PLC.TyName PLC.Name ()
 pruneProgram used pruneType (PLC.Program _ v t) = Program () (() <$ v) (pruneTerm used pruneType t)
 
+
+-- Merklisation with thresholds
+
 pruneTypeWithThreshold :: Int -> PLC.Type PLC.TyName b -> Type PLC.TyName ()
 pruneTypeWithThreshold threshold ty0 =
     let pruneType' = pruneTypeWithThreshold threshold
@@ -252,6 +254,8 @@ pruneTypesWithThreshold threshold t0 =
 
 pruneProgramTypesWithThreshold :: Int -> PLC.Program PLC.TyName PLC.Name Integer -> Program PLC.TyName PLC.Name ()
 pruneProgramTypesWithThreshold threshold (PLC.Program _ v t) = Program () (() <$ v) (pruneTypesWithThreshold threshold t)
+
+-- Try Merklising with a range of thresholds to see what gives us the best results
 
 incrementalTypeMerklisationStatistics ::Prog -> Prog -> Prog -> Prog -> String
 incrementalTypeMerklisationStatistics validator dataVal redeemer valData =
@@ -513,8 +517,46 @@ merklisationStatistics2 validator dataVal redeemer valData =
          ++ " | "  ++ (show $ clen s4) ++ " |"
          ++ "\nPruned term nodes in program: " ++ show (progPrunedTerms prunedValidator1)
 
-{- Remember div/mod / quot/rem / whatever -}
 
+
+----------------- Type abstraction/instantiation statistics -----------------
+
+data Counts = Counts Integer Integer Integer Integer
+
+instance Semigroup Counts
+    where (Counts a b c d) <> (Counts x y z t) = Counts (a+x) (b+y) (c+z) (d+t)
+
+instance Monoid Counts
+    where mempty = Counts 0 0 0 0
+
+
+analyseTypeApplications :: PLC.Term tyname name () -> Counts
+analyseTypeApplications = f
+    where f = \case
+              PLC.Var{}              -> mempty
+              PLC.Constant{}         -> mempty
+              PLC.Builtin{}          -> mempty
+              PLC.Error _ _          -> mempty
+              PLC.LamAbs _ _ _ t     -> f t
+              PLC.Unwrap _ t         -> f t
+              PLC.IWrap _ _ _ t      -> f t
+              PLC.Apply _ t t'       -> f t <> f t'
+              PLC.TyAbs _ _ _ t      -> f t <> Counts 1 0 0 0
+              PLC.TyInst _ t _       ->
+                  case t of
+                    PLC.TyAbs {} -> f t <> Counts 0 1 1 0
+                    PLC.Var {}   -> Counts 0 1 0 1
+                    _            -> f t <> Counts 0 1 0 0
+
+-- {(abs alpha K M) A} -> M
+
+tyAppStatistics :: Prog -> Prog -> Prog -> Prog -> String
+tyAppStatistics validator _dataVal _redeemer _valData =
+  let PLC.Program _ _ body = validator
+      Counts appcount instcount instappcount instvarcount = analyseTypeApplications body
+  in show appcount ++ "/" ++ show instcount ++ "/" ++ show instappcount ++ "/" ++ show instvarcount
+
+---------------------- Size statistics -----------------
 
 sizeStatistics ::Prog -> Prog -> Prog -> Prog -> String
 sizeStatistics validator _dataVal _redeemer _valData =
@@ -560,15 +602,16 @@ totalMerklisationOverhead validator dataVal redeemer valData =
         overhead s1 s2 =
             let n1 = BSL.length s1
                 n2 = BSL.length s2
-                increase = 100.0 * (fromIntegral n1) / (fromIntegral n2)
+                increase :: Double = 100.0 * (fromIntegral n1) / (fromIntegral n2)
             in Numeric.showFFloat (Just 2) increase "%"
    in "\n"
          ++ "* Uncompressed: "  ++ overhead merklised erased ++ "\n"
          ++ "* Compressed:   "  ++ overhead (compress merklised) (compress erased)
 
 
-
-finalMerklisationStatistics ::Prog -> Prog -> Prog -> Prog -> String
+-- Analyse Merklised validators using near-optimal Merklisation thresholds
+-- as indicated by incrementalMerklisationStatistics.
+finalMerklisationStatistics :: Prog -> Prog -> Prog -> Prog -> String
 finalMerklisationStatistics validator dataVal redeemer valData =
     let appliedValidator = apply (apply (apply validator dataVal) redeemer) valData
         numberedValidator = numberProgram validator
@@ -604,3 +647,11 @@ finalMerklisationStatistics validator dataVal redeemer valData =
          ++ " | " ++ (show $ clen unhashed)
          ++ " | \n"
 
+
+-- The lets us expose one of the analsyes above for use elsewhere:
+-- specifically, this is used in Ledger.Scripts (in plutus-wallet-api)
+-- to enable us to insert some analysis code in the use case tests
+-- at the point where all of the on-chain components are available.
+
+analyseScripts ::  Prog -> Prog -> Prog -> Prog -> String
+analyseScripts = finalMerklisationStatistics

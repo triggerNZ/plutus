@@ -3,6 +3,7 @@
    these effect the size of the CBOR. -}
 
 {-# LANGUAGE DataKinds       #-}
+{-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 --{-# OPTIONS_GHC -fno-warn-unused-imports #-}
@@ -39,7 +40,7 @@ import           Language.Marlowe.Semantics                                    a
 import           Language.PlutusTx                                             as PlutusTx
 
 import qualified Codec.Compression.GZip                                        as G
-import           Codec.Serialise                                               (serialise)
+import           Codec.Serialise                                               (Serialise, serialise, decode, encode)
 import qualified Data.ByteString.Lazy                                          as B
 import           GHC.Int                                                       (Int64)
 import           Numeric
@@ -48,7 +49,7 @@ import           Numeric
 data X = X
 instance Serialise X where
     encode = mempty
-    decode = pure ()
+    decode = pure X
              
 {----------------- Analysis -----------------}
 
@@ -140,34 +141,68 @@ compiledMarloweValidator :: CompiledCode (Ledger.Crypto.PubKey
 
 compiledMarloweValidator = $$(PlutusTx.compile [|| Marlowe.marloweValidator ||])
 
+data Counts = Counts Integer Integer Integer Integer
+                           
+instance Semigroup Counts
+    where (Counts a b c d) <> (Counts x y z t) = Counts (a+x) (b+y) (c+z) (d+t)
+
+instance Monoid Counts
+    where mempty = Counts 0 0 0 0
+
+analyseTypeApplications :: PLC.Term tyname name () -> Counts
+analyseTypeApplications = f 
+    where f = \case
+              PLC.Var{}              -> mempty
+              PLC.Constant{}         -> mempty
+              PLC.Builtin{}          -> mempty
+              PLC.Error _ _          -> mempty
+              PLC.LamAbs _ _ _ t     -> f t
+              PLC.Unwrap _ t         -> f t
+              PLC.IWrap _ _ _ t      -> f t
+              PLC.Apply _ t t'       -> f t <> f t'
+              PLC.TyAbs _ _ _ t      -> f t <> Counts 1 0 0 0
+              PLC.TyInst _ t _       ->
+                  case t of
+                    PLC.TyAbs {} -> f t <> Counts 0 1 1 0
+                    PLC.Var {}   -> Counts 0 1 0 1
+                    _ -> f t <> Counts 0 1 0 0
+
+-- {(abs alpha K M) A} -> M
+                                  
+analyseTyApps :: String -> CompiledCode a -> IO ()
+analyseTyApps name prg = do
+  let PLC.Program _ _ body = PlutusTx.getPlc prg
+      Counts appcount instcount instappcount instvarcount = analyseTypeApplications body
+  putStrLn $ name ++ ": " ++ show appcount ++ "/" ++ show instcount ++ "/" ++ show instappcount ++ "/" ++ show instvarcount
+
 main :: IO ()
 main = do
   printHeader
-  analyseProg    "Crowdfunding"         Crowdfunding.exportedValidator
+  analyseTyApps    "Crowdfunding"         Crowdfunding.exportedValidator
   printSeparator
-  analyseProg    "Currrency"            Currrency.exportedValidator
+  analyseTyApps    "Currrency"            Currrency.exportedValidator
   printSeparator
-  analyseProg    "Escrow"               Escrow.exportedValidator
+  analyseTyApps    "Escrow"               Escrow.exportedValidator
   printSeparator
-  analyseProg    "Future"               Future.exportedValidator
+  analyseTyApps    "Future"               Future.exportedValidator
   printSeparator
-  analyseProg    "Game"                 Game.exportedValidator
+  analyseTyApps    "Game"                 Game.exportedValidator
   printSeparator
-  analyseProg    "GameStateMachine"     GameStateMachine.exportedValidator
+  analyseTyApps    "GameStateMachine"     GameStateMachine.exportedValidator
   printSeparator
-  analyseProg    "MultiSig"             MultiSig.exportedValidator
+  analyseTyApps    "MultiSig"             MultiSig.exportedValidator
   printSeparator
-  analyseProg    "MultiSigStateMachine" MultiSigStateMachine.exportedValidator
+  analyseTyApps    "MultiSigStateMachine" MultiSigStateMachine.exportedValidator
   printSeparator
-  analyseProg    "PubKey"               PubKey.exportedValidator
+  analyseTyApps    "PubKey"               PubKey.exportedValidator
   printSeparator
-  analyseProg    "Swap"                 Swap.exportedValidator
+  analyseTyApps    "Swap"                 Swap.exportedValidator
   printSeparator
-  analyseProg    "TokenAccount"         TokenAccount.exportedValidator
+  analyseTyApps    "TokenAccount"         TokenAccount.exportedValidator
   printSeparator
-  analyseProg    "Vesting"              Vesting.exportedValidator
+  analyseTyApps    "Vesting"              Vesting.exportedValidator
   printSeparator
-  analyseProg    "Marlowe"              compiledMarloweValidator
+  analyseTyApps    "Marlowe"              compiledMarloweValidator
 
 -- Current validator is a little different for Future and PubKey
 
