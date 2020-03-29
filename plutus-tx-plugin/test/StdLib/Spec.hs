@@ -6,32 +6,34 @@
 module StdLib.Spec where
 
 import           Common
-import qualified Data.ByteString.Lazy      as BSL
-import           Data.Ratio                ((%))
-import           GHC.Real                  (reduce)
-import           Hedgehog                  (Gen, MonadGen, Property)
+import qualified Data.ByteString.Lazy         as BSL
+import           Data.Ratio                   ((%))
+import           GHC.Real                     (reduce)
+import           Hedgehog                     (Gen, MonadGen, Property)
 import qualified Hedgehog
-import qualified Hedgehog.Gen              as Gen
-import qualified Hedgehog.Range            as Range
+import qualified Hedgehog.Gen                 as Gen
+import qualified Hedgehog.Range               as Range
 import           PlcTestUtils
 import           Plugin.Lib
-import           Test.Tasty                (TestName)
-import           Test.Tasty.Hedgehog       (testProperty)
+import           Test.Tasty                   (TestName)
+import           Test.Tasty.Hedgehog          (testProperty)
 
-import           Language.PlutusTx.Data    (Data (..))
-import qualified Language.PlutusTx.Data    as Data
-import qualified Language.PlutusTx.Eq      as PlutusTx
-import qualified Language.PlutusTx.Ord     as PlutusTx
-import qualified Language.PlutusTx.Prelude as PlutusTx
-import qualified Language.PlutusTx.Ratio   as Ratio
+import           Language.PlutusTx.Data       (Data (..))
+import qualified Language.PlutusTx.Data       as Data
+import qualified Language.PlutusTx.Eq         as PlutusTx
+import qualified Language.PlutusTx.Ord        as PlutusTx
+import qualified Language.PlutusTx.Prelude    as PlutusTx
+import qualified Language.PlutusTx.Ratio      as Ratio
 
 import           Language.PlutusTx.Code
-import qualified Language.PlutusTx.Lift    as Lift
+import qualified Language.PlutusTx.Lift       as Lift
 import           Language.PlutusTx.Plugin
+
+import qualified Language.PlutusCore.Universe as PLC
 
 {-# ANN module ("HLint: ignore"::String) #-}
 
-roundPlc :: CompiledCode (Ratio.Rational -> Integer)
+roundPlc :: CompiledCode PLC.DefaultUni (Ratio.Rational -> Integer)
 roundPlc = plc @"roundPlc" Ratio.round
 
 tests :: TestNested
@@ -80,8 +82,9 @@ testReduce = Hedgehog.property $ do
 testOrd :: Property
 testOrd = Hedgehog.property $ do
     let gen = Gen.integral (Range.linear (-10000) 100000)
-    n1 <- Hedgehog.forAll $ (%) <$> gen <*> gen
-    n2 <- Hedgehog.forAll $ (%) <$> gen <*> gen
+    let genNonzero = Gen.filter (\i -> not (i == 0)) gen
+    n1 <- Hedgehog.forAll $ (%) <$> gen <*> genNonzero
+    n2 <- Hedgehog.forAll $ (%) <$> gen <*> genNonzero
     let ghcResult = n1 <= n2
         plutusResult = (PlutusTx.<=) (Ratio.fromGHC n1) (Ratio.fromGHC n2)
     Hedgehog.annotateShow ghcResult
@@ -111,5 +114,5 @@ genData =
             , List <$> genList genData
             ]
 
-errorTrace :: CompiledCode (Integer)
+errorTrace :: CompiledCode PLC.DefaultUni (Integer)
 errorTrace = plc @"errorTrace" (PlutusTx.traceErrorH "")

@@ -15,11 +15,6 @@ library
         Marlowe.Symbolic.Types.Response
         Marlowe.Symbolic.Types.API
         Language.Marlowe.Analysis.FSSemantics
-    other-modules:
-        Language.Marlowe.Analysis.FSSet
-        Language.Marlowe.Analysis.IntegerArray
-        Language.Marlowe.Analysis.Numbering
-        Language.Marlowe.Analysis.MkSymb
     hs-source-dirs: src
     default-language: Haskell2010
     build-depends:      aeson >= 1.4.2.0,
@@ -30,10 +25,31 @@ library
                         marlowe,
                         containers,
                         sbv >= 8.4,
-                        plutus-wallet-api,
+                        plutus-tx,
+                        plutus-ledger,
                         process,
                         servant,
                         servant-client -any,
                         template-haskell,
                         utf8-string,
                         wl-pprint
+test-suite marlowe-symbolic-test
+    other-modules: Tests
+                   OldAnalysis.FSMap
+                   OldAnalysis.FSSemantics
+                   OldAnalysis.FSSet
+                   OldAnalysis.IntegerArray
+                   OldAnalysis.MkSymb
+                   OldAnalysis.Numbering
+    type: exitcode-stdio-1.0
+    main-is: Spec.hs
+    hs-source-dirs: test
+    default-language: Haskell2010
+    build-depends:      base >= 4.9,
+                        containers,
+                        marlowe,
+                        marlowe-symbolic,
+                        plutus-ledger,
+                        sbv >= 8.4,
+                        template-haskell,
+                        QuickCheck

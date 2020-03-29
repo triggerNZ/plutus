@@ -6,7 +6,7 @@ import Data.Array (snoc)
 import Data.Either (Either(..))
 import Data.Identity (Identity)
 import Data.Integral (fromIntegral)
-import Data.Lens (modifying, over, use, (^.))
+import Data.Lens (modifying, over, (^.))
 import Data.List.NonEmpty as NEL
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap, wrap)
@@ -14,11 +14,11 @@ import Data.Tuple (Tuple(..))
 import Editor as Editor
 import Examples.Marlowe.Contracts as Contracts
 import Marlowe.Semantics (AccountId(..), ChoiceId(..), Contract(..), Input(..), Token(..), Party(..))
-import MonadApp (class MonadApp, applyTransactions, extendWith, marloweEditorSetAnnotations, updateContractInState, updateContractInStateP, updateMarloweState, updatePossibleActions, updateStateP)
+import MonadApp (class MonadApp, applyTransactions, extendWith, updateContractInState, updateContractInStateP, updateMarloweState, updatePossibleActions, updateStateP)
 import Network.RemoteData (RemoteData(..))
 import Test.Unit (TestSuite, suite, test)
 import Test.Unit.Assert (equal)
-import Types (FrontendState(..), View(..), _Head, _contract, _currentMarloweState, _editorErrors, _marloweState, _pendingInputs, _transactionError, emptyMarloweState)
+import Types (FrontendState(..), HelpContext(..), SimulationBottomPanelView(..), View(..), _Head, _contract, _currentMarloweState, _marloweState, _pendingInputs, _transactionError, emptyMarloweState)
 
 -- | For these tests we only need to worry about the MarloweState that is being carried around
 --   However we can use similar techniques to mock other parts of the App
@@ -44,18 +44,16 @@ instance monadAppState :: MonadApp MockApp where
   haskellEditorGetValue = pure Nothing
   haskellEditorSetAnnotations _ = pure unit
   haskellEditorHandleAction _ = pure unit
+  haskellEditorResize = pure unit
   marloweEditorSetValue _ _ = pure unit
   marloweEditorGetValue = pure (Just Contracts.escrow)
-  marloweEditorHandleAction _ = pure unit
-  marloweEditorSetAnnotations _ = pure unit
   marloweEditorMoveCursorToPosition _ = pure unit
+  marloweEditorResize = pure unit
+  marloweEditorSetMarkers _ = pure unit
   preventDefault _ = pure unit
   readFileFromDragEvent _ = pure ""
   updateContractInState contract = do
     updateContractInStateImpl contract
-    annotations <- use (_marloweState <<< _Head <<< _editorErrors)
-    marloweEditorSetAnnotations annotations
-  updateState = wrap $ modifying _currentMarloweState updateStateP
   saveInitialState = pure unit
   updateMarloweState f = wrap $ modifying _marloweState (extendWith f)
   applyTransactions = wrap $ modifying _marloweState (extendWith updateStateP)
@@ -69,7 +67,7 @@ instance monadAppState :: MonadApp MockApp where
   postContractHaskell _ = pure Loading
   resizeBlockly = pure Nothing
   setBlocklyCode _ = pure unit
-  checkContractForWarnings _ = pure unit
+  checkContractForWarnings _ _ = pure unit
 
 updateContractInStateImpl :: String -> MockApp Unit
 updateContractInStateImpl contract = modifying _currentMarloweState (updatePossibleActions <<< updateContractInStateP contract)
@@ -78,17 +76,22 @@ initialState :: FrontendState
 initialState =
   FrontendState
     { view: HaskellEditor
+    , simulationBottomPanelView: CurrentStateView
     , editorPreferences: Editor.Preferences { keyBindings: Editor.Ace }
     , compilationResult: NotAsked
     , marloweCompileResult: Right unit
     , authStatus: NotAsked
     , createGistResult: NotAsked
+    , loadGistResult: Right NotAsked
     , marloweState: NEL.singleton (emptyMarloweState zero)
     , oldContract: Nothing
     , gistUrl: Nothing
     , blocklyState: Nothing
     , analysisState: NotAsked
     , selectedHole: Nothing
+    , helpContext: MarloweHelp
+    , showRightPanel: true
+    , showBottomPanel: true
     }
 
 runTests :: forall a. MockApp a -> Tuple a FrontendState

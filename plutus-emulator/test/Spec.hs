@@ -38,6 +38,8 @@ import qualified Language.PlutusTx.Prelude  as PlutusTx
 import           Language.PlutusTx.AssocMap as AssocMap
 import           Ledger
 import qualified Ledger.Ada                 as Ada
+import           Ledger.Generators          (Mockchain(Mockchain))
+import qualified Ledger.Generators          as Gen
 import qualified Ledger.Index               as Index
 import           Ledger.Typed.Scripts       (wrapValidator)
 import qualified Ledger.Value               as Value
@@ -53,9 +55,7 @@ import qualified Wallet.Emulator.NodeClient as NC
 import qualified Wallet.Emulator.Chain as Chain
 import qualified Wallet.Emulator.Wallet as Wallet
 import           Wallet.Emulator.Types
-import qualified Wallet.Generators          as Gen
 import qualified Wallet.Emulator.Generators          as Gen
-import           Wallet.Generators          (Mockchain(Mockchain))
 import qualified Wallet.Graph
 
 
@@ -212,13 +212,13 @@ invalidScript = property $ do
 
     -- modify one of the outputs to be a script output
     index <- forAll $ Gen.int (Range.linear 0 ((length $ txOutputs txn1) -1))
-    let scriptTxn = txn1 & outputs . element index %~ \o -> scriptTxOut (txOutValue o) failValidator unitData
+    let scriptTxn = txn1 & outputs . element index %~ \o -> scriptTxOut (txOutValue o) failValidator unitDatum
     Hedgehog.annotateShow (scriptTxn)
     let outToSpend = (txOutRefs scriptTxn) !! index
     let totalVal = Ada.fromValue $ txOutValue (fst outToSpend)
 
     -- try and spend the script output
-    invalidTxn <- forAll $ Gen.genValidTransactionSpending (Set.fromList [scriptTxIn (snd outToSpend) failValidator unitRedeemer unitData]) totalVal
+    invalidTxn <- forAll $ Gen.genValidTransactionSpending (Set.fromList [scriptTxIn (snd outToSpend) failValidator unitRedeemer unitDatum]) totalVal
     Hedgehog.annotateShow (invalidTxn)
 
     let (result, st) = Gen.runTrace m $ do

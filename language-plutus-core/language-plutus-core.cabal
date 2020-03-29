@@ -29,12 +29,14 @@ library
         Language.PlutusCore.Evaluation.Machine.ExBudgeting
         Language.PlutusCore.Evaluation.Machine.Exception
         Language.PlutusCore.Evaluation.Machine.ExMemory
+        Language.PlutusCore.Evaluation.Evaluator
         Language.PlutusCore.Evaluation.Result
         Language.PlutusCore.Check.Value
         Language.PlutusCore.Check.Normal
         Language.PlutusCore.CBOR
         Language.PlutusCore.Constant
         Language.PlutusCore.Constant.Dynamic
+        Language.PlutusCore.Universe
         Language.PlutusCore.Rename.Internal
         Language.PlutusCore.Rename.Monad
         Language.PlutusCore.Rename
@@ -56,6 +58,7 @@ library
         Language.PlutusCore.StdLib.Data.Nat
         Language.PlutusCore.StdLib.Data.Sum
         Language.PlutusCore.StdLib.Data.Unit
+        Language.PlutusCore.StdLib.Data.ScottUnit
         Language.PlutusCore.StdLib.Everything
         Language.PlutusCore.StdLib.Meta
         Language.PlutusCore.StdLib.Meta.Data.Tuple
@@ -92,11 +95,9 @@ library
         Language.PlutusCore.Constant.Dynamic.BuiltinName
         Language.PlutusCore.Constant.Dynamic.Call
         Language.PlutusCore.Constant.Dynamic.Emit
-        Language.PlutusCore.Constant.Dynamic.Instances
         Language.PlutusCore.Constant.Dynamic.OnChain
         Language.PlutusCore.Constant.Dynamic.OffChain
         Language.PlutusCore.Constant.Function
-        Language.PlutusCore.Constant.Make
         Language.PlutusCore.Constant.Name
         Language.PlutusCore.Constant.Typed
         Language.PlutusCore.Lexer.Type
@@ -108,6 +109,8 @@ library
         Language.PlutusCore.Pretty.Plc
         Language.PlutusCore.Pretty.Readable
         Language.PlutusCore.Pretty.Utils
+        Language.PlutusCore.Universe.Core
+        Language.PlutusCore.Universe.Default
         Language.PlutusCore.Error
         Language.PlutusCore.Size
         Language.PlutusCore.TypeCheck.Internal
@@ -149,9 +152,11 @@ library
         containers -any,
         cryptonite -any,
         cryptonite,
-        deepseq -any,
         dependent-map -any,
         dependent-sum -any,
+        dependent-sum-template -any,
+        deriving-compat -any,
+        deepseq -any,
         filepath -any,
         hashable,
         hedgehog <1.0,
@@ -169,6 +174,7 @@ library
         tasty-golden -any,
         template-haskell -any,
         text -any,
+        th-lift -any,
         th-lift-instances -any,
         transformers -any
 
@@ -261,3 +267,19 @@ benchmark language-plutus-core-weigh
         language-plutus-core -any,
         serialise -any,
         weigh -any
+
+executable plc
+    main-is: Main.hs
+    hs-source-dirs: exe
+    default-language: Haskell2010
+    ghc-options: -Wall -Wincomplete-uni-patterns
+                 -Wincomplete-record-updates -Wredundant-constraints -Widentities
+    build-depends:
+        base <5,
+        language-plutus-core -any,
+        transformers -any,
+        bytestring -any,
+        text -any,
+        lens -any,
+        prettyprinter -any,
+        optparse-applicative -any

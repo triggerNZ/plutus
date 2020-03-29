@@ -80,7 +80,7 @@ library
         playground-common -any,
         plutus-emulator -any,
         plutus-playground-lib -any,
-        plutus-wallet-api -any,
+        plutus-ledger -any,
         plutus-tx -any,
         process -any,
         regex-compat -any,
@@ -142,7 +142,7 @@ library plutus-playground-usecases
         plutus-emulator -any,
         plutus-playground-lib -any,
         plutus-tx -any,
-        plutus-wallet-api -any,
+        plutus-ledger -any,
         recursion-schemes -any,
         row-types -any,
         text -any,
@@ -218,7 +218,7 @@ executable plutus-playground-server
         wai-extra -any,
         plutus-contract -any,
         plutus-emulator -any,
-        plutus-wallet-api -any,
+        plutus-ledger -any,
         recursion-schemes -any,
         row-types -any,
         warp -any,
@@ -255,7 +255,7 @@ test-suite plutus-playground-server-test
         plutus-playground-lib -any,
         plutus-playground-server -any,
         plutus-tx -any,
-        plutus-wallet-api -any,
+        plutus-ledger -any,
         plutus-playground-usecases -any,
         plutus-emulator -any,
         tasty -any,
@@ -263,7 +263,7 @@ test-suite plutus-playground-server-test
         text -any,
         time-units -any,
         transformers -any,
-        plutus-wallet-api -any
+        plutus-ledger -any
 
     if !(impl(ghcjs) || os(ghcjs))
         build-depends: plutus-tx-plugin -any

@@ -13,7 +13,7 @@ import Data.Foldable (class Foldable)
 import Data.NonEmpty (NonEmpty, foldl1, (:|))
 import Data.String.CodeUnits (fromCharArray)
 import Marlowe.Holes (AccountId(..), Action(..), Case(..), Party(..), ChoiceId(..), Contract(..), Observation(..), Payee(..), Term(..), Token(..), Value(..), ValueId(..), Bound(..))
-import Marlowe.Semantics (CurrencySymbol, Input(..), PubKey, Slot(..), SlotInterval(..), Timeout, TokenName, TransactionInput(..), TransactionWarning(..))
+import Marlowe.Semantics (Rational(..), CurrencySymbol, Input(..), PubKey, Slot(..), SlotInterval(..), Timeout, TokenName, TransactionInput(..), TransactionWarning(..))
 import Marlowe.Semantics as S
 import Text.Parsing.StringParser (Pos)
 import Type.Proxy (Proxy(..))
@@ -28,6 +28,12 @@ oneOf = foldl1 Gen.choose
 
 genBigInteger :: forall m. MonadGen m => MonadRec m => m BigInteger
 genBigInteger = BigInteger.fromInt <$> chooseInt bottom top
+
+genRational :: forall m. MonadGen m => MonadRec m => m Rational
+genRational = do
+  n <- genBigInteger
+  d <- genBigInteger
+  pure $ Rational n d
 
 genSlot :: forall m. MonadGen m => MonadRec m => m Slot
 genSlot = Slot <$> genBigInteger
@@ -80,14 +86,14 @@ genHole :: forall m a. MonadGen m => MonadRec m => m (Term a)
 genHole = do
   name <- suchThat genString (\s -> s /= "")
   proxy <- pure (Proxy :: Proxy a)
-  start <- genPosition
-  end <- genPosition
-  pure $ Hole name proxy start end
+  row <- genPosition
+  column <- genPosition
+  pure $ Hole name proxy { row, column }
 
 genTerm :: forall m a. MonadGen m => MonadRec m => MonadAsk Boolean m => m a -> m (Term a)
 genTerm g = do
   withHoles <- ask
-  oneOf $ (Term <$> g <*> pure 0 <*> pure 0) :| (if withHoles then [ genHole ] else [])
+  oneOf $ (Term <$> g <*> pure { row: 0, column: 0 }) :| (if withHoles then [ genHole ] else [])
 
 genAccountId :: forall m. MonadGen m => MonadRec m => MonadAsk Boolean m => m AccountId
 genAccountId = do
@@ -173,6 +179,7 @@ genValue' size
             , NegValue <$> genNewValue
             , AddValue <$> genNewValue <*> genNewValue
             , SubValue <$> genNewValue <*> genNewValue
+            , Scale <$> genTerm genRational <*> genNewValue
             , ChoiceValue <$> genTerm genChoiceId <*> genNewValue
             , UseValue <$> genTerm genValueId
             ]

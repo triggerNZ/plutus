@@ -1,7 +1,6 @@
 module Types where
 
 import API (RunResult)
-import Ace (Annotation)
 import Ace.Halogen.Component (AceMessage, AceQuery)
 import Auth (AuthStatus)
 import Blockly.Types (BlocklyState)
@@ -27,10 +26,12 @@ import Gist (Gist)
 import Gists (GistAction)
 import Halogen as H
 import Halogen.Blockly (BlocklyQuery, BlocklyMessage)
+import Halogen.Monaco as Monaco
 import Language.Haskell.Interpreter (InterpreterError, InterpreterResult)
 import Marlowe.Holes (Holes, MarloweHole)
 import Marlowe.Semantics (AccountId, Action(..), Assets, Bound, ChoiceId, ChosenNum, Contract, Environment(..), Input, Party, Payment, PubKey, Slot, SlotInterval(..), State, Token, TransactionError, TransactionWarning, _minSlot, boundFrom, emptyState, evalValue)
 import Marlowe.Symbolic.Types.Response (Result)
+import Monaco (IMarker)
 import Network.RemoteData (RemoteData)
 import Prelude (class Eq, class Ord, class Show, Unit, map, mempty, min, zero, (<<<))
 import Servant.PureScript.Ajax (AjaxError)
@@ -47,10 +48,10 @@ data HQuery a
 
 data HAction
   -- Haskell Editor
-  = MarloweHandleEditorMessage AceMessage
+  = MarloweHandleEditorMessage Monaco.Message
   | MarloweHandleDragEvent DragEvent
   | MarloweHandleDropEvent DragEvent
-  | MarloweMoveToPosition Pos
+  | MarloweMoveToPosition Pos Pos
   | HaskellEditorAction Editor.Action
   -- Gist support.
   | CheckAuthStatus
@@ -71,6 +72,11 @@ data HAction
   | Undo
   | SelectHole (Maybe String)
   | InsertHole String MarloweHole (Array MarloweHole)
+  -- simulation view
+  | ChangeSimulationView SimulationBottomPanelView
+  | ChangeHelpContext HelpContext
+  | ShowRightPanel Boolean
+  | ShowBottomPanel Boolean
   -- blockly
   | HandleBlocklyMessage BlocklyMessage
   | SetBlocklyCode
@@ -83,7 +89,7 @@ data Message
 ------------------------------------------------------------
 type ChildSlots
   = ( haskellEditorSlot :: H.Slot AceQuery AceMessage Unit
-    , marloweEditorSlot :: H.Slot AceQuery AceMessage Unit
+    , marloweEditorSlot :: H.Slot Monaco.Query Monaco.Message Unit
     , blocklySlot :: H.Slot BlocklyQuery BlocklyMessage Unit
     )
 
@@ -109,20 +115,38 @@ derive instance genericView :: Generic View _
 instance showView :: Show View where
   show = genericShow
 
+data SimulationBottomPanelView
+  = CurrentStateView
+  | StaticAnalysisView
+  | MarloweErrorsView
+  | MarloweWarningsView
+
+derive instance eqSimulationBottomPanelView :: Eq SimulationBottomPanelView
+
+derive instance genericSimulationBottomPanelView :: Generic SimulationBottomPanelView _
+
+instance showSimulationBottomPanelView :: Show SimulationBottomPanelView where
+  show = genericShow
+
 newtype FrontendState
   = FrontendState
   { view :: View
+  , simulationBottomPanelView :: SimulationBottomPanelView
   , editorPreferences :: Editor.Preferences
   , compilationResult :: WebData (JsonEither InterpreterError (InterpreterResult RunResult))
   , marloweCompileResult :: Either (Array MarloweError) Unit
   , authStatus :: WebData AuthStatus
   , createGistResult :: WebData Gist
+  , loadGistResult :: Either String (WebData Gist)
   , gistUrl :: Maybe String
   , marloweState :: NonEmptyList MarloweState
   , oldContract :: Maybe String
   , blocklyState :: Maybe BlocklyState
   , analysisState :: RemoteData String Result
   , selectedHole :: Maybe String
+  , helpContext :: HelpContext
+  , showRightPanel :: Boolean
+  , showBottomPanel :: Boolean
   }
 
 derive instance newtypeFrontendState :: Newtype FrontendState _
@@ -132,6 +156,12 @@ data MarloweError
 
 _view :: Lens' FrontendState View
 _view = _Newtype <<< prop (SProxy :: SProxy "view")
+
+_simulationBottomPanelView :: Lens' FrontendState SimulationBottomPanelView
+_simulationBottomPanelView = _Newtype <<< prop (SProxy :: SProxy "simulationBottomPanelView")
+
+_helpContext :: Lens' FrontendState HelpContext
+_helpContext = _Newtype <<< prop (SProxy :: SProxy "helpContext")
 
 _editorPreferences :: Lens' FrontendState Editor.Preferences
 _editorPreferences = _Newtype <<< prop (SProxy :: SProxy "editorPreferences")
@@ -147,6 +177,9 @@ _authStatus = _Newtype <<< prop (SProxy :: SProxy "authStatus")
 
 _createGistResult :: Lens' FrontendState (WebData Gist)
 _createGistResult = _Newtype <<< prop (SProxy :: SProxy "createGistResult")
+
+_loadGistResult :: Lens' FrontendState (Either String (WebData Gist))
+_loadGistResult = _Newtype <<< prop (SProxy :: SProxy "loadGistResult")
 
 _gistUrl :: Lens' FrontendState (Maybe String)
 _gistUrl = _Newtype <<< prop (SProxy :: SProxy "gistUrl")
@@ -165,6 +198,12 @@ _analysisState = _Newtype <<< prop (SProxy :: SProxy "analysisState")
 
 _selectedHole :: Lens' FrontendState (Maybe String)
 _selectedHole = _Newtype <<< prop (SProxy :: SProxy "selectedHole")
+
+_showRightPanel :: Lens' FrontendState Boolean
+_showRightPanel = _Newtype <<< prop (SProxy :: SProxy "showRightPanel")
+
+_showBottomPanel :: Lens' FrontendState Boolean
+_showBottomPanel = _Newtype <<< prop (SProxy :: SProxy "showBottomPanel")
 
 -- editable
 _timestamp ::
@@ -193,7 +232,8 @@ type MarloweState
     , slot :: Slot
     , moneyInContract :: Assets
     , contract :: Maybe Contract
-    , editorErrors :: Array Annotation
+    , editorErrors :: Array IMarker
+    , editorWarnings :: Array IMarker
     , holes :: Holes
     , payments :: Array Payment
     }
@@ -225,6 +265,9 @@ _contract = prop (SProxy :: SProxy "contract")
 _editorErrors :: forall s a. Lens' { editorErrors :: a | s } a
 _editorErrors = prop (SProxy :: SProxy "editorErrors")
 
+_editorWarnings :: forall s a. Lens' { editorWarnings :: a | s } a
+_editorWarnings = prop (SProxy :: SProxy "editorWarnings")
+
 _holes :: forall s a. Lens' { holes :: a | s } a
 _holes = prop (SProxy :: SProxy "holes")
 
@@ -251,7 +294,8 @@ emptyMarloweState sn =
   , slot: zero
   , moneyInContract: mempty
   , contract: Nothing
-  , editorErrors: []
+  , editorErrors: mempty
+  , editorWarnings: mempty
   , holes: mempty
   , payments: []
   }
@@ -285,3 +329,13 @@ actionToActionInput state (Deposit accountId party token value) =
 actionToActionInput _ (Choice choiceId bounds) = Tuple (ChoiceInputId choiceId bounds) (ChoiceInput choiceId bounds (minimumBound bounds))
 
 actionToActionInput _ (Notify _) = Tuple NotifyInputId NotifyInput
+
+data HelpContext
+  = MarloweHelp
+  | InputComposerHelp
+  | TransactionComposerHelp
+
+derive instance genericHelpContext :: Generic HelpContext _
+
+instance showHelpContext :: Show HelpContext where
+  show = genericShow

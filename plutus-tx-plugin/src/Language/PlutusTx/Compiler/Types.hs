@@ -1,7 +1,9 @@
 {-# LANGUAGE ConstraintKinds   #-}
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE Rank2Types        #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Language.PlutusTx.Compiler.Types where
 
@@ -11,6 +13,7 @@ import           Language.PlutusTx.PLCTypes
 import           Language.PlutusIR.Compiler.Definitions
 
 import           Language.PlutusCore.Quote
+import qualified Language.PlutusCore.Universe           as PLC
 
 import qualified FamInstEnv                             as GHC
 import qualified GhcPlugins                             as GHC
@@ -30,12 +33,12 @@ type BuiltinNameInfo = Map.Map TH.Name GHC.TyThing
 -- | Compilation options. Empty currently.
 data CompileOptions = CompileOptions {}
 
-data CompileContext = CompileContext {
+data CompileContext uni = CompileContext {
     ccOpts            :: CompileOptions,
     ccFlags           :: GHC.DynFlags,
     ccFamInstEnvs     :: GHC.FamInstEnvs,
     ccBuiltinNameInfo :: BuiltinNameInfo,
-    ccScopes          :: ScopeStack,
+    ccScopes          :: ScopeStack uni,
     ccBlackholed      :: Set.Set GHC.Name
     }
 
@@ -107,12 +110,19 @@ stableModuleCmp m1 m2 =
     (GHC.moduleUnitId m1 `GHC.stableUnitIdCmp` GHC.moduleUnitId m2)
 
 -- See Note [Scopes]
-type Compiling m = (Monad m, MonadError CompileError m, MonadQuote m, MonadReader CompileContext m, MonadState CompileState m, MonadDefs LexName () m)
+type Compiling uni m =
+    ( Monad m
+    , MonadError (CompileError uni) m
+    , MonadQuote m
+    , MonadReader (CompileContext uni) m
+    , MonadState CompileState m
+    , MonadDefs LexName uni () m,
+    uni `PLC.IncludesAll` [Bool, ()] )
 
-blackhole :: MonadReader CompileContext m => GHC.Name -> m a -> m a
+blackhole :: MonadReader (CompileContext uni) m => GHC.Name -> m a -> m a
 blackhole name = local (\cc -> cc {ccBlackholed=Set.insert name (ccBlackholed cc)})
 
-blackholed :: MonadReader CompileContext m => GHC.Name -> m Bool
+blackholed :: MonadReader (CompileContext uni) m => GHC.Name -> m Bool
 blackholed name = do
     CompileContext {ccBlackholed=bh} <- ask
     pure $ Set.member name bh
@@ -126,8 +136,8 @@ appropriately.
 So we have the usual mechanism of carrying around a stack of scopes.
 -}
 
-data Scope = Scope (Map.Map GHC.Name PLCVar) (Map.Map GHC.Name PLCTyVar)
-type ScopeStack = NE.NonEmpty Scope
+data Scope uni = Scope (Map.Map GHC.Name (PLCVar uni)) (Map.Map GHC.Name PLCTyVar)
+type ScopeStack uni = NE.NonEmpty (Scope uni)
 
-initialScopeStack :: ScopeStack
+initialScopeStack :: ScopeStack uni
 initialScopeStack = pure $ Scope Map.empty Map.empty

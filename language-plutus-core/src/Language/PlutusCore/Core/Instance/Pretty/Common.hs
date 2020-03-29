@@ -30,6 +30,7 @@ instance Pretty BuiltinName where
     pretty SHA2                 = "sha2_256"
     pretty SHA3                 = "sha3_256"
     pretty VerifySignature      = "verifySignature"
+    pretty IfThenElse           = "ifThenElse"
 
 instance Pretty DynamicBuiltinName where
     pretty (DynamicBuiltinName n) = pretty n
@@ -38,10 +39,9 @@ instance Pretty StagedBuiltinName where
     pretty (StaticStagedBuiltinName  n) = pretty n
     pretty (DynamicStagedBuiltinName n) = pretty n
 
-instance Pretty TypeBuiltin where
-    pretty TyInteger    = "integer"
-    pretty TyByteString = "bytestring"
-    pretty TyString     = "string"
+instance Pretty (Builtin ann) where
+    pretty (BuiltinName    _ n) = pretty n
+    pretty (DynBuiltinName _ n) = pretty n
 
 instance Pretty (Version ann) where
     pretty (Version _ i j k) = pretty i <> "." <> pretty j <> "." <> pretty k

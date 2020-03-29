@@ -19,7 +19,7 @@ open import Builtin.Constant.Type
 open import Builtin.Constant.Term Ctx⋆ Kind * _⊢Nf⋆_ con
 open import Untyped
 open import Builtin.Signature Ctx⋆ Kind
-  ∅ _,⋆_ * _∋⋆_ Z S _⊢Nf⋆_ (ne ∘ `) con booleanNf
+  ∅ _,⋆_ * _∋⋆_ Z S _⊢Nf⋆_ (ne ∘ `) con
 open import Type.BetaNBE.RenamingSubstitution
 open import Data.Sum as S
 open import Relation.Binary.PropositionalEquality hiding ([_])
@@ -158,8 +158,9 @@ erase-BUILTIN verifySignature Γ σ _
   (A.V-con (bytestring b) ,, A.V-con (bytestring b') ,, A.V-con (bytestring b'') ,, tt) =
   erase-VERIFYSIG _
 erase-BUILTIN equalsByteString Γ σ _
-  (A.V-con (bytestring b) ,, A.V-con (bytestring b') ,, tt) =
-  erase-if (equals b b') _ _     
+  (A.V-con (bytestring b) ,, A.V-con (bytestring b') ,, tt) = refl
+erase-BUILTIN ifThenElse Γ σ _ (A.V-con (bool B.false) ,, vt ,, vu) = refl
+erase-BUILTIN ifThenElse Γ σ _ (A.V-con (bool B.true)  ,, vt ,, vu) = refl
 \end{code}
 
 \begin{code}
@@ -175,8 +176,8 @@ erase—→ (A.ξ-·₂ {V = V} p q)                            = map
   (erase—→ q)
 erase—→ (A.ξ-·⋆ p)                                      =
   map U.ξ-·₁ (cong (_· plc_dummy)) (erase—→ p)
-erase—→ (A.β-ƛ {N = N}{W = W})                   =
-  inj₁ (subst ((ƛ (erase N) · erase W) U.—→_) (lem[] N W) U.β-ƛ)
+erase—→ (A.β-ƛ {N = N}{V = V} _)                   =
+  inj₁ (subst ((ƛ (erase N) · erase V) U.—→_) (lem[] N V) U.β-ƛ)
 erase—→ (A.β-Λ {N = N}{A = A})                          =
   inj₁ (subst (ƛ (U.weaken (erase N)) · plc_dummy U.—→_)
               (trans (trans (sym (U.sub-ren
@@ -186,7 +187,7 @@ erase—→ (A.β-Λ {N = N}{A = A})                          =
                             (sym (U.sub-id  (erase N))))
                      (lem[]⋆ N A))
               U.β-ƛ)
-erase—→ A.β-wrap1                                       = inj₂ refl
+erase—→ (A.β-wrap1 p)                                   = inj₂ refl
 erase—→ (A.ξ-unwrap1 p)                                 = erase—→ p
 erase—→ (A.ξ-wrap p)                                    = erase—→ p
 erase—→ (A.β-builtin bn σ tel vtel)                     = inj₁ (subst

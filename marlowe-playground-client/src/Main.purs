@@ -38,7 +38,6 @@ ajaxSettings = SPSettings_ $ (settings { decodeJson = decodeJson, encodeJson = e
 main ::
   Effect Unit
 main = do
-  -- TODO: need to get the proper url, same as the client
   window <- W.window
   location <- WW.location window
   protocol <- WL.protocol location
@@ -55,7 +54,7 @@ main = do
   runHalogenAff do
     body <- awaitBody
     driver <- runUI (hoist (flip runReaderT ajaxSettings) mainFrame) unit body
-    driver.subscribe $ wsSender socket
+    driver.subscribe $ wsSender socket driver.query
     void $ forkAff $ runProcess (wsProducer socket $$ wsConsumer driver.query)
     forkAff $ runProcess watchLocalStorageProcess
 

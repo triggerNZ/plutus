@@ -3,19 +3,18 @@ module MonadApp where
 import Prelude
 import API (RunResult)
 import Ace (Annotation, Editor)
-import Ace as Ace
 import Ace.EditSession as Session
 import Ace.Editor as AceEditor
 import Auth (AuthStatus)
 import Control.Monad.Except (class MonadTrans, ExceptT, runExceptT)
 import Control.Monad.Reader (class MonadAsk)
 import Control.Monad.State (class MonadState)
-import Data.Array (fold, fromFoldable)
+import Data.Array (filter, fromFoldable)
 import Data.Either (Either(..))
 import Data.Foldable (foldl)
 import Data.FoldableWithIndex (foldlWithIndex)
 import Data.Json.JsonEither (JsonEither)
-import Data.Lens (assign, modifying, over, set, to, use, view, (^.))
+import Data.Lens (assign, modifying, over, set, to, view, (^.))
 import Data.List as List
 import Data.List.NonEmpty as NEL
 import Data.List.Types (NonEmptyList)
@@ -23,7 +22,6 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype, unwrap, wrap)
-import Data.Set as Set
 import Data.Tuple (Tuple(..), fst)
 import Editor as Editor
 import Effect.Aff.Class (class MonadAff)
@@ -34,23 +32,23 @@ import Gist (Gist, GistId, NewGist)
 import Global.Unsafe (unsafeStringify)
 import Halogen (HalogenM, liftAff, liftEffect, query, raise)
 import Halogen.Blockly (BlocklyQuery(..))
+import Halogen.Monaco as Monaco
 import Language.Haskell.Interpreter (InterpreterError, InterpreterResult, SourceCode)
 import Marlowe (SPParams_)
 import Marlowe as Server
-import Marlowe.Holes (Holes(..), MarloweHole(..), fromTerm)
-import Marlowe.Linter (Position, lint)
+import Marlowe.Holes (fromTerm)
+import Marlowe.Linter (lint)
 import Marlowe.Linter as L
-import Marlowe.Parser (parseTerm, contract)
+import Marlowe.Parser (parseContract)
 import Marlowe.Semantics (ChoiceId(..), Contract(..), Party(..), PubKey, SlotInterval(..), TransactionInput(..), TransactionOutput(..), computeTransaction, extractRequiredActionsWithTxs, moneyInContract)
+import Monaco (IMarker, IPosition, isError, isWarning)
 import Network.RemoteData as RemoteData
 import Servant.PureScript.Ajax (AjaxError)
 import Servant.PureScript.Settings (SPSettings_)
 import StaticData (bufferLocalStorageKey, marloweBufferLocalStorageKey)
-import Text.Parsing.StringParser (ParseError, Pos)
-import Text.Parsing.StringParser.Basic (posToRowAndColumn, runParser')
-import Types (ActionInput(..), ActionInputId, ChildSlots, FrontendState, HAction, MarloweState, WebData, Message(..), _Head, _blocklySlot, _contract, _currentMarloweState, _editorErrors, _haskellEditorSlot, _holes, _marloweEditorSlot, _marloweState, _moneyInContract, _oldContract, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, _transactionWarnings, actionToActionInput, emptyMarloweState)
+import Types (ActionInput(..), ActionInputId, ChildSlots, FrontendState, HAction, MarloweState, Message(..), WebData, _Head, _blocklySlot, _contract, _currentMarloweState, _editorErrors, _editorWarnings, _haskellEditorSlot, _holes, _marloweEditorSlot, _marloweState, _moneyInContract, _oldContract, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, _transactionWarnings, actionToActionInput, emptyMarloweState)
 import Web.HTML.Event.DragEvent (DragEvent)
-import WebSocket (WebSocketRequestMessage(CheckForWarnings))
+import WebSocket (WebSocketRequestMessage(..))
 
 class
   Monad m <= MonadApp m where
@@ -58,15 +56,15 @@ class
   haskellEditorGetValue :: m (Maybe String)
   haskellEditorHandleAction :: Editor.Action -> m Unit
   haskellEditorSetAnnotations :: Array Annotation -> m Unit
+  haskellEditorResize :: m Unit
   marloweEditorSetValue :: String -> Maybe Int -> m Unit
   marloweEditorGetValue :: m (Maybe String)
-  marloweEditorHandleAction :: Editor.Action -> m Unit
-  marloweEditorSetAnnotations :: Array Annotation -> m Unit
-  marloweEditorMoveCursorToPosition :: Ace.Position -> m Unit
+  marloweEditorResize :: m Unit
+  marloweEditorMoveCursorToPosition :: IPosition -> m Unit
+  marloweEditorSetMarkers :: Array IMarker -> m Unit
   preventDefault :: DragEvent -> m Unit
   readFileFromDragEvent :: DragEvent -> m String
   updateContractInState :: String -> m Unit
-  updateState :: m Unit
   saveInitialState :: m Unit
   updateMarloweState :: (MarloweState -> MarloweState) -> m Unit
   applyTransactions :: m Unit
@@ -80,7 +78,7 @@ class
   postContractHaskell :: SourceCode -> m (WebData (JsonEither InterpreterError (InterpreterResult RunResult)))
   resizeBlockly :: m (Maybe Unit)
   setBlocklyCode :: String -> m Unit
-  checkContractForWarnings :: String -> m Unit
+  checkContractForWarnings :: String -> String -> m Unit
 
 newtype HalogenApp m a
   = HalogenApp (HalogenM FrontendState HAction ChildSlots Message m a)
@@ -118,27 +116,25 @@ instance monadAppHalogenApp ::
           liftEffect do
             session <- AceEditor.getSession editor
             Session.setAnnotations annotations session
-  marloweEditorSetValue contents i = void $ withMarloweEditor $ liftEffect <<< AceEditor.setValue contents i
-  marloweEditorGetValue = withMarloweEditor $ liftEffect <<< AceEditor.getValue
-  marloweEditorHandleAction action = void $ withMarloweEditor (Editor.handleAction marloweBufferLocalStorageKey action)
-  marloweEditorSetAnnotations annotations =
+  haskellEditorResize =
     void
-      $ withMarloweEditor \editor ->
-          liftEffect do
-            session <- AceEditor.getSession editor
-            Session.setAnnotations annotations session
-  marloweEditorMoveCursorToPosition (Ace.Position { column, row }) = do
-    void $ withMarloweEditor $ liftEffect <<< AceEditor.focus
-    void $ withMarloweEditor $ liftEffect <<< AceEditor.navigateTo (row - 1) (column - 1)
+      $ withHaskellEditor \editor ->
+          liftEffect $ AceEditor.resize Nothing editor
+  marloweEditorResize = void $ wrap $ query _marloweEditorSlot unit (Monaco.Resize unit)
+  marloweEditorSetValue contents i = void $ wrap $ query _marloweEditorSlot unit (Monaco.SetText contents unit)
+  marloweEditorGetValue = wrap $ query _marloweEditorSlot unit (Monaco.GetText identity)
+  marloweEditorMoveCursorToPosition position = void $ wrap $ query _marloweEditorSlot unit (Monaco.SetPosition position unit)
+  marloweEditorSetMarkers markers = do
+    let
+      warnings = filter (\{ severity } -> isWarning severity) markers
+    let
+      errors = filter (\{ severity } -> isError severity) markers
+    assign (_marloweState <<< _Head <<< _editorWarnings) warnings
+    assign (_marloweState <<< _Head <<< _editorErrors) errors
+    pure unit
   preventDefault event = wrap $ liftEffect $ FileEvents.preventDefault event
   readFileFromDragEvent event = wrap $ liftAff $ FileEvents.readFileFromDragEvent event
-  updateContractInState contract = do
-    updateContractInStateImpl contract
-    annotations <- use (_marloweState <<< _Head <<< _editorErrors)
-    marloweEditorSetAnnotations annotations
-  updateState = do
-    saveInitialStateImpl
-    wrap $ modifying _currentMarloweState updateStateImpl
+  updateContractInState contract = modifying _currentMarloweState (updatePossibleActions <<< updateContractInStateP contract)
   saveInitialState = saveInitialStateImpl
   updateMarloweState f = wrap $ modifying _marloweState (extendWith (updatePossibleActions <<< f))
   applyTransactions = wrap $ modifying _marloweState (extendWith updateStateImpl)
@@ -146,7 +142,7 @@ instance monadAppHalogenApp ::
     newContract <- marloweEditorGetValueImpl
     wrap $ assign _marloweState $ NEL.singleton (emptyMarloweState zero)
     wrap $ assign _oldContract Nothing
-    updateContractInStateImpl $ fromMaybe "" newContract
+    updateContractInState $ fromMaybe "" newContract
   saveBuffer text = wrap $ Editor.saveBuffer bufferLocalStorageKey text
   saveMarloweBuffer text = wrap $ Editor.saveBuffer marloweBufferLocalStorageKey text
   getOauthStatus = runAjax Server.getOauthStatus
@@ -156,37 +152,13 @@ instance monadAppHalogenApp ::
   postContractHaskell source = runAjax $ Server.postContractHaskell source
   resizeBlockly = wrap $ query _blocklySlot unit (Resize unit)
   setBlocklyCode source = wrap $ void $ query _blocklySlot unit (SetCode source unit)
-  checkContractForWarnings contract = do
+  checkContractForWarnings contract state = do
     let
-      msgString = unsafeStringify <<< encode $ CheckForWarnings contract
+      msgString = unsafeStringify <<< encode $ CheckForWarnings contract state
     wrap $ raise (WebsocketMessage msgString)
 
 -- I don't quite understand why but if you try to use MonadApp methods in HalogenApp methods you
--- blow the stack so we have 3 methods pulled out here. I think this just ensures they are run
--- in the HalogenApp monad and that's all that's required although a type annotation inside the
--- monad doesn't seem to help, neither does `wrap . runHalogenApp`
-saveInitialState' :: forall m. MonadEffect m => HalogenApp m Unit
-saveInitialState' = do
-  oldContract <- marloweEditorGetValue'
-  modifying _oldContract
-    ( \x -> case x of
-        Nothing ->
-          Just
-            ( case oldContract of
-                Nothing -> ""
-                Just y -> y
-            )
-        _ -> x
-    )
-
-marloweEditorGetValue' :: forall m. MonadEffect m => HalogenApp m (Maybe String)
-marloweEditorGetValue' = withMarloweEditor $ liftEffect <<< AceEditor.getValue
-
-updateContractInState' :: forall m. String -> HalogenApp m Unit
-updateContractInState' contract = modifying _currentMarloweState (updateStateP <<< updateContractInStateP contract)
-
--- I don't quite understand why but if you try to use MonadApp methods in HalogenApp methods you
--- blow the stack so we have 3 methods pulled out here. I think this just ensures they are run
+-- blow the stack so we have 2 methods pulled out here. I think this just ensures they are run
 -- in the HalogenApp monad and that's all that's required although a type annotation inside the
 -- monad doesn't seem to help, neither does `wrap . runHalogenApp`
 saveInitialStateImpl :: forall m. MonadEffect m => HalogenApp m Unit
@@ -199,10 +171,7 @@ saveInitialStateImpl = do
     )
 
 marloweEditorGetValueImpl :: forall m. MonadEffect m => HalogenApp m (Maybe String)
-marloweEditorGetValueImpl = withMarloweEditor $ liftEffect <<< AceEditor.getValue
-
-updateContractInStateImpl :: forall m. String -> HalogenApp m Unit
-updateContractInStateImpl contract = modifying _currentMarloweState (updatePossibleActions <<< updateContractInStateP contract)
+marloweEditorGetValueImpl = wrap $ query _marloweEditorSlot unit (Monaco.GetText identity)
 
 runHalogenApp :: forall m a. HalogenApp m a -> HalogenM FrontendState HAction ChildSlots Message m a
 runHalogenApp = unwrap
@@ -220,65 +189,22 @@ withHaskellEditor ::
   HalogenApp m (Maybe a)
 withHaskellEditor = HalogenApp <<< Editor.withEditor _haskellEditorSlot unit
 
-withMarloweEditor ::
-  forall m a.
-  MonadEffect m =>
-  (Editor -> m a) ->
-  HalogenApp m (Maybe a)
-withMarloweEditor = HalogenApp <<< Editor.withEditor _marloweEditorSlot unit
-
 updateContractInStateP :: String -> MarloweState -> MarloweState
-updateContractInStateP text state = case runParser' (parseTerm contract) text of
+updateContractInStateP text state = case parseContract text of
   Right parsedContract ->
     let
       lintResult = lint parsedContract
-
-      warnings =
-        map (warningToAnnotation text "The contract can make a negative payment here") (view L._negativePayments lintResult)
-          <> map (warningToAnnotation text "The contract can make a negative deposit here") (view L._negativeDeposits lintResult)
-          <> map (warningToAnnotation text "Timeouts should always increase in value") (view L._timeoutNotIncreasing lintResult)
-          <> map (warningToAnnotation text "The contract tries to Use a ValueId that has not been defined in a Let") (view L._uninitializedUse lintResult)
-          <> map (warningToAnnotation text "Let is redefining a ValueId that already exists") (view L._shadowedLet lintResult)
-          <> map (warningToAnnotation text "This Observation will always evaluate to True") (view L._trueObservation lintResult)
-          <> map (warningToAnnotation text "This Observation will always evaluate to False") (view L._falseObservation lintResult)
 
       mContract = fromTerm parsedContract
     in
       case mContract of
         Just contract -> do
-          set _editorErrors warnings <<< set _contract (Just contract) $ state
+          set _editorErrors [] <<< set _contract (Just contract) $ state
         Nothing -> do
           let
-            (Holes holes) = view L._holes lintResult
-
-            holesArray = Set.toUnfoldable $ fold $ Map.values holes
-
-            errors = warnings <> map (holeToAnnotation text) holesArray
-          (set _editorErrors errors <<< set _holes (Holes holes)) state
-  Left error -> (set _editorErrors [ errorToAnnotation text error ] <<< set _holes mempty) state
-
-warningToAnnotation :: String -> String -> Position -> Annotation
-warningToAnnotation str text { start, end } =
-  let
-    { column, row } = posToRowAndColumn str start
-  in
-    { column, row, text, "type": "warning" }
-
-holeToAnnotation :: String -> MarloweHole -> Annotation
-holeToAnnotation str (MarloweHole { name, marloweType, start }) =
-  let
-    { column, row } = posToRowAndColumn str start
-  in
-    { column, row, text: "Found hole ?" <> name, "type": "warning" }
-
-errorToAnnotation :: String -> { error :: ParseError, pos :: Pos } -> Annotation
-errorToAnnotation str { error, pos } =
-  let
-    { column, row } = posToRowAndColumn str pos
-
-    msg = show error
-  in
-    { column, row, text: msg, "type": "error" }
+            holes = view L._holes lintResult
+          (set _holes holes) state
+  Left error -> (set _holes mempty) state
 
 updatePossibleActions :: MarloweState -> MarloweState
 updatePossibleActions oldState =

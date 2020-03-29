@@ -10,7 +10,7 @@ open import Data.Integer using (ℤ;-_;+≤+;-≤+;-≤-;_<_;_>_;_≤?_;_<?_;_�
 open import Data.Bool using (Bool)
 open import Data.Product
 open import Relation.Binary
-open import Data.Nat using (ℕ;_*_;z≤n;s≤s;zero;suc) 
+open import Data.Nat using (ℕ;_*_;z≤n;s≤s;zero;suc)
 open import Relation.Binary.PropositionalEquality
 open import Relation.Nullary
 open import Function
@@ -99,16 +99,25 @@ i ≥? j = j ≤? i
 
 ## Type constants
 
-We have three base types referred to as type constants, integer,
-bytestring, and size, size is used to limit the size of integers and
-bytestrings
+We have six base types referred to as type constants:
 
 \begin{code}
 data TyCon : Set where
   integer    : TyCon
   bytestring : TyCon
   string     : TyCon
+  char       : TyCon
+  unit       : TyCon
+  bool       : TyCon
 
-{-# FOREIGN GHC import Language.PlutusCore #-}
-{-# COMPILE GHC TyCon = data TypeBuiltin (TyInteger | TyByteString | TyString) #-}
+{-# FOREIGN GHC {-# LANGUAGE GADTs, PatternSynonyms #-}                   #-}
+{-# FOREIGN GHC import Language.PlutusCore                                #-}
+{-# FOREIGN GHC type TypeBuiltin = Some (TypeIn DefaultUni)               #-}
+{-# FOREIGN GHC pattern TyInteger    = Some (TypeIn DefaultUniInteger)    #-}
+{-# FOREIGN GHC pattern TyByteString = Some (TypeIn DefaultUniByteString) #-}
+{-# FOREIGN GHC pattern TyString     = Some (TypeIn DefaultUniString)     #-}
+{-# FOREIGN GHC pattern TyChar       = Some (TypeIn DefaultUniChar)       #-}
+{-# FOREIGN GHC pattern TyUnit       = Some (TypeIn DefaultUniUnit)       #-}
+{-# FOREIGN GHC pattern TyBool       = Some (TypeIn DefaultUniBool)       #-}
+{-# COMPILE GHC TyCon = data TypeBuiltin (TyInteger | TyByteString | TyString | TyChar | TyUnit | TyBool) #-}
 \end{code}
