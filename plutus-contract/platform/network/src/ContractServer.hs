@@ -15,7 +15,6 @@ import           Data.Maybe               (fromMaybe)
 import           Language.Plutus.Contract.Servant (contractApp)
 import           Network.Wai (Application)
 import           Network.Wai.Handler.Warp (run)
-import           Language.Plutus.Contract          (PlutusContract)
 
 defaultPort :: Int
 defaultPort = 16523 -- 408B
@@ -33,11 +32,8 @@ findPort = do
   envPort <- (>>= readMaybe) <$> lookupEnv envName
   pure $ fromMaybe defaultPort (argsPort `mplus` envPort)
 
-serveHTTP :: Application -> IO ()
-serveHTTP app = do
+serveContract :: Application -> IO ()
+serveContract app = do
   port <- findPort
   putStrLn $ envName ++ ": " ++ show port
   run port app
-
-serveContract :: PlutusContract () -> IO ()
-serveContract contract = serveHTTP (contractApp contract)
