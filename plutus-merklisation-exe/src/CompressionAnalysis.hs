@@ -178,31 +178,31 @@ analyseTyApps name prg = do
 main :: IO ()
 main = do
   printHeader
-  analyseTyApps    "Crowdfunding"         Crowdfunding.exportedValidator
+  analyseProg    "Crowdfunding"         Crowdfunding.exportedValidator
   printSeparator
-  analyseTyApps    "Currrency"            Currrency.exportedValidator
+  analyseProg    "Currrency"            Currrency.exportedValidator
   printSeparator
-  analyseTyApps    "Escrow"               Escrow.exportedValidator
+  analyseProg    "Escrow"               Escrow.exportedValidator
   printSeparator
-  analyseTyApps    "Future"               Future.exportedValidator
+  analyseProg    "Future"               Future.exportedValidator
   printSeparator
-  analyseTyApps    "Game"                 Game.exportedValidator
+  analyseProg    "Game"                 Game.exportedValidator
   printSeparator
-  analyseTyApps    "GameStateMachine"     GameStateMachine.exportedValidator
+  analyseProg    "GameStateMachine"     GameStateMachine.exportedValidator
   printSeparator
-  analyseTyApps    "MultiSig"             MultiSig.exportedValidator
+  analyseProg    "MultiSig"             MultiSig.exportedValidator
   printSeparator
-  analyseTyApps    "MultiSigStateMachine" MultiSigStateMachine.exportedValidator
+  analyseProg    "MultiSigStateMachine" MultiSigStateMachine.exportedValidator
   printSeparator
-  analyseTyApps    "PubKey"               PubKey.exportedValidator
+  analyseProg    "PubKey"               PubKey.exportedValidator
   printSeparator
-  analyseTyApps    "Swap"                 Swap.exportedValidator
+  analyseProg    "Swap"                 Swap.exportedValidator
   printSeparator
-  analyseTyApps    "TokenAccount"         TokenAccount.exportedValidator
+  analyseProg    "TokenAccount"         TokenAccount.exportedValidator
   printSeparator
-  analyseTyApps    "Vesting"              Vesting.exportedValidator
+  analyseProg    "Vesting"              Vesting.exportedValidator
   printSeparator
-  analyseTyApps    "Marlowe"              compiledMarloweValidator
+  analyseProg    "Marlowe"              compiledMarloweValidator
 
 -- Current validator is a little different for Future and PubKey
 
