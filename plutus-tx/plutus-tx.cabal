@@ -80,7 +80,7 @@ library
         base >=4.9 && <5,
         bytestring -any,
         template-haskell >=2.13.0.0,
-        th-abstraction <0.3,
+        th-abstraction -any,
         prettyprinter -any,
         text -any,
         mtl -any,

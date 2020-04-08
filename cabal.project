@@ -23,6 +23,8 @@ packages: language-plutus-core
           iots-export
           metatheory
 
+allow-newer: eventful-sql-common:persistent-template
+
 -- We never, ever, want this.
 write-ghc-environment-files: never
 
@@ -74,19 +76,19 @@ source-repository-package
   tag: 2547ad1e80aeabca2899951601079408becbc92c
   --sha256: 1p2kg2w02q5w1cvqzhfhqmxviy4xrzada3mmb096j2n6hfr20kri
 
--- https://github.com/haskell-foundation/foundation/pull/531
-source-repository-package
-  type: git
-  location: https://github.com/hamishmack/foundation
-  tag: 2ab63bcfbeee90ea4e3cc46f6feb184affdd2db2
-  --sha256: 0krcn1brm0vgq8s3w4rnyh36d7bq26jh27p2iaf8zay118ardgp9
-  subdir: basement
-source-repository-package
-  type: git
-  location: https://github.com/hamishmack/foundation
-  tag: 2ab63bcfbeee90ea4e3cc46f6feb184affdd2db2
-  --sha256: 0krcn1brm0vgq8s3w4rnyh36d7bq26jh27p2iaf8zay118ardgp9
-  subdir: foundation
+---- https://github.com/haskell-foundation/foundation/pull/531
+--source-repository-package
+--  type: git
+--  location: https://github.com/hamishmack/foundation
+--  tag: 2ab63bcfbeee90ea4e3cc46f6feb184affdd2db2
+--  --sha256: 0krcn1brm0vgq8s3w4rnyh36d7bq26jh27p2iaf8zay118ardgp9
+--  subdir: basement
+--source-repository-package
+--  type: git
+--  location: https://github.com/hamishmack/foundation
+--  tag: 2ab63bcfbeee90ea4e3cc46f6feb184affdd2db2
+--  --sha256: 0krcn1brm0vgq8s3w4rnyh36d7bq26jh27p2iaf8zay118ardgp9
+--  subdir: foundation
 
 -- https://github.com/biegunka/terminal-size/pull/12
 source-repository-package
@@ -109,13 +111,13 @@ source-repository-package
   tag: 3be0b7733b1cef3d0e7ed0e2967155a1b63b6a62
   --sha256: 1a5jaz3641kqnya58n81jbxg9siy46ryziby3r99457v72z5v6fm
 
--- https://github.com/luite/network at b77e7c10e29ccf3512be67defbe0fb66ac2bc4c8
--- this makes it compile, not necessarily "work".
-source-repository-package
-  type: git
-  location: https://github.com/luite/network
-  tag: b77e7c10e29ccf3512be67defbe0fb66ac2bc4c8
-  --sha256: 1birwn2lc6gzc06zajiv9xq41sr624l5c4i8dlwcsasypail1zys
+---- https://github.com/luite/network at b77e7c10e29ccf3512be67defbe0fb66ac2bc4c8
+---- this makes it compile, not necessarily "work".
+--source-repository-package
+--  type: git
+--  location: https://github.com/luite/network
+--  tag: b77e7c10e29ccf3512be67defbe0fb66ac2bc4c8
+--  --sha256: 1birwn2lc6gzc06zajiv9xq41sr624l5c4i8dlwcsasypail1zys
 
 -- this is essential to build warp.
 -- https://github.com/kazu-yamamoto/simple-sendfile/pull/34
@@ -124,7 +126,3 @@ source-repository-package
   location: https://github.com/angerman/simple-sendfile
   tag: 9077aa7439f0d52c1a2d10d228f6666a1bf91099
   --sha256: 1jplcsp3gir116c263rc36i5mm7ag6kj77w9c4pwx0hvxw681qpx
-
--- need these because for reasons I don't fully undertand yet, we fail to respect the freeze file.
--- FIXME: Maybe the cabalProject doesn't copy over the freeze file.
-constraints: servant-server == 0.15, servant-websockets == 1.1.0

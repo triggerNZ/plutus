@@ -71,7 +71,7 @@ library
         serialise -any,
         text -any,
         transformers -any,
-        algebraic-graphs >= 0.3 && <0.4,
+        algebraic-graphs >= 0.3,
         megaparsec -any,
         parser-combinators >= 0.4.0
 
