@@ -68,6 +68,7 @@ instance monadAppState :: MonadApp MockApp where
   resizeBlockly = pure Nothing
   setBlocklyCode _ = pure unit
   checkContractForWarnings _ _ = pure unit
+  scrollHelpPanel = pure unit
 
 updateContractInStateImpl :: String -> MockApp Unit
 updateContractInStateImpl contract = modifying _currentMarloweState (updatePossibleActions <<< updateContractInStateP contract)
@@ -92,6 +93,7 @@ initialState =
     , helpContext: MarloweHelp
     , showRightPanel: true
     , showBottomPanel: true
+    , showErrorDetail: false
     }
 
 runTests :: forall a. MockApp a -> Tuple a FrontendState

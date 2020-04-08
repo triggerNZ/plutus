@@ -69,7 +69,7 @@ import           Network.HTTP.Conduit        (Request, newManager, parseRequest,
 import           Network.HTTP.Simple         (addRequestHeader)
 import           Network.HTTP.Types          (hAccept, statusIsSuccessful)
 import           Servant                     ((:<|>) ((:<|>)), (:>), Get, Header, Headers, JSON, NoContent (NoContent),
-                                              QueryParam, ServantErr, ServerT, StdMethod (GET), ToHttpApiData, Verb,
+                                              QueryParam, ServerError, ServerT, StdMethod (GET), ToHttpApiData, Verb,
                                               addHeader, err401, err500, errBody, throwError)
 import           Servant.API.BrowserHeader   (BrowserHeader)
 import           Servant.Client              (BaseUrl, ClientM, mkClientEnv, parseBaseUrl, runClientM)
@@ -240,7 +240,7 @@ extractGithubToken signer now cookieHeader =
 githubCallback ::
        ( MonadLogger m
        , MonadWeb m
-       , MonadError ServantErr m
+       , MonadError ServerError m
        , MonadNow m
        , MonadReader Env m
        )
@@ -268,8 +268,8 @@ githubCallback (Just code) = do
     pure . addHeader cookie . addHeader _configRedirectUrl $ NoContent
 
 withErr ::
-       (MonadLogger m, MonadError ServantErr m)
-    => ServantErr
+       (MonadLogger m, MonadError ServerError m)
+    => ServerError
     -> m (Either Text b)
     -> m b
 withErr servantErr action =
@@ -281,7 +281,7 @@ withErr servantErr action =
         Right r -> pure r
 
 withErr500 ::
-       (MonadLogger m, MonadError ServantErr m) => m (Either Text b) -> m b
+       (MonadLogger m, MonadError ServerError m) => m (Either Text b) -> m b
 withErr500 = withErr err500
 
 makeTokenRequest :: GithubEndpoints -> Config -> OAuthCode -> Request
@@ -319,7 +319,7 @@ createSessionCookie signer token now =
 #ifdef __GHCJS__
     cookieValue = undefined
 #else
-    cookieValue = JWT.encodeSigned signer jwtClaims
+    cookieValue = JWT.encodeSigned signer mempty jwtClaims
 #endif
     jwtClaims =
         mempty
@@ -335,7 +335,7 @@ createSessionCookie signer token now =
 getGists ::
        ( MonadNow m
        , MonadLogger m
-       , MonadError ServantErr m
+       , MonadError ServerError m
        , MonadIO m
        , MonadReader Env m
        )
@@ -346,7 +346,7 @@ getGists header = withGithubToken header (\token -> Gist.getGists $ Just token)
 createNewGist ::
        ( MonadNow m
        , MonadLogger m
-       , MonadError ServantErr m
+       , MonadError ServerError m
        , MonadIO m
        , MonadReader Env m
        )
@@ -359,7 +359,7 @@ createNewGist header newGist =
 getGist ::
        ( MonadNow m
        , MonadLogger m
-       , MonadError ServantErr m
+       , MonadError ServerError m
        , MonadIO m
        , MonadReader Env m
        )
@@ -372,7 +372,7 @@ getGist header gistId =
 updateGist ::
        ( MonadNow m
        , MonadLogger m
-       , MonadError ServantErr m
+       , MonadError ServerError m
        , MonadIO m
        , MonadReader Env m
        )
@@ -388,7 +388,7 @@ updateGist header gistId newGist =
 withGithubToken ::
        ( MonadNow m
        , MonadLogger m
-       , MonadError ServantErr m
+       , MonadError ServerError m
        , MonadIO m
        , MonadReader Env m
        )
@@ -422,7 +422,7 @@ server ::
        ( MonadNow m
        , MonadWeb m
        , MonadLogger m
-       , MonadError ServantErr m
+       , MonadError ServerError m
        , MonadIO m
        , MonadReader Env m
        )

@@ -35,12 +35,6 @@ write-ghc-environment-files: never
 -- and need to be kept in sync.
 source-repository-package
   type: git
-  location: https://github.com/target/row-types
-  tag: 1e8d5e084ffd46f6c7842826a1f62c60820885df
-  --sha256: 0ly5m4r8wkm8gdqyrqzsjfmp189yxsd4qp0zi3idrbgfaf45sk9k
-
-source-repository-package
-  type: git
   location: https://github.com/shmish111/purescript-bridge.git
   tag: 28c37771ef30b0d751960c061ef95627f05d290e
   --sha256: 0n6q7g2w1xafngd3dwbbmfxfn018fmq61db7mymplbrww8ld1cp3
@@ -60,21 +54,15 @@ source-repository-package
 
 source-repository-package
   type: git
-  location: https://github.com/bitnomial/prometheus.git
-  tag: 69e4cefeb7d04d61a54cb0ae9fd57e2de134badb
-  --sha256: 0h836qp0ic587gfyfkj9a53p8rczja50sfy2y8ymx8wwkmq9zdgc
-
-source-repository-package
-  type: git
   location: https://github.com/michaelpj/unlit.git
   tag: 9ca1112093c5ffd356fc99c7dafa080e686dd748
   --sha256: 145sffn8gbdn6xp9q5b75yd3m46ql5bnc02arzmpfs6wgjslfhff
 
 source-repository-package
   type: git
-  location: https://github.com/shmish111/github.git
-  tag: cc27b9de4d5d0939235fa9a8b418de3ea4807bab
-  --sha256: 0jx65x4c8s561nbxa0hv7mp8fvndfhs8i8gzxng7ym808n4n538i
+  location: https://github.com/michaelpj/slack-web.git
+  tag: 6ff88895c5da593e7bd09a46d7002441817aa6f8
+  --sha256: 1115jngzx2hbvznhnrnm4qs9vn6hsjklxwiwa5i11npr2kxd5rm2
 
 -- needed for Cabal-3 compat.
 constraints: happy==1.19.12

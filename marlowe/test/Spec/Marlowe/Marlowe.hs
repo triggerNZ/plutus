@@ -39,7 +39,7 @@ import           Spec.Marlowe.Common
 import           Test.Tasty
 import           Test.Tasty.Hedgehog            (HedgehogTestLimit (..), testProperty)
 import           Test.Tasty.HUnit
-import           Wallet                         (PubKey (..), WalletAPIError)
+import           Wallet                         (WalletAPIError)
 import           Wallet.Emulator
 import           Wallet.Emulator.ChainIndex     (ChainIndexEffect)
 import qualified Wallet.Emulator.Generators     as Gen
@@ -216,7 +216,7 @@ makeProgressTest = checkMarloweTrace (MarloweScenario {
 
 
 pubKeyGen :: Gen PubKey
-pubKeyGen = toPublicKey . (knownPrivateKeys !!) <$> integral (Range.linear 0 10)
+pubKeyGen = toPublicKey . (knownPrivateKeys !!) <$> integral (Range.linear 0 9)
 
 
 uniqueContractHash :: IO ()

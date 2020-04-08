@@ -84,9 +84,9 @@ library
         if(flag(ghcjs-plugin))
             -- `ghc-api-ghcjs' will be changed to `ghcjs' for the new
             -- emscripten builds
-            build-depends: ghc-api-ghcjs >=8.6 && <8.7
+            build-depends: ghc-api-ghcjs >=8.8 && <8.9
         else
-            build-depends: ghc >=8.6 && <8.7
+            build-depends: ghc >=8.8 && <8.9
 
 test-suite plutus-tx-tests
     type: exitcode-stdio-1.0

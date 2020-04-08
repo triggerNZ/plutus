@@ -9,7 +9,6 @@ import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Bounded (genericBottom, genericTop)
 import Data.Generic.Rep.Enum (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
-import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Map (Map)
 import Data.Map as Map
@@ -42,7 +41,6 @@ data MarloweType
   | PayeeType
   | CaseType
   | ValueType
-  | InputType
   | ObservationType
   | ContractType
   | BoundType
@@ -94,8 +92,6 @@ readMarloweType "PayeeType" = Just PayeeType
 readMarloweType "CaseType" = Just CaseType
 
 readMarloweType "ValueType" = Just ValueType
-
-readMarloweType "InputType" = Just InputType
 
 readMarloweType "ObservationType" = Just ObservationType
 
@@ -156,13 +152,6 @@ getMarloweConstructors ValueType =
     , (Tuple "UseValue" [ DataArg "valueId" ])
     ]
 
-getMarloweConstructors InputType =
-  Map.fromFoldable
-    [ (Tuple "IDeposit" [ DataArg "accountId", DataArg "party", DataArg "token", DataArg "money" ])
-    , (Tuple "IChoice" [ DataArg "choiceId", DataArg "choiceNum" ])
-    , (Tuple "INotify" [])
-    ]
-
 getMarloweConstructors ObservationType =
   Map.fromFoldable
     [ (Tuple "AndObs" [ DataArg "observation", DataArg "observation" ])
@@ -216,13 +205,17 @@ constructMarloweType :: String -> MarloweHole -> Map String (Array Argument) -> 
 constructMarloweType constructorName (MarloweHole { row, column }) m = case Map.lookup constructorName m of
   Nothing -> ""
   Just [] -> constructorName
-  Just vs -> "(" <> constructorName <> " " <> intercalate " " (mapWithIndex showArgument vs) <> ")"
+  Just vs -> parens row column $ constructorName <> " " <> intercalate " " (mapWithIndex showArgument vs)
   where
   showArgument i (ArrayArg arg) = "[ ?" <> arg <> "_" <> show row <> "_" <> show column <> "_" <> show i <> " ]"
 
   showArgument i (DataArg arg) = "?" <> arg <> "_" <> show row <> "_" <> show column <> "_" <> show i
 
   showArgument _ NewtypeArg = ""
+
+  parens 1 1 text = text
+
+  parens _ _ text = "(" <> text <> ")"
 
 mkHole :: forall a. String -> { row :: Pos, column :: Pos } -> Term a
 mkHole name position = Hole name Proxy position
@@ -233,8 +226,9 @@ data Term a
 
 derive instance genericTerm :: Generic (Term a) _
 
-instance eqTerm :: Eq a => Eq (Term a) where
-  eq a b = genericEq a b
+derive instance eqTerm :: Eq a => Eq (Term a)
+
+derive instance ordTerm :: Ord a => Ord (Term a)
 
 instance showTerm :: Show a => Show (Term a) where
   show (Term a _) = show a
@@ -249,6 +243,11 @@ instance hasArgsTerm :: Args a => Args (Term a) where
   hasArgs _ = false
   hasNestedArgs (Term a _) = hasNestedArgs a
   hasNestedArgs _ = false
+
+getPosition :: forall a. Term a -> { row :: Pos, column :: Pos }
+getPosition (Term _ pos) = pos
+
+getPosition (Hole _ _ pos) = pos
 
 -- a concrete type for holes only
 data MarloweHole
@@ -398,6 +397,10 @@ data AccountId
 
 derive instance genericAccountId :: Generic AccountId _
 
+derive instance eqAccountId :: Eq AccountId
+
+derive instance ordAccountId :: Ord AccountId
+
 instance showAccountId :: Show AccountId where
   show v = genericShow v
 
@@ -416,12 +419,16 @@ instance accountIdIsMarloweType :: IsMarloweType AccountId where
   marloweType _ = AccountIdType
 
 instance accountIdHasMarloweHoles :: HasMarloweHoles AccountId where
-  getHoles (AccountId a b) m = insertHole a m <> insertHole b m
+  getHoles (AccountId a b) m = insertHole a m <> getHoles b m
 
 data Token
   = Token (Term String) (Term String)
 
 derive instance genericToken :: Generic Token _
+
+derive instance eqToken :: Eq Token
+
+derive instance ordToken :: Ord Token
 
 instance showToken :: Show Token where
   show tok = genericShow tok
@@ -447,6 +454,10 @@ data ChoiceId
   = ChoiceId (Term String) (Term Party)
 
 derive instance genericChoiceId :: Generic ChoiceId _
+
+derive instance eqChoiceId :: Eq ChoiceId
+
+derive instance ordChoiceId :: Ord ChoiceId
 
 instance showChoiceId :: Show ChoiceId where
   show v = genericShow v
@@ -498,6 +509,10 @@ data Payee
   | Party (Term Party)
 
 derive instance genericPayee :: Generic Payee _
+
+derive instance eqParty :: Eq Party
+
+derive instance ordParty :: Ord Party
 
 instance showPayee :: Show Payee where
   show v = genericShow v
@@ -556,6 +571,10 @@ data Value
 
 derive instance genericValue :: Generic Value _
 
+derive instance eqValue :: Eq Value
+
+derive instance ordValue :: Ord Value
+
 instance showValue :: Show Value where
   show v = genericShow v
 
@@ -600,6 +619,10 @@ data Observation
   | FalseObs
 
 derive instance genericObservation :: Generic Observation _
+
+derive instance eqObservation :: Eq Observation
+
+derive instance ordObservation :: Ord Observation
 
 instance showObservation :: Show Observation where
   show v = genericShow v

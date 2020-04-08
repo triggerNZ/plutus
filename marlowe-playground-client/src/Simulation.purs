@@ -6,18 +6,19 @@ import Data.Array (foldr, intercalate, (:))
 import Data.Array as Array
 import Data.BigInteger (BigInteger, fromString, fromInt)
 import Data.Either (Either(..))
-import Data.HeytingAlgebra (not, (&&), (||))
+import Data.HeytingAlgebra (not, (&&))
 import Data.Lens (to, view, (^.))
 import Data.List.NonEmpty as NEL
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Tuple (Tuple(..), snd)
+import Data.Tuple (Tuple(..), fst, snd)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Gist (Gist)
 import Gists (GistAction(..), idPublishGist)
 import Halogen.Classes (aHorizontal, accentBorderBottom, active, activeTextPrimary, blocklyIcon, bold, closeDrawerIcon, codeEditor, expanded, githubDisplay, infoIcon, isActiveDemo, jFlexStart, minusBtn, noMargins, panelHeader, panelHeaderMain, panelHeaderSide, panelSubHeader, panelSubHeaderMain, panelSubHeaderSide, plusBtn, pointer, smallBtn, spaceLeft, spanText, textSecondaryColor, uppercase)
+import Halogen.Classes as Classes
 import Halogen.HTML (ClassName(..), ComponentHTML, HTML, a, article, aside, b_, button, div, em_, h2, h4, h6, h6_, img, input, label, li, li_, p, p_, section, slot, small, small_, span, strong_, text, ul, ul_)
 import Halogen.HTML.Events (onClick, onValueChange, onValueInput)
 import Halogen.HTML.Properties (InputType(..), alt, class_, classes, disabled, enabled, href, placeholder, src, type_, value)
@@ -32,15 +33,11 @@ import Marlowe.Monaco as MM
 import Marlowe.Semantics (AccountId(..), Bound(..), ChoiceId(..), Input(..), Party, PubKey, Token, TransactionError, inBounds)
 import Monaco as Monaco
 import Network.RemoteData (RemoteData(..))
-import Prelude (class Show, bind, const, mempty, show, unit, ($), (/=), (<$>), (<<<), (<>), (>))
+import Prelude (class Show, bind, const, mempty, show, unit, ($), (<$>), (<<<), (<>), (>))
 import Servant.PureScript.Ajax (AjaxError)
+import Simulation.BottomPanel (isContractValid)
 import StaticData as StaticData
-import Types (ActionInput(..), ActionInputId, ChildSlots, FrontendState, HAction(..), HelpContext(..), _Head, _authStatus, _contract, _createGistResult, _editorErrors, _editorPreferences, _helpContext, _loadGistResult, _marloweEditorSlot, _marloweState, _pendingInputs, _possibleActions, _showRightPanel, _slot)
-
-isContractValid :: FrontendState -> Boolean
-isContractValid state =
-  view (_marloweState <<< _Head <<< _contract) state /= Nothing
-    && view (_marloweState <<< _Head <<< _editorErrors <<< to Array.null) state
+import Types (ActionInput(..), ActionInputId, ChildSlots, FrontendState, HAction(..), HelpContext(..), _Head, _authStatus, _createGistResult, _editorPreferences, _helpContext, _loadGistResult, _marloweEditorSlot, _marloweState, _pendingInputs, _possibleActions, _showRightPanel, _slot)
 
 render ::
   forall m.
@@ -64,7 +61,7 @@ render state =
                   ]
               ]
           , ul [ classes [ ClassName "demo-list", aHorizontal ] ]
-              (demoScriptLink <$> Array.fromFoldable (Map.keys StaticData.marloweContracts))
+              (demoScriptLink <$> Array.fromFoldable (map fst StaticData.marloweContracts))
           , div [ class_ (ClassName "code-to-blockly-wrap") ]
               [ button
                   [ class_ smallBtn
@@ -101,7 +98,7 @@ marloweEditor state = slot _marloweEditorSlot unit component unit (Just <<< Marl
 
   component = monacoComponent $ MM.settings setup
 
-  initialContents = fromMaybe "" $ Map.lookup "Deposit Incentive" StaticData.marloweContracts
+  initialContents = fromMaybe "" $ Array.head $ map fst StaticData.marloweContracts
 
   editorPreferences = view _editorPreferences state
 
@@ -187,34 +184,36 @@ inputItem ::
   ActionInput ->
   HTML p HAction
 inputItem isEnabled person (DepositInput accountId party token value) =
-  div [ classes [ ClassName "deposit-a", aHorizontal ] ]
-    [ button
-        [ classes [ plusBtn, smallBtn ]
+  div [ classes [ aHorizontal ] ]
+    [ p_ (renderDeposit accountId party token value)
+    , button
+        [ classes [ plusBtn, smallBtn, (Classes.disabled $ not isEnabled) ]
         , enabled isEnabled
         , onClick $ const $ Just
             $ AddInput (Just person) (IDeposit accountId party token value) []
         ]
         [ text "+" ]
-    , p_ (renderDeposit accountId party token value)
     ]
 
 inputItem isEnabled person (ChoiceInput choiceId@(ChoiceId choiceName choiceOwner) bounds chosenNum) =
   div
     [ classes [ aHorizontal, ClassName "flex-wrap" ] ]
-    [ button
-        [ classes [ plusBtn, smallBtn ]
+    [ div []
+        [ p [ class_ (ClassName "choice-input") ]
+            [ spanText "Choice "
+            , b_ [ spanText (show choiceName) ]
+            , spanText ": Choose value "
+            , marloweActionInput isEnabled (SetChoice choiceId) chosenNum
+            ]
+        , p [ class_ (ClassName "choice-error") ] error
+        ]
+    , button
+        [ classes [ plusBtn, smallBtn, (Classes.disabled $ not isEnabled) ]
         , enabled (isEnabled && inBounds chosenNum bounds)
         , onClick $ const $ Just
             $ AddInput (Just person) (IChoice (ChoiceId choiceName choiceOwner) chosenNum) bounds
         ]
         [ text "+" ]
-    , p [ class_ (ClassName "choice-input") ]
-        [ spanText "Choice "
-        , b_ [ spanText (show choiceName) ]
-        , spanText ": Choose value "
-        , marloweActionInput isEnabled (SetChoice choiceId) chosenNum
-        ]
-    , p [ class_ (ClassName "choice-error") ] error
     ]
   where
   error = if inBounds chosenNum bounds then [] else [ text boundsError ]
@@ -226,14 +225,14 @@ inputItem isEnabled person (ChoiceInput choiceId@(ChoiceId choiceName choiceOwne
 inputItem isEnabled person NotifyInput =
   li
     [ classes [ ClassName "choice-a", aHorizontal ] ]
-    [ button
-        [ classes [ plusBtn, smallBtn ]
+    [ p_ [ text "Notify Contract" ]
+    , button
+        [ classes [ plusBtn, smallBtn, (Classes.disabled $ not isEnabled) ]
         , enabled isEnabled
         , onClick $ const $ Just
             $ AddInput (Just person) INotify []
         ]
         [ text "+" ]
-    , p_ [ text "Notify Contract" ]
     ]
 
 marloweActionInput :: forall p a. Show a => Boolean -> (BigInteger -> HAction) -> a -> HTML p HAction
@@ -274,7 +273,7 @@ transactionComposer ::
 transactionComposer state =
   div [ classes [ ClassName "transaction-composer", ClassName "composer" ] ]
     [ ul [ class_ (ClassName "participants") ]
-        [ transaction state ]
+        [ transaction state isEnabled ]
     , div [ class_ (ClassName "transaction-btns") ]
         [ ul [ classes [ ClassName "demo-list", aHorizontal ] ]
             [ li [ classes [ activeTextPrimary, bold, pointer ] ]
@@ -284,6 +283,7 @@ transactionComposer state =
                             Just <<< const Undo
                           else
                             const Nothing
+                    , class_ (Classes.disabled $ not isEnabled)
                     ]
                     [ text "Undo" ]
                 ]
@@ -294,23 +294,26 @@ transactionComposer state =
                             Just <<< const ResetSimulator
                           else
                             const Nothing
+                    , class_ (Classes.disabled $ not isEnabled)
                     ]
                     [ text "Reset" ]
                 ]
             , li [ classes [ activeTextPrimary, bold, pointer ] ]
                 [ a
                     [ onClick
-                        $ if isContractValid state then
+                        $ if isEnabled then
                             Just <<< const NextSlot
                           else
                             const Nothing
+                    , class_ (Classes.disabled $ not isEnabled)
                     ]
                     [ text $ "Next Block (" <> show currentBlock <> ")" ]
                 ]
             , li_
                 [ button
                     [ onClick $ Just <<< const ApplyTransaction
-                    , enabled $ isContractValid state
+                    , enabled isEnabled
+                    , class_ (Classes.disabled $ not isEnabled)
                     ]
                     [ text "Apply" ]
                 ]
@@ -320,18 +323,19 @@ transactionComposer state =
   where
   currentBlock = state ^. (_marloweState <<< _Head <<< _slot)
 
+  isEnabled = isContractValid state
+
 transaction ::
   forall p.
   FrontendState ->
+  Boolean ->
   HTML p HAction
-transaction state =
+transaction state isEnabled =
   li [ classes [ ClassName "participant-a", noMargins ] ]
     [ ul
         []
         (map (transactionRow state isEnabled) (state ^. (_marloweState <<< _Head <<< _pendingInputs)))
     ]
-  where
-  isEnabled = state ^. (_marloweState <<< _Head <<< _contract) /= Nothing || state ^. (_marloweState <<< _Head <<< _editorErrors <<< to Array.null)
 
 transactionRow ::
   forall p.
@@ -341,13 +345,7 @@ transactionRow ::
   HTML p HAction
 transactionRow state isEnabled (Tuple input@(IDeposit (AccountId accountNumber accountOwner) party token money) person) =
   li [ classes [ ClassName "choice-a", aHorizontal ] ]
-    [ button
-        [ classes [ minusBtn, smallBtn, bold ]
-        , enabled isEnabled
-        , onClick $ const $ Just $ RemoveInput person input
-        ]
-        [ text "-" ]
-    , p_
+    [ p_
         [ text "Deposit "
         , strong_ [ text (show money) ]
         , text " units of "
@@ -357,17 +355,17 @@ transactionRow state isEnabled (Tuple input@(IDeposit (AccountId accountNumber a
         , text " as "
         , strong_ [ text (show party) ]
         ]
-    ]
-
-transactionRow state isEnabled (Tuple input@(IChoice (ChoiceId choiceName choiceOwner) chosenNum) person) =
-  li [ classes [ ClassName "choice-a", aHorizontal ] ]
-    [ button
-        [ classes [ minusBtn, smallBtn, bold ]
+    , button
+        [ classes [ minusBtn, smallBtn, bold, (Classes.disabled $ not isEnabled) ]
         , enabled isEnabled
         , onClick $ const $ Just $ RemoveInput person input
         ]
         [ text "-" ]
-    , p_
+    ]
+
+transactionRow state isEnabled (Tuple input@(IChoice (ChoiceId choiceName choiceOwner) chosenNum) person) =
+  li [ classes [ ClassName "choice-a", aHorizontal ] ]
+    [ p_
         [ text "Participant "
         , strong_ [ text (show choiceOwner) ]
         , text " chooses the value "
@@ -375,19 +373,25 @@ transactionRow state isEnabled (Tuple input@(IChoice (ChoiceId choiceName choice
         , text " for choice with id "
         , strong_ [ text (show choiceName) ]
         ]
+    , button
+        [ classes [ minusBtn, smallBtn, bold, (Classes.disabled $ not isEnabled) ]
+        , enabled isEnabled
+        , onClick $ const $ Just $ RemoveInput person input
+        ]
+        [ text "-" ]
     ]
 
 transactionRow state isEnabled (Tuple INotify person) =
   li [ classes [ ClassName "choice-a", aHorizontal ] ]
-    [ button
-        [ classes [ minusBtn, smallBtn, bold ]
+    [ p_
+        [ text "Notification"
+        ]
+    , button
+        [ classes [ minusBtn, smallBtn, bold, (Classes.disabled $ not isEnabled) ]
         , enabled isEnabled
         , onClick $ const $ Just $ RemoveInput person INotify
         ]
         [ text "-" ]
-    , p_
-        [ text "Notification"
-        ]
     ]
 
 hasHistory :: FrontendState -> Boolean

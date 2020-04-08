@@ -22,6 +22,8 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype, unwrap, wrap)
+import Data.String (codePointFromChar)
+import Data.String as String
 import Data.Tuple (Tuple(..), fst)
 import Editor as Editor
 import Effect.Aff.Class (class MonadAff)
@@ -47,7 +49,14 @@ import Servant.PureScript.Ajax (AjaxError)
 import Servant.PureScript.Settings (SPSettings_)
 import StaticData (bufferLocalStorageKey, marloweBufferLocalStorageKey)
 import Types (ActionInput(..), ActionInputId, ChildSlots, FrontendState, HAction, MarloweState, Message(..), WebData, _Head, _blocklySlot, _contract, _currentMarloweState, _editorErrors, _editorWarnings, _haskellEditorSlot, _holes, _marloweEditorSlot, _marloweState, _moneyInContract, _oldContract, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, _transactionWarnings, actionToActionInput, emptyMarloweState)
+import Web.DOM.Document as D
+import Web.DOM.Element (setScrollTop)
+import Web.DOM.Element as E
+import Web.DOM.HTMLCollection as WC
+import Web.HTML as Web
 import Web.HTML.Event.DragEvent (DragEvent)
+import Web.HTML.HTMLDocument (toDocument)
+import Web.HTML.Window as W
 import WebSocket (WebSocketRequestMessage(..))
 
 class
@@ -79,6 +88,7 @@ class
   resizeBlockly :: m (Maybe Unit)
   setBlocklyCode :: String -> m Unit
   checkContractForWarnings :: String -> String -> m Unit
+  scrollHelpPanel :: m Unit
 
 newtype HalogenApp m a
   = HalogenApp (HalogenM FrontendState HAction ChildSlots Message m a)
@@ -127,9 +137,23 @@ instance monadAppHalogenApp ::
   marloweEditorSetMarkers markers = do
     let
       warnings = filter (\{ severity } -> isWarning severity) markers
+
+      trimHoles =
+        map
+          ( \marker ->
+              let
+                trimmedMessage =
+                  if String.take 6 marker.source == "Hole: " then
+                    String.takeWhile (\c -> c /= codePointFromChar '\n') marker.message
+                  else
+                    marker.message
+              in
+                marker { message = trimmedMessage }
+          )
+          warnings
     let
       errors = filter (\{ severity } -> isError severity) markers
-    assign (_marloweState <<< _Head <<< _editorWarnings) warnings
+    assign (_marloweState <<< _Head <<< _editorWarnings) trimHoles
     assign (_marloweState <<< _Head <<< _editorErrors) errors
     pure unit
   preventDefault event = wrap $ liftEffect $ FileEvents.preventDefault event
@@ -156,6 +180,17 @@ instance monadAppHalogenApp ::
     let
       msgString = unsafeStringify <<< encode $ CheckForWarnings contract state
     wrap $ raise (WebsocketMessage msgString)
+  scrollHelpPanel =
+    wrap
+      $ liftEffect do
+          window <- Web.window
+          document <- toDocument <$> W.document window
+          mSidePanel <- WC.item 0 =<< D.getElementsByClassName "sidebar-composer" document
+          case mSidePanel of
+            Nothing -> pure unit
+            Just sidePanel -> do
+              scrollHeight <- E.scrollHeight sidePanel
+              setScrollTop scrollHeight sidePanel
 
 -- I don't quite understand why but if you try to use MonadApp methods in HalogenApp methods you
 -- blow the stack so we have 2 methods pulled out here. I think this just ensures they are run
