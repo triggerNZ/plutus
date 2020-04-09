@@ -29,7 +29,7 @@ in {
 
   z3 = super.z3.override { staticbin = true; };
   gmp6 = super.gmp6.override { withStatic = true; };
-  zlib = super.zlib.override { static = true; };
+  zlib = super.zlib.overrideAttrs { static = true; };
   ncurses = super.ncurses.override { enableStatic = true; };
   libffi = super.libffi.overrideAttrs (old: { dontDisableStatic = true; });
 
