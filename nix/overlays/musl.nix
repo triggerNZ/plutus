@@ -25,4 +25,16 @@ in {
   openssl = super.openssl.overrideAttrs (old: lib.optionalAttrs hostPlatform.isMusl {
     configureScript = "./Configure linux-x86_64";
   });
+
+  z3 = super.z3.override { staticbin = true; };
+  openssl = (super.openssl.override { static = true; }).overrideAttrs(old : {
+    # "no-shared" per https://github.com/NixOS/nixpkgs/pull/77542, should be able to
+    # get rid of this when we update nixpkgs
+    configureFlags = old.configureFlags ++ [ "no-shared" ];
+  });
+  gmp6 = super.gmp6.override { withStatic = true; };
+  zlib = super.zlib.static;
+  ncurses = super.ncurses.override { enableStatic = true; };
+  libffi = super.libffi.overrideAttrs (old: { dontDisableStatic = true; });
+
 }

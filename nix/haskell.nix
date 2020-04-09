@@ -79,6 +79,13 @@ let
             marlowe.package.ghcOptions = "-Werror";
             marlowe-hspec.package.ghcOptions = "-Werror";
             marlowe-symbolic.package.ghcOptions = "-Werror";
+            marlowe-symbolic.package.configurationFlags = ''
+                     -optl=-L${pkgs.ncurses}/lib \
+                     -optl=-L${pkgs.zlib}/lib \
+                     -optl=-L${pkgs.gmp6}/lib \
+                     -optl=-L${pkgs.openssl}/lib \
+                     -optl=-L${pkgs.libffi}/lib
+            '';
             marlowe-playground-server.package.ghcOptions = "-Werror";
             playground-common.package.ghcOptions = "-Werror";
             # FIXME: has warnings
