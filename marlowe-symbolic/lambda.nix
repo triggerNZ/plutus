@@ -50,7 +50,7 @@ in
     #                  -optl=-L${lib.getLib libffi}/lib
     #   '';
     installPhase = ''
-      zip -j marlowe-symbolic.zip ${haskellPackages.marlowe-symbolic.components.exes.marlowe-symbolic}/bin/bootstrap ${z3}/bin/z3 ${killallz3}/bin/killallz3
+      zip -j marlowe-symbolic.zip ${haskellPackages.marlowe-symbolic.components.exes.marlowe-symbolic}/bin/bootstrap ${pkgs.z3}/bin/z3 ${killallz3}/bin/killallz3
       mv marlowe-symbolic.zip $out/marlowe-symbolic.zip
     '';
 
