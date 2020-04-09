@@ -76,6 +76,8 @@ in rec {
       // { inherit (packages) plc-agda; };
     # All the packages defined by our project, built for musl
     muslPackages = import ./nix/haskell.nix { inherit (pkgsMusl) lib stdenv pkgs haskell-nix buildPackages; inherit metatheory checkMaterialization; };
+    muslProjectPackages =
+      pkgsMusl.haskell-nix.haskellLib.selectProjectPackages muslPackages;
     # Extra Haskell packages which we use but aren't part of the main project definition.
     extraPackages = pkgs.callPackage ./nix/haskell-extra.nix { inherit (localLib) index-state; inherit checkMaterialization; };
   };
@@ -279,7 +281,7 @@ in rec {
     });
   };
 
-  marlowe-symbolic-lambda = pkgsMusl.callPackage ./marlowe-symbolic/lambda.nix { haskellPackages = haskell.muslPackages; };
+  marlowe-symbolic-lambda = pkgsMusl.callPackage ./marlowe-symbolic/lambda.nix { haskellPackages = haskell.muslProjectPackages; };
 
   metatheory = import ./metatheory/default.nix {
     inherit (agdaPackages) agda AgdaStdlib;
