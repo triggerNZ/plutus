@@ -3,7 +3,6 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeOperators         #-}
 
 module Language.PlutusCore.Evaluation.Machine.Ck
@@ -21,10 +20,12 @@ import           PlutusPrelude
 import           Language.PlutusCore.Constant.Apply
 import           Language.PlutusCore.Core
 import           Language.PlutusCore.Evaluation.Machine.ExBudgeting
+import           Language.PlutusCore.Evaluation.Machine.ExBudgetingDefaults
 import           Language.PlutusCore.Evaluation.Machine.Exception
 import           Language.PlutusCore.Evaluation.Machine.ExMemory
 import           Language.PlutusCore.Evaluation.Result
 import           Language.PlutusCore.Name
+import           Language.PlutusCore.Pretty                                 (PrettyConst)
 import           Language.PlutusCore.Universe
 import           Language.PlutusCore.View
 
@@ -45,6 +46,7 @@ type CkM uni = Either (CkEvaluationException uni)
 
 instance SpendBudget (CkM uni) uni where
     spendBudget _ _ _ = pure ()
+    builtinCostParams = pure defaultCostModel
 
 data Frame uni
     = FrameApplyFun (Value TyName Name uni ())                 -- ^ @[V _]@
@@ -172,7 +174,9 @@ applyEvaluate stack fun                    arg =
 applyEvaluateCkBuiltinName
     :: (GShow uni, GEq uni, DefaultUni <: uni, Closed uni, uni `Everywhere` ExMemoryUsage)
     => BuiltinName -> [Value TyName Name uni ()] -> CkM uni (ConstAppResult uni ())
-applyEvaluateCkBuiltinName name args = void <$> applyBuiltinName name (withMemory <$> args)
+applyEvaluateCkBuiltinName name args = do
+    params <- builtinCostParams
+    void <$> applyBuiltinName params name (withMemory <$> args)
 
 -- | Evaluate a term using the CK machine. May throw a 'CkMachineException'.
 -- This differs from the spec version: we do not have the following rule:
@@ -190,7 +194,7 @@ evaluateCk term = [] |> term
 -- | Evaluate a term using the CK machine. May throw a 'CkMachineException'.
 unsafeEvaluateCk
     :: ( GShow uni, GEq uni, DefaultUni <: uni, Closed uni, uni `Everywhere` ExMemoryUsage
-       , Typeable uni, uni `Everywhere` Pretty
+       , Typeable uni, uni `Everywhere` PrettyConst
        )
     => Term TyName Name uni () -> EvaluationResultDef uni
 unsafeEvaluateCk = either throw id . extractEvaluationResult . evaluateCk

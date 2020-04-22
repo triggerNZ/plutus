@@ -4,6 +4,7 @@
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE MonoLocalBinds     #-}
 {-# LANGUAGE NamedFieldPuns     #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RankNTypes         #-}
@@ -15,7 +16,9 @@
 {-# OPTIONS_GHC -fno-specialise #-}
 
 module Language.Marlowe.Client where
-import           Control.Monad.Error.Class  (MonadError (..))
+
+import           Control.Monad.Freer
+import           Control.Monad.Freer.Error  (Error)
 import           Data.Map                   (Map)
 import qualified Data.Map                   as Map
 import           Data.Maybe                 (maybeToList)
@@ -32,22 +35,23 @@ import           Ledger.Scripts             (Redeemer (..), Validator, validator
 import qualified Ledger.Typed.Scripts       as Scripts
 import           Ledger.Validation
 import qualified Ledger.Value               as Val
-import           Wallet                     (NodeAPI (..), SigningProcessAPI, WalletAPI (..), WalletAPIError,
-                                             createPaymentWithChange, createTxAndSubmit, throwOtherError)
+import           Wallet                     (WalletAPIError, createPaymentWithChange, createTxAndSubmit,
+                                             throwOtherError)
+import           Wallet.Effects             hiding (Payment)
+import qualified Wallet.Effects             as Wallet
 
 {-| Create a Marlowe contract.
     Uses wallet public key to generate a unique script address.
  -}
 createContract :: (
-    MonadError WalletAPIError m,
-    WalletAPI m,
-    NodeAPI m,
-    SigningProcessAPI m)
+    Member WalletEffect effs,
+    Member SigningProcessEffect effs
+    )
     => MarloweParams
     -> Contract
-    -> m (MarloweData, Tx)
+    -> Eff effs (MarloweData, Tx)
 createContract params contract = do
-    slot <- slot
+    slot <- walletSlot
     creator <- pubKeyHash <$> ownPubKey
     let validator = validatorScript params
 
@@ -57,12 +61,12 @@ createContract params contract = do
         ds = Datum $ PlutusTx.toData marloweData
 
     let payValue = adaValueOf 1
-    (payment, change) <- createPaymentWithChange payValue
+    Wallet.Payment{paymentInputs, paymentChangeOutput} <- createPaymentWithChange payValue
     let o = scriptTxOut P.zero validator ds
         slotRange = interval slot (slot + 10)
-        outputs = o : (pubKeyHashTxOut payValue creator) : maybeToList change
+        outputs = o : (pubKeyHashTxOut payValue creator) : maybeToList paymentChangeOutput
 
-    tx <- createTxAndSubmit slotRange payment outputs [ds]
+    tx <- createTxAndSubmit slotRange paymentInputs outputs [ds]
     return (marloweData, tx)
 
 
@@ -70,17 +74,17 @@ createContract params contract = do
     from 'tx' with 'MarloweData' data script.
  -}
 deposit :: (
-    MonadError WalletAPIError m,
-    WalletAPI m,
-    NodeAPI m,
-    SigningProcessAPI m)
+    Member WalletEffect effs,
+    Member SigningProcessEffect effs,
+    Member (Error WalletAPIError) effs
+    )
     => Tx
     -> MarloweParams
     -> MarloweData
     -> AccountId
     -> Token
     -> Integer
-    -> m (MarloweData, Tx)
+    -> Eff effs (MarloweData, Tx)
 deposit tx params marloweData accountId token amount = do
     pubKeyHash <- pubKeyHash <$> ownPubKey
     applyInputs tx params marloweData [IDeposit accountId (PK pubKeyHash) token amount]
@@ -88,29 +92,29 @@ deposit tx params marloweData accountId token amount = do
 
 {-| Notify a contract -}
 notify :: (
-    MonadError WalletAPIError m,
-    WalletAPI m,
-    NodeAPI m,
-    SigningProcessAPI m)
+    Member WalletEffect effs,
+    Member SigningProcessEffect effs,
+    Member (Error WalletAPIError) effs
+    )
     => Tx
     -> MarloweParams
     -> MarloweData
-    -> m (MarloweData, Tx)
+    -> Eff effs (MarloweData, Tx)
 notify tx params marloweData = applyInputs tx params marloweData [INotify]
 
 
 {-| Make a 'choice' identified as 'choiceId'. -}
 makeChoice :: (
-    MonadError WalletAPIError m,
-    WalletAPI m,
-    NodeAPI m,
-    SigningProcessAPI m)
+    Member WalletEffect effs,
+    Member SigningProcessEffect effs,
+    Member (Error WalletAPIError) effs
+    )
     => Tx
     -> MarloweParams
     -> MarloweData
     -> ChoiceId
     -> Integer
-    -> m (MarloweData, Tx)
+    -> Eff effs (MarloweData, Tx)
 makeChoice tx params marloweData choiceId choice =
     applyInputs tx params marloweData [IChoice choiceId choice]
 
@@ -128,14 +132,14 @@ makeChoice tx params marloweData choiceId choice =
     Then, after slot 200, one can evaluate again to claim the payment.
 -}
 makeProgress :: (
-    MonadError WalletAPIError m,
-    WalletAPI m,
-    NodeAPI m,
-    SigningProcessAPI m)
+    Member WalletEffect effs,
+    Member SigningProcessEffect effs,
+    Member (Error WalletAPIError) effs
+    )
     => Tx
     -> MarloweParams
     -> MarloweData
-    -> m (MarloweData, Tx)
+    -> Eff effs (MarloweData, Tx)
 makeProgress tx params marloweData = applyInputs tx params marloweData []
 
 
@@ -144,21 +148,21 @@ makeProgress tx params marloweData = applyInputs tx params marloweData []
     One can only apply an input that's expected from his/her PubKey.
 -}
 applyInputs :: (
-    MonadError WalletAPIError m,
-    WalletAPI m,
-    NodeAPI m,
-    SigningProcessAPI m)
+    Member WalletEffect effs,
+    Member SigningProcessEffect effs,
+    Member (Error WalletAPIError) effs
+    )
     => Tx
     -> MarloweParams
     -> MarloweData
     -> [Input]
-    -> m (MarloweData, Tx)
+    -> Eff effs (MarloweData, Tx)
 applyInputs tx params marloweData@MarloweData{..} inputs = do
     let redeemer = mkRedeemer inputs
         validator = validatorScript params
         dataValue = Datum (PlutusTx.toData marloweData)
         address = scriptAddress validator
-    slot <- slot
+    slot <- walletSlot
 
     -- For now, we expect a transaction to happen whithin 10 slots from now.
     -- That's about 3 minutes, should be fine.
@@ -198,14 +202,14 @@ applyInputs tx params marloweData@MarloweData{..} inputs = do
         Error txError -> throwOtherError (Text.pack $ show txError)
 
 
-    (payment, change) <- if totalIncome `Val.gt` P.zero
+    Wallet.Payment{paymentInputs, paymentChangeOutput} <- if totalIncome `Val.gt` P.zero
         then createPaymentWithChange totalIncome
-        else return (Set.empty, Nothing)
+        else return Wallet.emptyPayment
 
     tx <- createTxAndSubmit
         slotRange
-        (Set.insert scriptIn payment)
-        (deducedTxOutputs ++ maybeToList change)
+        (Set.insert scriptIn paymentInputs)
+        (deducedTxOutputs ++ maybeToList paymentChangeOutput)
         dataValues
 
     return (marloweData, tx)
