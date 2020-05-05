@@ -20,7 +20,7 @@ import           Data.Text.Prettyprint.Doc          (Pretty, pretty, (<+>))
 import           Data.UUID                          (UUID)
 import qualified Data.UUID                          as UUID
 import           GHC.Generics                       (Generic)
-import           Language.Plutus.Contract.Resumable (ResumableError)
+import           Language.Plutus.Contract.Types     (ContractError)
 import           Ledger                             (Blockchain, Tx, TxId, UtxoIndex)
 import           Plutus.SCB.Events                  (ContractInstanceId)
 import           Servant.Client                     (BaseUrl, ClientError)
@@ -40,7 +40,7 @@ data SCBError
     = FileNotFound FilePath
     | ContractNotFound FilePath
     | ContractInstanceNotFound ContractInstanceId
-    | ContractError (ResumableError Text)
+    | SCBContractError ContractError
     | WalletClientError ClientError
     | NodeClientError ClientError
     | SigningProcessError ClientError

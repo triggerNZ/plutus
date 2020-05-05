@@ -20,17 +20,11 @@ import qualified Data.Aeson.Encode.Pretty                          as JSON
 import qualified Data.ByteString.Lazy                              as BSL
 import           Data.Proxy                                        (Proxy (Proxy))
 import           Language.Plutus.Contract.Effects.AwaitSlot        (WaitingForSlot)
-import           Language.Plutus.Contract.Effects.AwaitTxConfirmed (TxConfirmed, TxIdSet)
-import           Language.Plutus.Contract.Effects.ExposeEndpoint   (ActiveEndpoints, EndpointValue)
+import           Language.Plutus.Contract.Effects.AwaitTxConfirmed (TxConfirmed)
+import           Language.Plutus.Contract.Effects.ExposeEndpoint   (EndpointDescription, EndpointValue)
 import           Language.Plutus.Contract.Effects.OwnPubKey        (OwnPubKeyRequest)
 import           Language.Plutus.Contract.Effects.UtxoAt           (UtxoAtAddress)
-import           Language.Plutus.Contract.Effects.WatchAddress     (AddressSet)
-import           Language.Plutus.Contract.Effects.WriteTx          (PendingTransactions, WriteTxResponse)
-import           Language.PureScript.Bridge                        (BridgePart, Language (Haskell), SumType,
-                                                                    buildBridge, equal, genericShow, mkSumType, order,
-                                                                    writePSTypesWith)
-import           Language.PureScript.Bridge.CodeGenSwitches        (ForeignOptions (ForeignOptions), genForeign,
-                                                                    unwrapSingleConstructors)
+import           Language.Plutus.Contract.Effects.WriteTx          (WriteTxResponse)
 import           Language.PureScript.Bridge.TypeParameters         (A)
 import           Ledger.Constraints.OffChain                       (UnbalancedTx)
 import           Plutus.SCB.Core                                   (activateContract, installContract)
@@ -38,9 +32,8 @@ import           Plutus.SCB.Effects.ContractTest                   (TestContract
 import           Plutus.SCB.Effects.MultiAgent                     (agentAction)
 import           Plutus.SCB.Events                                 (ChainEvent)
 import           Plutus.SCB.Events.Contract                        (ContractEvent, ContractInstanceId,
-                                                                    ContractInstanceState, ContractIteration,
-                                                                    ContractMailbox, ContractRequest, ContractResponse,
-                                                                    MailboxMessage, PartiallyDecodedResponse)
+                                                                    ContractInstanceState, ContractResponse,
+                                                                    IterationID, PartiallyDecodedResponse)
 import           Plutus.SCB.Events.Node                            (NodeEvent)
 import           Plutus.SCB.Events.User                            (UserEvent)
 import           Plutus.SCB.Events.Wallet                          (WalletEvent)
@@ -88,28 +81,23 @@ myTypes =
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @(ContractInstanceState A))
     , (equal <*> (genericShow <*> mkSumType))
           (Proxy @(ContractSignatureResponse A))
-    , (equal <*> (genericShow <*> mkSumType)) (Proxy @PartiallyDecodedResponse)
-    , (equal <*> (genericShow <*> mkSumType)) (Proxy @ContractRequest)
+    , (equal <*> (genericShow <*> mkSumType)) (Proxy @(PartiallyDecodedResponse A))
+    , (order <*> (genericShow <*> mkSumType)) (Proxy @ContractInstanceId)
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @ContractResponse)
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @(ContractEvent A))
-    , (equal <*> (genericShow <*> mkSumType)) (Proxy @ContractIteration)
-    , (equal <*> (genericShow <*> mkSumType)) (Proxy @ContractMailbox)
-    , (equal <*> (genericShow <*> mkSumType)) (Proxy @MailboxMessage)
+    , (equal <*> (genericShow <*> mkSumType)) (Proxy @IterationID)
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @UnbalancedTx)
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @NodeEvent)
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @(UserEvent A))
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @WalletEvent)
 
     -- Contract request / response types
-    , (equal <*> (genericShow <*> mkSumType)) (Proxy @ActiveEndpoints)
-    , (equal <*> (genericShow <*> mkSumType)) (Proxy @AddressSet)
+    , (equal <*> (genericShow <*> mkSumType)) (Proxy @EndpointDescription)
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @(EndpointValue A))
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @OwnPubKeyRequest)
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @TxConfirmed)
-    , (equal <*> (genericShow <*> mkSumType)) (Proxy @TxIdSet)
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @UtxoAtAddress)
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @WriteTxResponse)
-    , (equal <*> (genericShow <*> mkSumType)) (Proxy @PendingTransactions)
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @WaitingForSlot)
     ]
 

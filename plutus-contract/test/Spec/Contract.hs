@@ -55,7 +55,7 @@ tests =
         , cp "both (2)"
             (void $ Con.both (awaitSlot 10) (awaitSlot 20))
             (waitingForSlot w1 20)
-            $ addEvent w1 (AwaitSlot.event 10)
+            $ addEvent @AwaitSlot.SlotSymbol w1 (AwaitSlot.event 10)
 
         , cp "fundsAtAddressGt"
             (void $ fundsAtAddressGt someAddress (Ada.adaValueOf 10))
@@ -81,9 +81,9 @@ tests =
             (let
                 oneTwo = endpoint @"1" >> endpoint @"2" >> endpoint @"4"
                 oneThree = endpoint @"1" >> endpoint @"3" >> endpoint @"4"
-             in oneTwo <|> oneThree)
-            (endpointAvailable @"2" w1
-            /\ not (endpointAvailable @"3" w1))
+             in oneTwo `select` oneThree)
+            (endpointAvailable @"3" w1
+            /\ not (endpointAvailable @"2" w1))
             (callEndpoint @"1" w1 1)
 
         , cp "call endpoint (1)"
@@ -121,7 +121,7 @@ tests =
                  s = selectEither l r
             in void s)
             (assertDone w1 (const True) "left branch should finish")
-            (callEndpoint @"3" w1 3 >> callEndpoint @"1" w1 1 >> callEndpoint @"2" w1 2)
+            (callEndpoint @"1" w1 1 >> callEndpoint @"2" w1 2)
 
         , cp "loopM"
             (void $ loopM (\_ -> Left <$> endpoint @"1" @Int) 0)
@@ -135,7 +135,7 @@ tests =
 
         , cp "throw an error"
             (void $ throwing Con._ContractError $ OtherError "error")
-            (assertContractError w1 (\case { ContractError (OtherError "error") -> True; _ -> False}) "failed to throw error")
+            (assertContractError w1 (\case { TContractError (OtherError "error") -> True; _ -> False}) "failed to throw error")
             (pure ())
 
         , cp "pay to wallet"
@@ -157,6 +157,11 @@ tests =
             /\ walletFundsChange w2 (Ada.lovelaceValueOf 10))
             (handleBlockchainEvents w1)
 
+        , cp "checkpoint"
+            (checkpointContract)
+            (not (endpointAvailable @"2" w1) /\ (endpointAvailable @"1" w1))
+            (callEndpoint @"1" @Int w1 1 >> callEndpoint @"2" @Int w1 1)
+
         ]
 
 w1 :: EM.Wallet
@@ -164,6 +169,15 @@ w1 = EM.Wallet 1
 
 w2 :: EM.Wallet
 w2 = EM.Wallet 2
+
+checkpointContract :: Contract Schema ContractError ()
+checkpointContract = void $ do
+    checkpoint $ do
+        endpoint @"1" @Int
+        endpoint @"2" @Int
+    checkpoint $ do
+        endpoint @"1" @Int
+        endpoint @"3" @Int
 
 someAddress :: Address
 someAddress = Ledger.scriptAddress $
