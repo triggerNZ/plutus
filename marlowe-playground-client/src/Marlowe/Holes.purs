@@ -189,6 +189,18 @@ getMarloweConstructors PartyType =
 allMarloweConstructors :: Map String (Array Argument)
 allMarloweConstructors = foldl (\acc mt -> getMarloweConstructors mt <> acc) mempty allMarloweTypes
 
+allMarloweConstructorNames :: Map String MarloweType
+allMarloweConstructorNames = foldl (\acc t -> f t <> acc) mempty allMarloweTypes
+  where
+  f :: MarloweType -> Map String MarloweType
+  f marloweType' =
+    let
+      constructors = Map.keys $ getMarloweConstructors marloweType'
+
+      (kvs :: Array (Tuple String MarloweType)) = Set.toUnfoldable $ Set.map (\constructor -> Tuple constructor marloweType') constructors
+    in
+      Map.fromFoldable kvs
+
 -- Based on a String representation of a constructor get the MarloweType
 -- "Close" -> ContractType
 -- "PK" -> PartyType
