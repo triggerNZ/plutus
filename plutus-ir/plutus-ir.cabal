@@ -38,6 +38,7 @@ library
     other-modules:
         Language.PlutusIR.Analysis.Dependencies
         Language.PlutusIR.Analysis.Usages
+        Language.PlutusIR.Analysis.Free
         Language.PlutusIR.Compiler.Error
         Language.PlutusIR.Compiler.Let
         Language.PlutusIR.Compiler.Datatype
