@@ -16,8 +16,8 @@ import           Data.Aeson                       (FromJSON, ToJSON)
 import           Data.Maybe                       (isJust)
 import           Data.Proxy
 import           Data.Row
+import           Data.String                      (IsString)
 import           Data.Text.Prettyprint.Doc
-import Data.String (IsString)
 import           Data.Text.Prettyprint.Doc.Extras
 import           GHC.Generics                     (Generic)
 import           GHC.TypeLits                     (Symbol, symbolVal)

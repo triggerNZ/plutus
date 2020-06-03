@@ -39,9 +39,11 @@ module Language.Plutus.Contract.Resumable(
 
 import           Control.Applicative
 import           Data.Aeson                    (FromJSON, FromJSONKey, ToJSON, ToJSONKey)
+import           Data.List.NonEmpty            (NonEmpty (..))
 import           Data.Map                      (Map)
 import qualified Data.Map                      as Map
 import           Data.Semigroup                (Max (..))
+import Data.Semigroup.Foldable (foldMap1)
 import           Data.Text.Prettyprint.Doc
 import           GHC.Generics                  (Generic)
 import           Numeric.Natural               (Natural)
@@ -138,10 +140,10 @@ initialRequestState =
         }
 
 pruneRequests :: [Request o] -> [Request o]
-pruneRequests [] = [] -- this case is not technically required because 'filter' won't evaluate the argument on an empty list, but I think it's nicer to include it because 'maximum' is, after all, a partial function.
-pruneRequests rs =
-    let maxIteration = maximum (itID <$> rs)
-    in filter ((==) maxIteration . itID) rs
+pruneRequests [] = []
+pruneRequests (r:rs) =
+    let Max maxIteration = foldMap1 (Max . itID) (r :| rs)
+    in filter ((==) maxIteration . itID) (r:rs)
 
 nextRequestID ::
     ( Member (State (RequestState o)) effs
@@ -180,20 +182,20 @@ type ResumableInterpreter i o effs =
      ': State RequestID
      ': effs
 
-newtype Record i = Record { unRecord :: Map IterationID (Map RequestID i) }
+newtype Record i = Record { unRecord :: Map (IterationID, RequestID) i }
     deriving newtype (Eq, Ord, Show, Semigroup, Monoid, ToJSON, FromJSON)
     deriving stock (Generic, Functor, Foldable, Traversable)
 
 instance Pretty i => Pretty (Record i) where
     pretty (Record mp) =
-        let entries = Map.toList mp >>= (\(itID, mp') -> fmap (itID,) (Map.toList mp'))
-            prettyEntry (itID, (reqID, i)) =
+        let entries = Map.toList mp
+            prettyEntry ((itID, reqID), i) =
                 hang 2 $ vsep ["IterationID:" <+> pretty itID, "RequestID:" <+> pretty reqID, "Event:" <+> pretty i]
         in vsep (prettyEntry <$> entries)
 
 insertResponse :: Response i -> Record i -> Record i
 insertResponse Response{rspRqID,rspItID,rspResponse} (Record r) =
-    Record $ Map.insert rspItID (Map.singleton rspRqID rspResponse) r
+    Record $ Map.insert (rspItID, rspRqID) rspResponse r
 
 -- Return the answer or the remaining requests
 mkResult ::
@@ -225,7 +227,7 @@ handleNonDetPrompt e = result where
     loop (Continue a k) = do
         Record mp' <- ask
         (iid,nid) <- nextRequestID a
-        case Map.lookup iid mp' >>= Map.lookup nid of
+        case Map.lookup (iid, nid) mp' of
             Nothing -> empty
             Just v  -> clearRequests @o >> k v >>= loop
     loop (Done a)       = pure a

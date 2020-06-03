@@ -24,21 +24,22 @@ module Plutus.SCB.Effects.Contract(
     ) where
 
 import           Control.Monad.Freer
-import           Control.Monad.Freer.Error                       (Error, throwError)
-import           Control.Monad.Freer.TH                          (makeEffect)
-import Data.Aeson ((.=))
-import qualified Data.Aeson                                      as JSON
-import qualified Data.HashMap.Lazy                               as HashMap
-import           Data.Text                                       (Text)
-import qualified Data.Text                                       as Text
+import           Control.Monad.Freer.Error          (Error, throwError)
+import           Control.Monad.Freer.TH             (makeEffect)
+import           Data.Aeson                         ((.=))
+import qualified Data.Aeson                         as JSON
+import qualified Data.HashMap.Lazy                  as HashMap
+import           Data.Text                          (Text)
+import qualified Data.Text                          as Text
 import           Language.Plutus.Contract.Resumable (Response (..))
-import           Playground.Types                                (FunctionSchema)
+import           Playground.Types                   (FunctionSchema)
+import Language.Plutus.Contract.Effects.ExposeEndpoint(EndpointDescription(..))
 
 import           Language.Plutus.Contract.State     (ContractRequest (..))
-import           Plutus.SCB.Events.Contract                      (ContractSCBRequest(..),ContractResponse (..),
-                                                                  PartiallyDecodedResponse (..))
-import           Plutus.SCB.Types                                (SCBError (OtherError))
-import           Schema                                          (FormSchema)
+import           Plutus.SCB.Events.Contract         (ContractResponse (..), ContractSCBRequest (..),
+                                                     PartiallyDecodedResponse (..))
+import           Plutus.SCB.Types                   (SCBError (OtherError))
+import           Schema                             (FormSchema)
 
 -- | Commands to update a contract. 't' identifies the contract.
 data ContractCommand t
@@ -57,7 +58,7 @@ makeEffect ''ContractEffect
 
 -- | An event sent to the contract
 newtype EventPayload = EventPayload { unEventPayload :: Response JSON.Value }
-    deriving stock Show 
+    deriving stock Show
 
 -- | Given a contract definition 't' and the contract's previous state
 --   in form of a 'PartiallyDecodedResponse', apply the next input
@@ -119,4 +120,4 @@ contractMessageToPayload = EventPayload . fmap go where
         UtxoAtResponse u -> ("utxo-at", JSON.toJSON u)
         NextTxAtResponse tx -> ("address", JSON.toJSON tx)
         WriteTxResponse r -> ("tx", JSON.toJSON r)
-        UserEndpointResponse n r -> (n, JSON.toJSON r)
+        UserEndpointResponse (EndpointDescription n) r -> (n, JSON.toJSON r)

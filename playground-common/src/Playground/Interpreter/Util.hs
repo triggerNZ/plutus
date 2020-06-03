@@ -19,7 +19,7 @@ import           Data.Foldable                                   (traverse_)
 import           Data.Map                                        (Map)
 import qualified Data.Map                                        as Map
 import           Data.Row                                        (Forall)
-import           Data.Row.Internal                (Unconstrained1)
+import           Data.Row.Internal                               (Unconstrained1)
 import           Data.Text                                       (Text)
 import qualified Data.Text                                       as Text
 import qualified Data.Text.Encoding                              as Text
@@ -29,8 +29,8 @@ import           Language.Plutus.Contract.Effects.ExposeEndpoint (EndpointDescri
 import           Language.Plutus.Contract.Schema                 (Event, Input, Output)
 import           Language.Plutus.Contract.Test                   (renderTraceContext)
 import           Language.Plutus.Contract.Trace                  (ContractTrace, ContractTraceState,
-                                                                  TraceError (TContractError), addBlocks, addBlocksUntil,
-                                                                  addNamedEvent, handleBlockchainEvents,
+                                                                  TraceError (TContractError), addBlocks,
+                                                                  addBlocksUntil, addNamedEvent, handleBlockchainEvents,
                                                                   notifyInterestingAddresses, notifySlot, payToWallet,
                                                                   runTraceWithDistribution)
 import           Ledger                                          (Blockchain, PubKey, TxOut (txOutValue), pubKeyHash,

@@ -1,4 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE DeriveAnyClass      #-}
 {-# LANGUAGE DeriveGeneric       #-}
@@ -6,6 +5,7 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -37,14 +37,16 @@ import           Plutus.SCB.Types                                  (SCBError (..
 import           Plutus.SCB.Utils                                  (render, tshow)
 
 import           Control.Monad.Freer.Extra.Log                     (Log, logDebug)
-import           Language.Plutus.Contract                  (Contract, ContractError)
+import           Language.Plutus.Contract                          (Contract, ContractError)
 
+import           Language.Plutus.Contract.Schema                   (Event, Handlers, Input, Output)
 import           Language.Plutus.Contract.State                    (ContractRequest, ContractResponse (..))
 import qualified Language.Plutus.Contract.State                    as ContractState
-import           Language.Plutus.Contract.Schema                   (Event, Handlers, Input, Output)
 import qualified Language.PlutusTx.Coordination.Contracts.Currency as Contracts.Currency
 import qualified Language.PlutusTx.Coordination.Contracts.Game     as Contracts.Game
 import           Playground.Schema                                 (endpointsToSchemas)
+
+import qualified Debug.Trace as Trace
 
 data TestContracts = Game | Currency
     deriving (Eq, Ord, Show, Generic)
@@ -99,6 +101,7 @@ doContractUpdate ::
     -> Eff effs (PartiallyDecodedResponse ContractSCBRequest)
 doContractUpdate contract payload = do
     logDebug "doContractUpdate"
+    logDebug $ Text.pack  $ show $ Trace.traceShowId $ fmap JSON.encode payload
     request :: (ContractRequest (Event schema)) <-
         either throwError pure
         $ fromString

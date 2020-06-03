@@ -1,11 +1,11 @@
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE MonoLocalBinds      #-}
+{-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RankNTypes       #-}
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MonoLocalBinds   #-}
-{-# LANGUAGE NamedFieldPuns   #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
 module Spec.State where
 
 import           Control.Monad.Freer                (Eff, run)
@@ -58,12 +58,12 @@ tests = testGroup "stateful contract"
             rsOpenRequests
 
     , HUnit.testCase "run a contract with a two prompts and one answer" $
-        let record = Record $ Map.singleton (IterationID 1) $ Map.singleton (RequestID 2) 5
+        let record = Record $ Map.singleton (1, 2) 5
             (result, _) = runResumableTest @Int @String record ((askStr "prompt1" >> pure "branch 1") `selectStr` (askStr "prompt2" >> pure "branch 2"))
         in HUnit.assertEqual "run a contract with a two prompts and one answer" (Just "branch 2") result
 
     , HUnit.testCase "commit to a branch" $
-        let record = Record $ Map.singleton (IterationID 1) $ Map.singleton (RequestID 1) 5
+        let record = Record $ Map.singleton (1, 1) 5
             (_, RequestState{rsOpenRequests}) = runResumableTest @Int @String record ((askStr "prompt1" >> askStr "prompt3") `selectStr` (askStr "prompt2" >> pure 10))
         in HUnit.assertEqual
                 "commit to a branch"
@@ -71,7 +71,7 @@ tests = testGroup "stateful contract"
                 rsOpenRequests
 
     , HUnit.testCase "commit to a branch (II)" $
-        let record = Record $ Map.singleton (IterationID 1) $ Map.singleton (RequestID 2) 5
+        let record = Record $ Map.singleton (1, 2) 5
             (_, RequestState{rsOpenRequests}) = runResumableTest @Int @String record ((askStr "prompt2" >> pure 10) `selectStr` (askStr "prompt1" >> askStr "prompt3"))
         in HUnit.assertEqual
             "commit to a branch (II)"
@@ -79,12 +79,12 @@ tests = testGroup "stateful contract"
             rsOpenRequests
 
     , HUnit.testCase "return a result" $
-        let record = Record $ Map.singleton (IterationID 1) $ Map.singleton (RequestID 2) 5
+        let record = Record $ Map.singleton (1, 2) 5
             (result, _) = runResumableTest @Int @String record ((askStr "prompt1" >> askStr "prompt4") `selectStr` (askStr "prompt2" >> pure 10) `selectStr` (askStr "prompt3" >> askStr "prompt5"))
         in HUnit.assertEqual "return a result" (Just 10) result
 
     , HUnit.testCase "go into a branch" $
-        let record = Record $ Map.fromList [(IterationID 1, Map.singleton (RequestID 2) 5), (IterationID 2, Map.singleton (RequestID 4) 10)]
+        let record = Record $ Map.fromList [((IterationID 1, RequestID 2), 5), ((IterationID 2, RequestID 4), 10) ]
             (result, _) = runResumableTest @Int @String record
                 ((askStr "prompt1" >> askStr "prompt4")
                 `selectStr`
@@ -95,10 +95,10 @@ tests = testGroup "stateful contract"
     , HUnit.testCase "loop" $
         let record = Record
                  $ Map.fromList
-                    [ (IterationID 1, Map.singleton (RequestID 1) 1)
-                    , (IterationID 2, Map.singleton (RequestID 2) 1)
-                    , (IterationID 3, Map.singleton (RequestID 3) 1)
-                    , (IterationID 4, Map.singleton (RequestID 5) 1)
+                    [ ((IterationID 1, RequestID 1), 1)
+                    , ((IterationID 2, RequestID 2), 1)
+                    , ((IterationID 3, RequestID 3), 1)
+                    , ((IterationID 4, RequestID 5), 1)
                     ]
             stopLeft = askStr "stop left" >> pure (10 :: Int)
             stopRight = askStr "stop right" >> pure 11
@@ -109,9 +109,9 @@ tests = testGroup "stateful contract"
     , HUnit.testCase "loop requests" $
         let record = Record
                  $ Map.fromList
-                    [ (IterationID 1, Map.singleton (RequestID 1) 1)
-                    , (IterationID 2, Map.singleton (RequestID 2) 1)
-                    , (IterationID 3, Map.singleton (RequestID 3) 1)
+                    [ ((IterationID 1, RequestID 1), 1)
+                    , ((IterationID 2, RequestID 2), 1)
+                    , ((IterationID 3, RequestID 3), 1)
                     ]
             stopLeft = askStr "stop left" >> pure (10 :: Int)
             stopRight = askStr "stop right" >> pure 11

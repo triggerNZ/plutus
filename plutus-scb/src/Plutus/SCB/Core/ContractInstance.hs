@@ -47,7 +47,7 @@ import           Data.Text.Prettyprint.Doc                         (Pretty, pret
 
 import           Language.Plutus.Contract.Effects.AwaitSlot        (WaitingForSlot (..))
 import           Language.Plutus.Contract.Effects.AwaitTxConfirmed (TxConfirmed (..))
-import           Language.Plutus.Contract.Effects.ExposeEndpoint   (ActiveEndpoint (..), EndpointDescription(..),
+import           Language.Plutus.Contract.Effects.ExposeEndpoint   (ActiveEndpoint (..), EndpointDescription (..),
                                                                     EndpointValue (..))
 import           Language.Plutus.Contract.Effects.UtxoAt           (UtxoAtAddress (..))
 import           Language.Plutus.Contract.Effects.WriteTx          (WriteTxResponse (..))

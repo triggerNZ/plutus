@@ -15,7 +15,8 @@ import           Control.Monad            (void)
 import           Control.Monad.Error.Lens (catching, throwing, throwing_)
 import           Data.Text                (Text)
 
-import           Language.Plutus.Contract (AsContractError (_ContractError), ContractError, HasAwaitSlot, mapError, select)
+import           Language.Plutus.Contract (AsContractError (_ContractError), ContractError, HasAwaitSlot, mapError,
+                                           select)
 import           Playground.Contract
 import           Prelude                  (pure, ($), (>>))
 

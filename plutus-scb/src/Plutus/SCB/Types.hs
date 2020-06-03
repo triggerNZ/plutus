@@ -8,23 +8,23 @@
 
 module Plutus.SCB.Types where
 
-import qualified Cardano.ChainIndex.Types           as ChainIndex
-import qualified Cardano.Node.Server                as NodeServer
-import qualified Cardano.SigningProcess.Server      as SigningProcess
-import qualified Cardano.Wallet.Server              as WalletServer
-import           Control.Lens.TH                    (makePrisms)
-import           Data.Aeson                         (FromJSON, ToJSON)
-import           Data.Map.Strict                    (Map)
-import           Data.Text                          (Text)
-import           Data.Text.Prettyprint.Doc          (Pretty, pretty, (<+>))
-import           Data.UUID                          (UUID)
-import qualified Data.UUID                          as UUID
-import           GHC.Generics                       (Generic)
-import           Language.Plutus.Contract.Types     (ContractError)
-import           Ledger                             (Blockchain, Tx, TxId, UtxoIndex)
-import           Plutus.SCB.Events                  (ContractInstanceId)
-import           Servant.Client                     (BaseUrl, ClientError)
-import           Wallet.API                         (WalletAPIError)
+import qualified Cardano.ChainIndex.Types       as ChainIndex
+import qualified Cardano.Node.Server            as NodeServer
+import qualified Cardano.SigningProcess.Server  as SigningProcess
+import qualified Cardano.Wallet.Server          as WalletServer
+import           Control.Lens.TH                (makePrisms)
+import           Data.Aeson                     (FromJSON, ToJSON)
+import           Data.Map.Strict                (Map)
+import           Data.Text                      (Text)
+import           Data.Text.Prettyprint.Doc      (Pretty, pretty, (<+>))
+import           Data.UUID                      (UUID)
+import qualified Data.UUID                      as UUID
+import           GHC.Generics                   (Generic)
+import           Language.Plutus.Contract.Types (ContractError)
+import           Ledger                         (Blockchain, Tx, TxId, UtxoIndex)
+import           Plutus.SCB.Events              (ContractInstanceId)
+import           Servant.Client                 (BaseUrl, ClientError)
+import           Wallet.API                     (WalletAPIError)
 
 newtype ContractExe =
     ContractExe

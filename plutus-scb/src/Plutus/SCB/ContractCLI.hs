@@ -25,26 +25,25 @@ module Plutus.SCB.ContractCLI
     , Command(..)
     ) where
 
-import           Control.Monad.IO.Class             (MonadIO, liftIO)
-import           Data.Aeson                         (FromJSON, ToJSON)
-import qualified Data.Aeson                         as JSON
-import qualified Data.Aeson.Encode.Pretty           as JSON
-import           Data.Bifunctor                     (bimap)
-import qualified Data.ByteString.Lazy               as BSL
-import qualified Data.ByteString.Lazy.Char8         as BS8
-import           Data.Row                           (type (.\\), AllUniqueLabels, Forall)
-import           Data.Text                          (Text)
-import qualified Data.Text                          as Text
-import           Git                                (gitRev)
-import           Language.Plutus.Contract           (Contract, BlockchainActions)
-import           Language.Plutus.Contract.Schema    (Input, Output)
-import qualified Language.Plutus.Contract.State  as ContractState 
-import           Options.Applicative                (CommandFields, Mod, Parser, command, customExecParser,
-                                                     disambiguate, fullDesc, help, helper, idm, info, infoOption, long,
-                                                     prefs, progDesc, short, showHelpOnEmpty, showHelpOnError,
-                                                     subparser)
-import           Playground.Schema                  (EndpointToSchema, endpointsToSchemas)
-import           System.Exit                        (ExitCode (ExitFailure), exitSuccess, exitWith)
+import           Control.Monad.IO.Class          (MonadIO, liftIO)
+import           Data.Aeson                      (FromJSON, ToJSON)
+import qualified Data.Aeson                      as JSON
+import qualified Data.Aeson.Encode.Pretty        as JSON
+import           Data.Bifunctor                  (bimap)
+import qualified Data.ByteString.Lazy            as BSL
+import qualified Data.ByteString.Lazy.Char8      as BS8
+import           Data.Row                        (type (.\\), AllUniqueLabels, Forall)
+import           Data.Text                       (Text)
+import qualified Data.Text                       as Text
+import           Git                             (gitRev)
+import           Language.Plutus.Contract        (BlockchainActions, Contract)
+import           Language.Plutus.Contract.Schema (Input, Output)
+import qualified Language.Plutus.Contract.State  as ContractState
+import           Options.Applicative             (CommandFields, Mod, Parser, command, customExecParser, disambiguate,
+                                                  fullDesc, help, helper, idm, info, infoOption, long, prefs, progDesc,
+                                                  short, showHelpOnEmpty, showHelpOnError, subparser)
+import           Playground.Schema               (EndpointToSchema, endpointsToSchemas)
+import           System.Exit                     (ExitCode (ExitFailure), exitSuccess, exitWith)
 data Command
     = Initialise
     | Update
