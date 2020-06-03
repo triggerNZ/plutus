@@ -25,24 +25,27 @@ module Language.PlutusIR.TypeCheck.Internal
     , checkTypeM
     ) where
 
-import  Language.PlutusCore.Core as PLC (DynamicBuiltinName, BuiltinName, Builtin (..))
 import           Language.PlutusCore.Constant
 import           Language.PlutusIR
 import           Language.PlutusIR.Compiler.Error
 import           Language.PlutusCore.MkPlc
 import           Language.PlutusCore.Name
 import           Language.PlutusCore.Normalize
-import qualified Language.PlutusCore.Normalize.Internal as Norm
 import           Language.PlutusCore.Quote
 import           Language.PlutusCore.Rename
 import           Language.PlutusCore.Universe
+import Language.PlutusIR.Compiler.Datatype
 import           PlutusPrelude
-
-import           Control.Lens.TH                        (makeLenses)
+import Data.Foldable
 import           Control.Monad.Except
 import           Control.Monad.Reader
+import           Control.Lens.TH
+
+import qualified Language.PlutusCore.Normalize.Internal as Norm
+import qualified Language.PlutusCore.Core as PLC
 import           Data.Map                               (Map)
 import qualified Data.Map                               as Map
+import qualified Language.PlutusIR.MkPir                as PIR
 
 {- Note [Global uniqueness]
 WARNING: type inference/checking works under the assumption that the global uniqueness condition
@@ -96,7 +99,7 @@ functions that cannot fail looks like this:
 
 -- | Mapping from 'DynamicBuiltinName's to their 'Type's.
 newtype DynamicBuiltinNameTypes uni = DynamicBuiltinNameTypes
-    { unDynamicBuiltinNameTypes :: Map DynamicBuiltinName (Dupable (Normalized (Type TyName uni ())))
+    { unDynamicBuiltinNameTypes :: Map PLC.DynamicBuiltinName (Dupable (Normalized (Type TyName uni ())))
     } deriving newtype (Semigroup, Monoid)
 
 type TyVarKinds = UniqueMap TypeUnique (Kind ())
@@ -113,6 +116,9 @@ data TypeCheckEnv uni = TypeCheckEnv
     , _tceTyVarKinds      :: TyVarKinds
     , _tceVarTypes        :: VarTypes uni
     }
+
+instance Show (TypeCheckEnv uni) where
+    show (TypeCheckEnv _ k _) = show k
 
 -- | The type checking monad that the type checker runs in.
 -- In contains a 'TypeCheckEnv' and allows to throw 'TypeError's.
@@ -143,7 +149,7 @@ withVar name = local . over tceVarTypes . insertByName name . pure
 
 -- | Look up a 'DynamicBuiltinName' in the 'DynBuiltinNameTypes' environment.
 lookupDynamicBuiltinNameM
-    :: ann -> DynamicBuiltinName -> TypeCheckM uni ann (Normalized (Type TyName uni ()))
+    :: ann -> PLC.DynamicBuiltinName -> TypeCheckM uni ann (Normalized (Type TyName uni ()))
 lookupDynamicBuiltinNameM ann name = do
     DynamicBuiltinNameTypes dbnts <- asks $ _tccDynamicBuiltinNameTypes . _tceTypeCheckConfig
     case Map.lookup name dbnts of
@@ -182,6 +188,9 @@ dummyKind = Type ()
 
 dummyType :: Type TyName uni ()
 dummyType = TyVar () dummyTyName
+
+dummyTerm :: Term tyname Name unia ()
+dummyTerm = Var () (Name "__var" dummyUnique)
 
 -- ########################
 -- ## Type normalization ##
@@ -285,7 +294,7 @@ checkKindOfPatternFunctorM ann pat k =
 -- | Return the 'Type' of a 'BuiltinName'.
 typeOfBuiltinName
     :: (GShow uni, GEq uni, DefaultUni <: uni)
-    => BuiltinName -> Type TyName uni ()
+    => PLC.BuiltinName -> Type TyName uni ()
 typeOfBuiltinName bn = withTypedBuiltinName bn typeOfTypedBuiltinName
 
 -- | @unfoldFixOf pat arg k = NORM (vPat (\(a :: k) -> ifix vPat a) arg)@
@@ -307,15 +316,15 @@ unfoldFixOf pat arg k = do
 -- | Infer the type of a 'Builtin'.
 inferTypeOfBuiltinM
     :: (GShow uni, GEq uni, DefaultUni <: uni)
-    => Builtin ann -> TypeCheckM uni ann (Normalized (Type TyName uni ()))
+    => PLC.Builtin ann -> TypeCheckM uni ann (Normalized (Type TyName uni ()))
 -- We have a weird corner case here: the type of a 'BuiltinName' can contain 'TypedBuiltinDyn', i.e.
 -- a static built-in name is allowed to depend on a dynamic built-in type which are not required
 -- to be normalized. For dynamic built-in names we store a map from them to their *normalized types*,
 -- with the normalization happening in this module, but what should we do for static built-in names?
 -- Right now we just renormalize the type of a static built-in name each time we encounter that name.
-inferTypeOfBuiltinM (BuiltinName    _   name) = normalizeType $ typeOfBuiltinName name
+inferTypeOfBuiltinM (PLC.BuiltinName    _   name) = normalizeType $ typeOfBuiltinName name
 -- TODO: inline this definition once we have only dynamic built-in names.
-inferTypeOfBuiltinM (DynBuiltinName ann name) = lookupDynamicBuiltinNameM ann name
+inferTypeOfBuiltinM (PLC.DynBuiltinName ann name) = lookupDynamicBuiltinNameM ann name
 
 -- See the [Global uniqueness] and [Type rules] notes.
 -- | Synthesize the type of a term, returning a normalized type.
@@ -404,17 +413,31 @@ inferTypeM (Unwrap ann term)        = do
             -- Subparts of a normalized type, so normalized.
             unfoldFixOf (Normalized vPat) (Normalized vArg) k
         _                  -> throwError (TypeMismatch ann (void term) (TyIFix () dummyType dummyType) vTermTy)
-
--- TODO:
-inferTypeM (Let {}) =  undefined
-
-
 -- [check| G !- ty :: *]    ty ~>? vTy
 -- -----------------------------------
 -- [infer| G !- error ty : vTy]
 inferTypeM (Error ann ty)           = do
     checkKindM ann ty $ Type ()
     normalizeTypeM $ void ty
+
+
+inferTypeM (Let ann recurs bs inTerm) = do
+    tyInTerm <- case recurs of
+        NonRec ->
+            foldr
+               (\ b acc -> do
+                   checkWellformBind b
+                   withBind b acc)
+               (inferTypeM inTerm)
+               bs
+        Rec -> withBinds bs $ do
+            checkWellformBinds bs
+            inferTypeM inTerm
+    -- G !- inTerm :: *
+    -- TODO: here is the problem of existential-type escaping
+    checkKindM ann (ann <$ unNormalized tyInTerm) $ Type ()
+    pure tyInTerm
+
 
 -- See the [Global uniqueness] and [Type rules] notes.
 -- | Check a 'Term' against a 'NormalizedType'.
@@ -428,3 +451,126 @@ checkTypeM
 checkTypeM ann term vTy = do
     vTermTy <- inferTypeM term
     when (vTermTy /= vTy) $ throwError (TypeMismatch ann (void term) (unNormalized vTermTy) vTy)
+
+-- | extends the environment with a bind.
+-- NOTE: does not do any check of binds-name collision checks (which is needed for letrec)
+withBind :: forall uni ann a.
+           Binding TyName Name uni ann
+         -> TypeCheckM uni ann a
+         -> TypeCheckM uni ann a
+withBind b m = case b of
+  TermBind _ _ (VarDecl _ n ty) _rhs -> do
+      -- OPTIMIZE: redundant, usually this function is called together with `checkWellformBind`,
+      -- which performs normalization here as well
+      vTy <- normalizeTypeM $ void ty
+      withVar n vTy m
+  TypeBind _ (TyVarDecl _ tn k) _rhs ->
+      withTyVar tn (void k) m
+  DatatypeBind _ dt@(Datatype ann (TyVarDecl _ tn k) tyargs des vdecls) ->
+      -- add type constructor to environment
+      withTyVar tn (void k) $ do
+          -- add destructor to environment
+          desType <- mkDestructorType
+          withVar des desType $ do
+              -- normalize types of data-constructors
+              normConstrsTypes <- traverse (\ (VarDecl _ n ty) -> do
+                                        -- adds explicit forall tyargs. to the front of each constructor
+                                        vTy <- normalizeTypeM $ void $ PIR.mkIterTyForall tyargs ty
+                                        pure (n,vTy)
+                                ) vdecls
+              -- add data constructors to environment
+              foldr
+                 (uncurry withVar)
+                 m
+                 normConstrsTypes
+   where
+       mkDestructorType :: TypeCheckM uni ann (Normalized (Type TyName uni ()))
+       mkDestructorType = do
+           -- get a fresh result type
+           out <- resultTypeName dt
+           normalizeTypeM $ void $
+             -- forall (a1::*) (a2::*) ... .
+             PIR.mkIterTyForall tyargs $
+               TyFun ann
+                     -- first argument is datatype:  T a1 a2 ... ->
+                     (PIR.mkIterTyApp ann (TyVar ann tn) (fmap (mkTyVar ann) tyargs ))
+                     -- forall (out :: *)
+                     (TyForall ann out (Type ann) $
+                       -- the constructors' types with result-type replaced by out
+                       -- note to self: no need to normalize the individual constructor here;
+                       -- the outer,final,surrounding normalizeTypeM will reach and normalize each constructor
+                       foldr
+                       (TyFun ann . constructorCaseType (TyVar ann out))
+                       -- result type of constructor is: out
+                       (TyVar ann out)
+                       vdecls
+                     )
+
+withBinds :: forall uni ann a.
+            NonEmpty (Binding TyName Name uni ann)
+          -> TypeCheckM uni ann a
+          -> TypeCheckM uni ann a
+withBinds = flip . foldr $ withBind
+
+-- | check that a binding is well-formed (correctly typed, kinded)
+checkWellformBind :: forall uni ann.
+                     (GShow uni, GEq uni, DefaultUni <: uni)
+                    => Binding TyName Name uni ann
+                    -> TypeCheckM uni ann ()
+checkWellformBind = \case
+  TermBind _ _ (VarDecl ann _ ty) rhs -> do
+      checkKindM ann ty $ Type ()
+      -- OPTIMIZE: redundant, usually this function is called together with `withBind`,
+      -- which performs normalization here as well
+      vTy <- normalizeTypeM $ void ty
+      checkTypeM ann rhs vTy
+  TypeBind _ (TyVarDecl ann _ k) rhs ->
+      checkKindM ann rhs (void k)
+  DatatypeBind _ (Datatype _ (TyVarDecl _ dt _) tvdecls _des vdecls) ->
+      -- add the type-arguments to environment
+      foldr (\(TyVarDecl _ tn k) -> withTyVar tn (void k))
+      -- check the data-constructors' argument-types to be kinded by *
+      (traverse_
+          (\(VarDecl ann _ ty) -> do
+              checkKindM ann ty $ Type ()
+              -- check that the normalized result-type of the data-constructor is
+              -- of the form `[DT tyarg1 tyarg2 ... tyargn]`
+              -- Q: is this normalization absolutely necessary?
+              actualConstrResultType <- normalizeTypeM $ void ty
+              -- TODO: after GADTs are added to the language the expected constructor result type
+              -- has to be "relaxed" from `[DT tyarg1 ... tyargn]` to `[DT Same Arity As ... Tvdecls]`
+              -- i.e. we should only check that `DT` is applied to the correct *number* of tyargs as the number of tvdecls,
+              let expectedConstrResultType = foldl
+                      (\acc (TyVarDecl _ tyarg _) -> TyApp () acc $ TyVar () tyarg)
+                      (TyVar () dt)
+                      tvdecls
+              when (expectedConstrResultType /= unNormalized actualConstrResultType) $
+                  -- TODO: probably introduce a more specialized constructor type error,
+                  -- because we don't have a valid "occuring-in-term" to put in the typemismatch-error
+                  throwError $ TypeMismatch ann dummyTerm expectedConstrResultType actualConstrResultType
+        )
+          vdecls)
+      tvdecls
+
+checkWellformBinds :: forall uni ann.
+                     (GShow uni, GEq uni, DefaultUni <: uni)
+                    => NonEmpty (Binding TyName Name uni ann)
+                    -> TypeCheckM uni ann ()
+checkWellformBinds = traverse_ checkWellformBind
+
+
+-- HELPERS
+
+-- | Get the result type of a constructor's type that has been prior normalized.
+-- ex1 (A->B->C) = C
+-- ex2 forall b. b -> c = forall. b ->c
+constrResultTy :: Normalized (Type tyname uni a) -> Normalized (Type tyname uni a)
+constrResultTy (Normalized t) = Normalized $ constrResultTy' t
+    where
+      constrResultTy' ::  Type tyname uni a -> Type tyname uni a
+      constrResultTy' = \case
+          TyFun _ _ t2 -> constrResultTy' t2
+          -- Q: is it necessary to descend inside a forall?
+          -- TyForall _ _ _ t -> constrResultTy' t
+          t' -> t'
+

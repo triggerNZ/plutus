@@ -2,7 +2,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications  #-}
 -- | Functions for compiling let-bound PIR datatypes into PLC.
-module Language.PlutusIR.Compiler.Datatype (compileDatatype, compileRecDatatypes) where
+module Language.PlutusIR.Compiler.Datatype
+    ( compileDatatype
+    , compileRecDatatypes
+    , resultTypeName
+    , constructorCaseType
+    ) where
 
 import           PlutusPrelude                          (showText)
 
@@ -54,7 +59,7 @@ constructorArgTypes = funTyArgs . varDeclType
 unveilDatatype :: Eq tyname => Type tyname uni a -> Datatype tyname name uni a -> Type tyname uni a -> Type tyname uni a
 unveilDatatype dty (Datatype _ tn _ _ _) = typeSubstTyNames (\n -> if n == tyVarDeclName tn then Just dty else Nothing)
 
-resultTypeName :: Compiling m e uni a => Datatype TyName Name uni (Provenance a) -> m TyName
+resultTypeName :: MonadQuote m => Datatype TyName Name uni a -> m TyName
 resultTypeName (Datatype _ tn _ _ _) = liftQuote $ freshTyName $ "out_" <> (nameString $ unTyName $ tyVarDeclName tn)
 
 -- Datatypes

@@ -31,6 +31,21 @@ import           Language.PlutusCore.Universe
 
 import           Control.Monad.Except
 
+{- Note [Goal of PIR typecheker]
+
+Why we do typechecking:
+
+- The deadcode eliminator (at `Optimizer/Deadcode.hs`) may eliminate ill-typed code, which
+would turn, much to a surprise, an ill-typed program to a well-typed one.
+- The let datatypebinds and/or typebinds introduce new types which may escape from the type of the interm.
+Although they may compile fine to PLC and PLC-typecheck correctly, they are invalid in terms of PIR typechecking.
+This would disallow such programs. See for example `./test/recursion/even3Eval` and the discussion at
+<https://groups.google.com/a/iohk.io/forum/#!msg/plutus/6ycMTngVomc/VKeb00DuHwAJ>
+- The error-messages would be more specialized to lets.
+- We can have more flexible or more strict let syntax rules for truly recursive/nonrecursive bindings
+-}
+
+
 -- | The default 'TypeCheckConfig'.
 defConfig :: TypeCheckConfig uni
 defConfig = TypeCheckConfig mempty

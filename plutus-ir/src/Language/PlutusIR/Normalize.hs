@@ -7,7 +7,7 @@ module Language.PlutusIR.Normalize
     , normalizeTypesInProgram
     ) where
 
-import  Language.PlutusCore.Core as PLC (Type, Normalized (..))
+import  Language.PlutusCore.Core as PLC (Normalized (..))
 import           Language.PlutusCore.Name
 import           Language.PlutusCore.Normalize.Internal hiding (normalizeTypesInM)
 import           Language.PlutusCore.Quote

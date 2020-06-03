@@ -89,6 +89,7 @@ lets :: TestNested
 lets = testNested "lets"
     [ goldenPlcFromPir term "letInLet"
     , goldenPlcFromPir term "letDep"
+    , goldenPlcFromPir term "rectypebind"
     ]
 
 datatypes :: TestNested
