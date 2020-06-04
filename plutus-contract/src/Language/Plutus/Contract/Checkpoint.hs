@@ -15,37 +15,27 @@
 {-# LANGUAGE TypeOperators       #-}
 module Language.Plutus.Contract.Checkpoint(
     -- $checkpoints
-    Checkpoint
+    Checkpoint(..)
     , CheckpointError(..)
     , AsCheckpointError(..)
     , CheckpointStore(..)
     , CheckpointKey
     , jsonCheckpoint
     , handleCheckpoint
-    , handleCheckpointEnv
-    -- * Misc.
-    , runCheckpoint
-    , runCheckpointIO
-    , action1
-    , action2
     ) where
 
 import           Control.Lens
 import           Control.Monad.Freer
-import           Control.Monad.Freer.Error               (Error, runError, throwError)
-import           Control.Monad.Freer.Extras              (raiseEnd4)
-import           Control.Monad.Freer.Log                 (Log, LogMessage, logDebug, logInfo)
-import           Control.Monad.Freer.State               (State, evalState, get, gets, modify, put, runState)
-import           Control.Monad.Freer.Writer              (runWriter)
+import           Control.Monad.Freer.Error               (Error, throwError)
+import           Control.Monad.Freer.Log                 (Log, logDebug)
+import           Control.Monad.Freer.State               (State, get, gets, modify, put)
 import           Data.Aeson                              (FromJSON, FromJSONKey, ToJSON, ToJSONKey, Value)
 import qualified Data.Aeson.Types                        as JSON
-import           Data.Foldable                           (traverse_)
 import           Data.Map                                (Map)
 import qualified Data.Map                                as Map
 import qualified Data.Text                               as Text
-import           Data.Text.Prettyprint.Doc               (Pretty (..), colon, defaultLayoutOptions, layoutPretty,
+import           Data.Text.Prettyprint.Doc               (Pretty (..), colon,
                                                           viaShow, vsep, (<+>))
-import qualified Data.Text.Prettyprint.Doc.Render.String as Render
 import           GHC.Generics                            (Generic)
 
 -- $checkpoints
@@ -94,7 +84,6 @@ data CheckpointStoreItem a e =
     CheckpointStoreItem
         { csValue       :: a
         , csNewKey      :: CheckpointKey
-        , csEnvironment :: e
         }
     deriving stock (Eq, Ord, Show, Generic)
     deriving anyclass (ToJSON, FromJSON)
@@ -106,30 +95,26 @@ data CheckpointStoreItem a e =
 --   to the second argument to prevent chaos.
 insert ::
     ( ToJSON a
-    , ToJSON env
     , Member (State CheckpointStore) effs
     )
     => CheckpointKey
     -> CheckpointKey
     -> a
-    -> env
     -> Eff effs ()
-insert k k' v env =
-    let vl = CheckpointStoreItem{csValue = v, csNewKey = k', csEnvironment=env}
+insert k k' v =
+    let vl = CheckpointStoreItem{csValue = v, csNewKey = k'}
     in modify (over _CheckpointStore (Map.insert k (JSON.toJSON vl)))
 
 restore ::
-    forall a e effs.
+    forall a effs.
     ( FromJSON a
-    , FromJSON e
     , Member (State CheckpointStore) effs
     , Member (State CheckpointKey) effs
     , Member Log effs
     )
-    => (e -> Eff effs ())
-    -> CheckpointKey
+    => CheckpointKey
     -> Eff effs (Either CheckpointError (Maybe a))
-restore putEnv k = do
+restore k = do
     (result :: Maybe (Either String (CheckpointStoreItem a e))) <- fmap (fmap (JSON.parseEither JSON.parseJSON)) (gets (view $ _CheckpointStore . at k))
     case result of
         Nothing -> do
@@ -138,58 +123,39 @@ restore putEnv k = do
         Just (Left err) -> do
             logDebug $ "Decoding error at key " <> Text.pack (show k)
             pure $ Left (JSONDecodeError err)
-        Just (Right CheckpointStoreItem{csValue,csNewKey, csEnvironment}) -> do
+        Just (Right CheckpointStoreItem{csValue,csNewKey}) -> do
             logDebug "Found a value, restoring previous key"
             put csNewKey
-            logDebug "Restoring environment"
-            putEnv csEnvironment
             pure (Right (Just csValue))
 
-data Checkpoint e r where
-    DoCheckpoint :: Checkpoint e ()
-    GetKey :: Checkpoint e CheckpointKey
-    Store :: (ToJSON a) => CheckpointKey -> CheckpointKey -> a -> Checkpoint e ()
-    Retrieve :: (FromJSON a) => CheckpointKey -> Checkpoint e (Either CheckpointError (Maybe a))
+data Checkpoint r where
+    DoCheckpoint :: Checkpoint ()
+    GetKey :: Checkpoint CheckpointKey
+    Store :: (ToJSON a) => CheckpointKey -> CheckpointKey -> a -> Checkpoint ()
+    Retrieve :: (FromJSON a) => CheckpointKey -> Checkpoint (Either CheckpointError (Maybe a))
 
-doCheckpoint :: forall e effs. Member (Checkpoint e) effs => Eff effs ()
-doCheckpoint = send (DoCheckpoint @e)
+doCheckpoint :: forall effs. Member Checkpoint effs => Eff effs ()
+doCheckpoint = send DoCheckpoint
 
-getKey :: forall e effs. Member (Checkpoint e) effs => Eff effs CheckpointKey
-getKey = send (GetKey @e)
+getKey :: forall effs. Member Checkpoint effs => Eff effs CheckpointKey
+getKey = send GetKey
 
-store :: forall a e effs. (Member (Checkpoint e) effs, ToJSON a) => CheckpointKey -> CheckpointKey -> a -> Eff effs ()
-store k1 k2 a = send @(Checkpoint e) (Store k1 k2 a)
+store :: forall a effs. (Member Checkpoint effs, ToJSON a) => CheckpointKey -> CheckpointKey -> a -> Eff effs ()
+store k1 k2 a = send @Checkpoint (Store k1 k2 a)
 
-retrieve :: forall a e effs. (Member (Checkpoint e) effs, FromJSON a) => CheckpointKey -> Eff effs (Either CheckpointError (Maybe a))
-retrieve k = send @(Checkpoint e) (Retrieve k)
-
-handleCheckpoint ::
-    forall effs a.
-    ( Member (State CheckpointStore) effs
-    , Member (State CheckpointKey) effs
-    , Member Log effs
-    )
-    => Eff (Checkpoint () ': effs) a
-    -> Eff effs a
-handleCheckpoint =
-    handleCheckpointEnv @() @effs (pure ()) (\_ -> pure ())
+retrieve :: forall a effs. (Member Checkpoint effs, FromJSON a) => CheckpointKey -> Eff effs (Either CheckpointError (Maybe a))
+retrieve k = send @Checkpoint (Retrieve k)
 
 -- | Handle the 'Checkpoint' effect in terms of a 'CheckpointStore' effect.
-handleCheckpointEnv ::
-    forall e effs.
+handleCheckpoint ::
+    forall effs.
     ( Member (State CheckpointStore) effs
     , Member (State CheckpointKey) effs
     , Member Log effs
-    , ToJSON e
-    , FromJSON e
     )
-    => (Eff effs e)
-    -- ^ How to get the environment that should be stored alongside checkpointed values
-    -> (e -> Eff effs ())
-    -- ^ How to restore the environment when a checkpoint has been restored.
-    -> Eff (Checkpoint e ': effs)
+    => Eff (Checkpoint ': effs)
     ~> Eff effs
-handleCheckpointEnv getEnv storeEnv = interpret $ \case
+handleCheckpoint = interpret $ \case
     DoCheckpoint -> do
         logDebug "handleCheckpoint: doCheckpoint"
         modify @CheckpointKey succ
@@ -200,18 +166,18 @@ handleCheckpointEnv getEnv storeEnv = interpret $ \case
         logDebug "handleCheckpoint: store"
         logDebug $ "key1: " <> Text.pack (show k)
         logDebug $ "key2: " <> Text.pack (show k')
-        getEnv >>= insert k k' a
+        insert k k' a
     Retrieve k -> do
         logDebug "handleCheckpoint: retrieve"
         logDebug $ "key then: " <> Text.pack (show k)
-        result <- restore @_ @e @effs storeEnv k
+        result <- restore @_ @effs k
         k' <- get @CheckpointKey
         logDebug $ "key now: " <> Text.pack (show k')
         pure result
 
 jsonCheckpoint ::
-    forall e err a effs.
-    ( Member (Checkpoint e) effs
+    forall err a effs.
+    ( Member Checkpoint effs
     , Member (Error err) effs
     , ToJSON a
     , FromJSON a
@@ -220,60 +186,14 @@ jsonCheckpoint ::
     => Eff effs a
     -> Eff effs a
 jsonCheckpoint action = do
-    doCheckpoint @e
-    k <- getKey @e
-    vl <- retrieve @_ @e k
+    doCheckpoint
+    k <- getKey
+    vl <- retrieve @_ k
     case vl of
         Left err -> throwError @err (review _CheckpointError err)
         Right (Just a) -> return a
         Right Nothing -> do
             result <- action
-            k' <- getKey @e
-            store  @_ @e k k' result
+            k' <- getKey
+            store  @_ k k' result
             pure result
-
--- | Run the 'Checkpoint' effect (for debugging purposes)
-runCheckpoint ::
-    CheckpointStore
-    -> Eff '[Checkpoint Int, Log, State Int, Error CheckpointError] a
-    -> (Either CheckpointError (a, CheckpointStore), [LogMessage])
-runCheckpoint theStore =
-    run
-    . runWriter
-    . runError @CheckpointError
-    . runState theStore
-    . evalState (0 :: CheckpointKey)
-    . subsume
-    . evalState (0 :: Int)
-    . subsume
-    . handleCheckpointEnv @Int @'[Log, State Int, Error CheckpointError, State CheckpointKey, State CheckpointStore, Error CheckpointError, Log] (get @Int) (put @Int)
-    . raiseEnd4
-
-runCheckpointIO ::
-    CheckpointStore
-    -> Eff '[Checkpoint Int, Log, State Int, Error CheckpointError] a
-    -> IO (a, CheckpointStore)
-runCheckpointIO theStore action = do
-    let (result, messages) = runCheckpoint theStore action
-    traverse_ (putStrLn . Render.renderString . layoutPretty defaultLayoutOptions . pretty) messages
-    either (error . show) pure result
-
-action1 :: Eff '[Checkpoint Int, Log, State Int, Error CheckpointError] Int
-action1 = do
-    logInfo "Starting action1"
-    put @Int 1
-    jsonCheckpoint @Int @CheckpointError $ do
-        logInfo "within checkpoint"
-        put @Int 2
-        jsonCheckpoint @Int @CheckpointError $ do
-            logInfo "within checkpoint 2"
-            put @Int 3
-            jsonCheckpoint @Int @CheckpointError $ do
-                logInfo "within checkpoint 3"
-                put @Int 4
-                pure ()
-    logInfo "Done with action1"
-    get
-
-action2 :: Eff '[Checkpoint Int, Log, State Int, Error CheckpointError] Int
-action2 = (+) <$> action1 <*> action1

@@ -59,8 +59,8 @@ import qualified Data.Text                           as T
 
 import           Language.Plutus.Contract.Schema     (Event (..), Handlers (..))
 
-import           Language.Plutus.Contract.Checkpoint (AsCheckpointError, Checkpoint, CheckpointError (..),
-                                                      CheckpointKey, CheckpointStore, handleCheckpointEnv,
+import           Language.Plutus.Contract.Checkpoint (AsCheckpointError, Checkpoint(..), CheckpointError (..),
+                                                      CheckpointKey, CheckpointStore, handleCheckpoint,
                                                       jsonCheckpoint)
 import qualified Language.Plutus.Contract.Checkpoint as C
 import           Language.Plutus.Contract.Resumable  hiding (select)
@@ -103,7 +103,7 @@ instance AsCheckpointError ContractError where
 -- | Effects that are available to contracts.
 type ContractEffs s e =
     '[ Error e
-    ,  Checkpoint ContractEnv
+    ,  Checkpoint
     ,  Resumable (Event s) (Handlers s)
     ]
 
@@ -121,8 +121,9 @@ handleContractEffs =
   evalState (0 :: CheckpointKey)
   . handleNonDetPrompt
   . handleResumable
-  . handleCheckpointEnv getContractEnv putContractEnv
-  . subsume @(Error e) @(Checkpoint ContractEnv ': Resumable (Event s) (Handlers s) ': Yield (Handlers s) (Event s) ': State IterationID ': NonDet ': State RequestID ': State CheckpointKey ': effs)
+  . handleCheckpoint
+  . addEnvToCheckpoint
+  . subsume @(Error e) @(Checkpoint ': Resumable (Event s) (Handlers s) ': Yield (Handlers s) (Event s) ': State IterationID ': NonDet ': State RequestID ': State CheckpointKey ': effs)
   . raiseEnd3 @(Yield (Handlers s) (Event s) ': State IterationID ': NonDet ': State RequestID ': State CheckpointKey ': effs)
 
 type ContractEnv = (IterationID, RequestID)
@@ -143,6 +144,29 @@ putContractEnv ::
   => ContractEnv
   -> Eff effs ()
 putContractEnv (it, req) = put it >> put req
+
+addEnvToCheckpoint ::
+  forall effs.
+  ( Member (State RequestID) effs
+  , Member (State IterationID) effs
+  )
+  => Eff (Checkpoint ': effs)
+  ~> Eff (Checkpoint ': effs)
+addEnvToCheckpoint = reinterpret @Checkpoint @Checkpoint @effs $ \case
+  DoCheckpoint -> send DoCheckpoint
+  GetKey -> send GetKey
+  Store k k' a -> do
+    env <- getContractEnv
+    send $ Store k k' (env, a)
+  Retrieve k -> do
+    result <- send $ Retrieve @(ContractEnv, _) k
+    case result of
+      Right (Just (env, a)) -> do
+        putContractEnv env
+        pure (Right (Just a))
+      Left err -> pure (Left err)
+      Right Nothing -> pure (Right Nothing)
+   
 
 -- | @Contract s a@ is a contract with schema 's', producing a value of
 --  type 'a' or a 'ContractError'. See note [Contract Schema].
@@ -178,7 +202,7 @@ selectEither l r = (Left <$> l) `select` (Right <$> r)
 
 -- | Write the current state of the contract to a checkpoint.
 checkpoint :: forall s e a. (AsCheckpointError e, Aeson.FromJSON a, Aeson.ToJSON a) => Contract s e a -> Contract s e a
-checkpoint = Contract . jsonCheckpoint @ContractEnv @e . unContract
+checkpoint = Contract . jsonCheckpoint @e . unContract
 
 -- | Transform any exceptions thrown by the 'Contract' using the given function.
 mapError ::
