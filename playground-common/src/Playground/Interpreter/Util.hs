@@ -221,8 +221,8 @@ expressionToTrace CallEndpoint { caller
                                       , JSON.String (Text.pack (getEndpointDescription endpointDescription)))
                                     , ("value", JSON.object [("unEndpointValue", argument)])
                                     ]
-                        addNamedEvent caller event
-            Nothing -> throwError . ContractError $ "Expected a String, but got: " <> Text.pack (show rawArgument)
+                        addNamedEvent (getEndpointDescription endpointDescription) caller event
+            Nothing -> throwError . TContractError $ "Expected a String, but got: " <> Text.pack (show rawArgument)
 
 decodePayload ::
        (MonadEmulator (TraceError Text) m, FromJSON r)
