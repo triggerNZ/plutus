@@ -46,7 +46,7 @@ import qualified Language.PlutusTx.Coordination.Contracts.Currency as Contracts.
 import qualified Language.PlutusTx.Coordination.Contracts.Game     as Contracts.Game
 import           Playground.Schema                                 (endpointsToSchemas)
 
-import qualified Debug.Trace as Trace
+import qualified Debug.Trace                                       as Trace
 
 data TestContracts = Game | Currency
     deriving (Eq, Ord, Show, Generic)

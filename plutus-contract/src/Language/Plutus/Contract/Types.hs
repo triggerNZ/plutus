@@ -55,14 +55,13 @@ import           Control.Monad.Freer.Reader
 import           Control.Monad.Freer.State
 import qualified Data.Aeson                          as Aeson
 import           Data.String                         (IsString (..))
+import           Data.Text                           (Text)
 import qualified Data.Text                           as T
-import Data.Text (Text)
 
 import           Language.Plutus.Contract.Schema     (Event (..), Handlers (..))
 
-import           Language.Plutus.Contract.Checkpoint (AsCheckpointError, Checkpoint(..), CheckpointError (..),
-                                                      CheckpointKey, CheckpointStore, handleCheckpoint,
-                                                      jsonCheckpoint)
+import           Language.Plutus.Contract.Checkpoint (AsCheckpointError, Checkpoint (..), CheckpointError (..),
+                                                      CheckpointKey, CheckpointStore, handleCheckpoint, jsonCheckpoint)
 import qualified Language.Plutus.Contract.Checkpoint as C
 import           Language.Plutus.Contract.Resumable  hiding (select)
 import qualified Language.Plutus.Contract.Resumable  as Resumable
@@ -167,7 +166,7 @@ addEnvToCheckpoint = reinterpret @Checkpoint @Checkpoint @effs $ \case
         pure (Right (Just a))
       Left err -> pure (Left err)
       Right Nothing -> pure (Right Nothing)
-   
+
 
 -- | @Contract s a@ is a contract with schema 's', producing a value of
 --  type 'a' or a 'ContractError'. See note [Contract Schema].

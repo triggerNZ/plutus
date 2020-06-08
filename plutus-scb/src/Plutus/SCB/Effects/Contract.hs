@@ -24,22 +24,22 @@ module Plutus.SCB.Effects.Contract(
     ) where
 
 import           Control.Monad.Freer
-import           Control.Monad.Freer.Error          (Error, throwError)
-import           Control.Monad.Freer.TH             (makeEffect)
-import           Data.Aeson                         ((.=))
-import qualified Data.Aeson                         as JSON
-import qualified Data.HashMap.Lazy                  as HashMap
-import           Data.Text                          (Text)
-import qualified Data.Text                          as Text
-import           Language.Plutus.Contract.Resumable (Response (..))
-import           Playground.Types                   (FunctionSchema)
-import Language.Plutus.Contract.Effects.ExposeEndpoint(EndpointDescription(..))
+import           Control.Monad.Freer.Error                       (Error, throwError)
+import           Control.Monad.Freer.TH                          (makeEffect)
+import           Data.Aeson                                      ((.=))
+import qualified Data.Aeson                                      as JSON
+import qualified Data.HashMap.Lazy                               as HashMap
+import           Data.Text                                       (Text)
+import qualified Data.Text                                       as Text
+import           Language.Plutus.Contract.Effects.ExposeEndpoint (EndpointDescription (..))
+import           Language.Plutus.Contract.Resumable              (Response (..))
+import           Playground.Types                                (FunctionSchema)
 
-import           Language.Plutus.Contract.State     (ContractRequest (..))
-import           Plutus.SCB.Events.Contract         (ContractResponse (..), ContractSCBRequest (..),
-                                                     PartiallyDecodedResponse (..))
-import           Plutus.SCB.Types                   (SCBError (OtherError))
-import           Schema                             (FormSchema)
+import           Language.Plutus.Contract.State                  (ContractRequest (..))
+import           Plutus.SCB.Events.Contract                      (ContractResponse (..), ContractSCBRequest (..),
+                                                                  PartiallyDecodedResponse (..))
+import           Plutus.SCB.Types                                (SCBError (OtherError))
+import           Schema                                          (FormSchema)
 
 -- | Commands to update a contract. 't' identifies the contract.
 data ContractCommand t

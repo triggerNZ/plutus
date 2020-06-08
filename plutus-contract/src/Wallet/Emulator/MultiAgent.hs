@@ -28,8 +28,8 @@ import           Data.Aeson                     (FromJSON, ToJSON)
 import           Data.Map                       (Map)
 import qualified Data.Map                       as Map
 import qualified Data.Text                      as T
+import           Data.Text.Extras               (tshow)
 import           Data.Text.Prettyprint.Doc
-import Data.Text.Extras (tshow)
 import           GHC.Generics                   (Generic)
 import           Ledger                         hiding (to, value)
 import qualified Ledger.AddressMap              as AM

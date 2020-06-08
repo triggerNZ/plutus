@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE AllowAmbiguousTypes    #-}
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE FlexibleContexts       #-}
@@ -8,6 +7,7 @@
 {-# LANGUAGE LambdaCase             #-}
 {-# LANGUAGE MonoLocalBinds         #-}
 {-# LANGUAGE NamedFieldPuns         #-}
+{-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE RankNTypes             #-}
 {-# LANGUAGE TemplateHaskell        #-}
 {-# LANGUAGE TypeApplications       #-}
@@ -81,9 +81,9 @@ import qualified Data.Row.Internal                                 as V
 import qualified Data.Row.Variants                                 as V
 import           Data.Sequence                                     (Seq, (|>))
 import qualified Data.Set                                          as Set
-import Data.Text (Text)
-import Data.Text.Extras (tshow)
-import qualified Data.Text as Text
+import           Data.Text                                         (Text)
+import qualified Data.Text                                         as Text
+import           Data.Text.Extras                                  (tshow)
 import           Numeric.Natural                                   (Natural)
 
 import           Language.Plutus.Contract                          (Contract (..), HasAwaitSlot, HasTxConfirmation,

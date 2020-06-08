@@ -43,7 +43,7 @@ import           Data.List.NonEmpty            (NonEmpty (..))
 import           Data.Map                      (Map)
 import qualified Data.Map                      as Map
 import           Data.Semigroup                (Max (..))
-import Data.Semigroup.Foldable (foldMap1)
+import           Data.Semigroup.Foldable       (foldMap1)
 import           Data.Text.Prettyprint.Doc
 import           GHC.Generics                  (Generic)
 import           Numeric.Natural               (Natural)

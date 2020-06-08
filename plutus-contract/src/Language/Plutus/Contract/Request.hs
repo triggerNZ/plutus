@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
@@ -10,6 +9,7 @@
 {-# LANGUAGE MonoLocalBinds        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns        #-}
+{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
@@ -24,7 +24,7 @@ import           Control.Applicative
 import           Control.Lens                       (review)
 import qualified Control.Monad.Freer.Error          as E
 import           Data.Row
-import Data.Text.Extras (tshow)
+import           Data.Text.Extras                   (tshow)
 
 import           Language.Plutus.Contract.Schema    (Event (..), Handlers (..), Input, Output)
 import qualified Language.Plutus.Contract.Schema    as Events
