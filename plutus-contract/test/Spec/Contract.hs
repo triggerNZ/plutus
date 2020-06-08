@@ -11,6 +11,7 @@ module Spec.Contract(tests) where
 
 import           Control.Monad                              (void)
 import           Control.Monad.Error.Lens
+import           Control.Monad.Except (throwError, catchError)
 import           Test.Tasty
 
 import           Language.Plutus.Contract                   as Con
@@ -158,10 +159,14 @@ tests =
             (handleBlockchainEvents w1)
 
         , cp "checkpoint"
-            (checkpointContract)
+            checkpointContract
             (not (endpointAvailable @"2" w1) /\ (endpointAvailable @"1" w1))
             (callEndpoint @"1" @Int w1 1 >> callEndpoint @"2" @Int w1 1)
 
+        , cp "error handling & checkpoints"
+            errorContract
+            (assertDone w1 (\i -> i == 11) "should finish")
+            (callEndpoint @"1" @Int w1 1 >> callEndpoint @"2" @Int w1 10 >> callEndpoint @"3" @Int w1 11)
         ]
 
 w1 :: EM.Wallet
@@ -178,6 +183,12 @@ checkpointContract = void $ do
     checkpoint $ do
         endpoint @"1" @Int
         endpoint @"3" @Int
+
+errorContract :: Contract Schema ContractError Int
+errorContract = do
+    catchError
+        (endpoint @"1" @Int >> throwError (OtherError "something went wrong"))
+        (\_ -> do { checkpoint $ endpoint @"2" @Int; endpoint @"3" @Int })
 
 someAddress :: Address
 someAddress = Ledger.scriptAddress $
