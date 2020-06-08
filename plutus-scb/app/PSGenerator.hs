@@ -25,6 +25,11 @@ import           Language.Plutus.Contract.Effects.ExposeEndpoint   (EndpointDesc
 import           Language.Plutus.Contract.Effects.OwnPubKey        (OwnPubKeyRequest)
 import           Language.Plutus.Contract.Effects.UtxoAt           (UtxoAtAddress)
 import           Language.Plutus.Contract.Effects.WriteTx          (WriteTxResponse)
+import           Language.PureScript.Bridge                        (BridgePart, Language (Haskell), SumType,
+                                                                    buildBridge, equal, genericShow, mkSumType, order,
+                                                                    writePSTypesWith)
+import           Language.PureScript.Bridge.CodeGenSwitches        (ForeignOptions (ForeignOptions), genForeign,
+                                                                    unwrapSingleConstructors)
 import           Language.PureScript.Bridge.TypeParameters         (A)
 import           Ledger.Constraints.OffChain                       (UnbalancedTx)
 import           Plutus.SCB.Core                                   (activateContract, installContract)
