@@ -25,17 +25,16 @@ module Language.Plutus.Contract.Resumable(
     , prompt
     , select
     -- * Handling the 'Resumable' effect
-    , handleResumable
-    , handleNonDetPrompt
     , Request(..)
     , Response(..)
     , RequestID(..)
     , IterationID(..)
-    , RequestState(..)
-    , initialRequestState
+    , Requests(..)
     , ResumableInterpreter
-    , Record(..)
+    , Responses(..)
     , insertResponse
+    , handleResumable
+    , handleNonDetPrompt
     ) where
 
 import           Control.Applicative
@@ -103,11 +102,13 @@ select ::
     -> Eff effs a
 select l r = send @(Resumable i o) RSelect >>= \b -> if b then l else r
 
-
-newtype RequestID = RequestID Int
+-- | A value that uniquely identifies requests made during the execution of
+--   'Resumable' programs.
+newtype RequestID = RequestID Natural
     deriving stock (Eq, Ord, Show, Generic)
     deriving newtype (ToJSON, FromJSON, ToJSONKey, FromJSONKey, Pretty, Enum, Num)
 
+-- | A value that uniquely identifies groups of requests.
 newtype IterationID = IterationID Natural
     deriving stock (Eq, Ord, Show, Generic)
     deriving newtype (ToJSON, FromJSON, ToJSONKey, FromJSONKey, Pretty, Enum, Num)
@@ -147,27 +148,20 @@ instance Pretty i => Pretty (Response i) where
             "Response:" <+> pretty rspResponse
         ]
 
-data RequestState o =
-    RequestState
-        { rsOpenRequests :: [Request o]
-        } deriving (Eq, Ord, Show)
-
-instance Pretty o => Pretty (RequestState o) where
-    pretty RequestState{rsOpenRequests} =
-        indent 2 $ vsep ("Requests:" : (pretty <$> rsOpenRequests))
-
-initialRequestState :: RequestState o
-initialRequestState =
-    RequestState
-        { rsOpenRequests = []
-        }
-
-newtype Record i = Record { unRecord :: Map (IterationID, RequestID) i }
+newtype Requests o = Requests { unRequests :: [Request o] }
     deriving newtype (Eq, Ord, Show, Semigroup, Monoid, ToJSON, FromJSON)
     deriving stock (Generic, Functor, Foldable, Traversable)
 
-instance Pretty i => Pretty (Record i) where
-    pretty (Record mp) =
+instance Pretty o => Pretty (Requests o) where
+    pretty Requests{unRequests} =
+        indent 2 $ vsep ("Requests:" : (pretty <$> unRequests))
+
+newtype Responses i = Responses { unResponses :: Map (IterationID, RequestID) i }
+    deriving newtype (Eq, Ord, Show, Semigroup, Monoid, ToJSON, FromJSON)
+    deriving stock (Generic, Functor, Foldable, Traversable)
+
+instance Pretty i => Pretty (Responses i) where
+    pretty (Responses mp) =
         let entries = Map.toList mp
             prettyEntry ((itID, reqID), i) =
                 hang 2 $ vsep ["IterationID:" <+> pretty itID, "RequestID:" <+> pretty reqID, "Event:" <+> pretty i]
@@ -227,8 +221,8 @@ handleResumable = interpret $ \case
 --   keep track of request IDs.
 handleNonDetPrompt ::
     forall i o a effs.
-    ( Member (Reader (Record i)) effs
-    , Member (State (RequestState o)) effs
+    ( Member (Reader (Responses i)) effs
+    , Member (State (Requests o)) effs
     )
     => Eff (Yield o i ': ResumableInterpreter i o effs) a
     -> Eff effs (Maybe a)
@@ -241,11 +235,11 @@ handleNonDetPrompt e = result where
     -- the computation is waiting for input
     loop :: Status (ResumableInterpreter i o effs) o i a -> Eff (ResumableInterpreter i o effs) a
     loop (Continue a k) = do
-        Record mp' <- ask
+        Responses mp' <- ask
 
         -- nextRequestID' generates a pair of 'RequestID' and 'IterationID' for
         -- the current request. It writes the value 'a', which describes the
-        -- request, to the 'RequestState', alongside the two identifiers.
+        -- request, to the 'Requests', alongside the two identifiers.
         (iid,nid) <- nextRequestID a
         case Map.lookup (iid, nid) mp' of
 
@@ -267,15 +261,15 @@ handleNonDetPrompt e = result where
 -- Return the answer or the remaining requests
 mkResult ::
     forall effs o a.
-    Member (State (RequestState o)) effs
+    Member (State (Requests o)) effs
     => Maybe a
     -> Eff effs (Maybe a)
-mkResult (Just a) = modify @(RequestState o) (\rs -> rs { rsOpenRequests = [] }) >> pure (Just a)
-mkResult Nothing  = modify @(RequestState o) (\rs -> rs { rsOpenRequests = pruneRequests (rsOpenRequests rs)}) >> pure Nothing
+mkResult (Just a) = modify @(Requests o) (\rs -> rs { unRequests = [] }) >> pure (Just a)
+mkResult Nothing  = modify @(Requests o) (\rs -> rs { unRequests = pruneRequests (unRequests rs)}) >> pure Nothing
 
-insertResponse :: Response i -> Record i -> Record i
-insertResponse Response{rspRqID,rspItID,rspResponse} (Record r) =
-    Record $ Map.insert (rspItID, rspRqID) rspResponse r
+insertResponse :: Response i -> Responses i -> Responses i
+insertResponse Response{rspRqID,rspItID,rspResponse} (Responses r) =
+    Responses $ Map.insert (rspItID, rspRqID) rspResponse r
 
 pruneRequests :: [Request o] -> [Request o]
 pruneRequests [] = []
@@ -284,24 +278,24 @@ pruneRequests (r:rs) =
     in filter ((==) maxIteration . itID) (r:rs)
 
 nextRequestID ::
-    ( Member (State (RequestState o)) effs
+    ( Member (State (Requests o)) effs
     , Member (State IterationID) effs
     , Member (State RequestID) effs
     )
     => o
     -> Eff effs (IterationID, RequestID)
 nextRequestID s = do
-    RequestState{rsOpenRequests} <- get
+    Requests{unRequests} <- get
     requestID <- get @RequestID
     iid <- get @IterationID
     let niid = succ iid
         nid  = succ requestID
-    put $ RequestState
-            { rsOpenRequests = Request{rqRequest=s,rqID=nid,itID=niid} : rsOpenRequests
+    put $ Requests
+            { unRequests = Request{rqRequest=s,rqID=nid,itID=niid} : unRequests
             }
     put niid
     put nid
     pure (niid, nid)
 
-clearRequests :: forall o effs. Member (State (RequestState o)) effs => Eff effs ()
-clearRequests = modify @(RequestState o) (\rq -> rq{rsOpenRequests = [] })
+clearRequests :: forall o effs. Member (State (Requests o)) effs => Eff effs ()
+clearRequests = modify @(Requests o) (\rq -> rq{unRequests = [] })

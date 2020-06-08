@@ -106,7 +106,7 @@ import qualified Language.Plutus.Contract.Effects.UtxoAt           as UtxoAt
 import qualified Language.Plutus.Contract.Effects.WatchAddress     as WatchAddress
 import           Language.Plutus.Contract.Effects.WriteTx          (TxSymbol, WriteTxResponse)
 import qualified Language.Plutus.Contract.Effects.WriteTx          as WriteTx
-import           Language.Plutus.Contract.Resumable                (Request (..), RequestState (..), Response (..))
+import           Language.Plutus.Contract.Resumable                (Request (..), Requests (..), Response (..))
 import           Language.Plutus.Contract.Types                    (ResumableResult (..))
 
 import qualified Ledger.Ada                                        as Ada
@@ -156,7 +156,7 @@ data WalletState s e a =
         }
 
 walletHandlers :: WalletState s (TraceError e) a -> [State.Request (Handlers s)]
-walletHandlers = either mempty (State.rsOpenRequests . wcsHandlers) . walletContractState
+walletHandlers = either mempty (State.unRequests . wcsRequests) . walletContractState
 
 emptyWalletState :: Contract s e a -> WalletState s e a
 emptyWalletState (Contract c) =
@@ -174,10 +174,10 @@ addEventWalletState ::
 addEventWalletState (Contract c) event s@WalletState{walletContractState, walletEvents, walletHandlersHistory} =
     case walletContractState of
         Left _ -> s
-        Right ResumableResult{wcsRecord,wcsHandlers=RequestState{rsOpenRequests},wcsCheckpointStore} ->
-            let state' = Contract.Types.insertAndUpdate c wcsCheckpointStore wcsRecord event
+        Right ResumableResult{wcsResponses,wcsRequests=Requests{unRequests},wcsCheckpointStore} ->
+            let state' = Contract.Types.insertAndUpdate c wcsCheckpointStore wcsResponses event
                 events' = walletEvents |> event
-                history' = walletHandlersHistory |> rsOpenRequests
+                history' = walletHandlersHistory |> unRequests
             in s { walletContractState = state', walletEvents = events', walletHandlersHistory = history'}
 
 data ContractTraceState s e a =

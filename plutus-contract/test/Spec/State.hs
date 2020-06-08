@@ -17,19 +17,19 @@ import           Data.Maybe                         (isJust)
 import           Test.Tasty
 import qualified Test.Tasty.HUnit                   as HUnit
 
-import           Language.Plutus.Contract.Resumable (IterationID (..), Record (..), Request (..), RequestID (..),
-                                                     RequestState (..), Resumable, prompt, select)
+import           Language.Plutus.Contract.Resumable (IterationID (..), Responses (..), Request (..), RequestID (..),
+                                                     Requests (..), Resumable, prompt, select)
 import qualified Language.Plutus.Contract.Resumable as S
 import           Language.Plutus.Contract.Util      (loopM)
 
 runResumableTest ::
     forall i o a.
-    Record i
+    Responses i
     -> Eff '[Resumable i o] a
-    -> (Maybe a, RequestState o)
+    -> (Maybe a, Requests o)
 runResumableTest record =
     run
-    . runState S.initialRequestState
+    . runState mempty
     . runReader record
     . S.handleNonDetPrompt @i @o @a
     . S.handleResumable
@@ -42,49 +42,49 @@ tests = testGroup "stateful contract"
         in HUnit.assertBool "run a contract without prompts" (isJust $ fst res)
 
     , HUnit.testCase "run a contract with a single prompt" $
-        let (_, RequestState{rsOpenRequests}) = runResumableTest @Int @String mempty (askStr "prompt1")
+        let (_, Requests{unRequests}) = runResumableTest @Int @String mempty (askStr "prompt1")
         in HUnit.assertEqual
             "run a contract with a single prompt"
-            rsOpenRequests
+            unRequests
             [Request{rqID = RequestID 1, itID = IterationID 1, rqRequest = "prompt1"}]
 
     , HUnit.testCase "run a contract with two prompts" $
-        let (_, RequestState{rsOpenRequests}) = runResumableTest @Int @String mempty (askStr "prompt1" `selectStr` askStr "prompt2")
+        let (_, Requests{unRequests}) = runResumableTest @Int @String mempty (askStr "prompt1" `selectStr` askStr "prompt2")
         in HUnit.assertEqual
             "run a contract with two prompts"
             [ Request{rqID = RequestID 2, itID = IterationID 1, rqRequest = "prompt2"}
             , Request{rqID = RequestID 1, itID = IterationID 1, rqRequest = "prompt1"}
             ]
-            rsOpenRequests
+            unRequests
 
     , HUnit.testCase "run a contract with a two prompts and one answer" $
-        let record = Record $ Map.singleton (1, 2) 5
+        let record = Responses $ Map.singleton (1, 2) 5
             (result, _) = runResumableTest @Int @String record ((askStr "prompt1" >> pure "branch 1") `selectStr` (askStr "prompt2" >> pure "branch 2"))
         in HUnit.assertEqual "run a contract with a two prompts and one answer" (Just "branch 2") result
 
     , HUnit.testCase "commit to a branch" $
-        let record = Record $ Map.singleton (1, 1) 5
-            (_, RequestState{rsOpenRequests}) = runResumableTest @Int @String record ((askStr "prompt1" >> askStr "prompt3") `selectStr` (askStr "prompt2" >> pure 10))
+        let record = Responses $ Map.singleton (1, 1) 5
+            (_, Requests{unRequests}) = runResumableTest @Int @String record ((askStr "prompt1" >> askStr "prompt3") `selectStr` (askStr "prompt2" >> pure 10))
         in HUnit.assertEqual
                 "commit to a branch"
                 [ Request{rqID = RequestID 2, itID = IterationID 2, rqRequest = "prompt3"} ]
-                rsOpenRequests
+                unRequests
 
     , HUnit.testCase "commit to a branch (II)" $
-        let record = Record $ Map.singleton (1, 2) 5
-            (_, RequestState{rsOpenRequests}) = runResumableTest @Int @String record ((askStr "prompt2" >> pure 10) `selectStr` (askStr "prompt1" >> askStr "prompt3"))
+        let record = Responses $ Map.singleton (1, 2) 5
+            (_, Requests{unRequests}) = runResumableTest @Int @String record ((askStr "prompt2" >> pure 10) `selectStr` (askStr "prompt1" >> askStr "prompt3"))
         in HUnit.assertEqual
             "commit to a branch (II)"
             [ Request{rqID = RequestID 3, itID = IterationID 2, rqRequest = "prompt3"} ]
-            rsOpenRequests
+            unRequests
 
     , HUnit.testCase "return a result" $
-        let record = Record $ Map.singleton (1, 2) 5
+        let record = Responses $ Map.singleton (1, 2) 5
             (result, _) = runResumableTest @Int @String record ((askStr "prompt1" >> askStr "prompt4") `selectStr` (askStr "prompt2" >> pure 10) `selectStr` (askStr "prompt3" >> askStr "prompt5"))
         in HUnit.assertEqual "return a result" (Just 10) result
 
     , HUnit.testCase "go into a branch" $
-        let record = Record $ Map.fromList [((IterationID 1, RequestID 2), 5), ((IterationID 2, RequestID 4), 10) ]
+        let record = Responses $ Map.fromList [((IterationID 1, RequestID 2), 5), ((IterationID 2, RequestID 4), 10) ]
             (result, _) = runResumableTest @Int @String record
                 ((askStr "prompt1" >> askStr "prompt4")
                 `selectStr`
@@ -93,7 +93,7 @@ tests = testGroup "stateful contract"
         in HUnit.assertEqual "go into a branch" (Just 11) result
 
     , HUnit.testCase "loop" $
-        let record = Record
+        let record = Responses
                  $ Map.fromList
                     [ ((IterationID 1, RequestID 1), 1)
                     , ((IterationID 2, RequestID 2), 1)
@@ -107,7 +107,7 @@ tests = testGroup "stateful contract"
         in HUnit.assertEqual "loop" (Just 10) result
 
     , HUnit.testCase "loop requests" $
-        let record = Record
+        let record = Responses
                  $ Map.fromList
                     [ ((IterationID 1, RequestID 1), 1)
                     , ((IterationID 2, RequestID 2), 1)
@@ -115,14 +115,14 @@ tests = testGroup "stateful contract"
                     ]
             stopLeft = askStr "stop left" >> pure (10 :: Int)
             stopRight = askStr "stop right" >> pure 11
-            (_, RequestState{rsOpenRequests}) = runResumableTest @Int @String record $
+            (_, Requests{unRequests}) = runResumableTest @Int @String record $
                 loopM (const $ (Left <$> askStr "keep going") `selectStr` (Right <$> (stopLeft `selectStr` stopRight))) 0
         in HUnit.assertEqual "loop requests"
             [ Request{rqID = RequestID 6, itID = IterationID 4, rqRequest = "stop right"}
             , Request{rqID = RequestID 5, itID = IterationID 4, rqRequest = "stop left"}
             , Request{rqID = RequestID 4, itID = IterationID 4, rqRequest = "keep going"}
             ]
-            rsOpenRequests
+            unRequests
 
     ]
 

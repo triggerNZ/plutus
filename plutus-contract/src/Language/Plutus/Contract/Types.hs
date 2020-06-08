@@ -110,8 +110,8 @@ type ContractEffs s e =
 handleContractEffs ::
   forall s e effs a.
   ( Member (Error e) effs
-  , Member (Reader (Record (Event s))) effs
-  , Member (State (RequestState (Handlers s))) effs
+  , Member (Reader (Responses (Event s))) effs
+  , Member (State (Requests (Handlers s))) effs
   , Member (State CheckpointStore) effs
   , Member Log effs
   )
@@ -226,24 +226,24 @@ runWithRecord ::
   forall s e a.
   Eff (ContractEffs s e) a
   -> CheckpointStore
-  -> Record (Event s)
+  -> Responses (Event s)
   -> Either e (ResumableResult (Event s) (Handlers s) a)
 runWithRecord action store rc =
-  let mkResult ((rs, reqState), newStore) = ResumableResult{wcsRecord = rc, wcsHandlers = reqState, wcsFinalState = rs, wcsCheckpointStore = newStore}
+  let mkResult ((rs, reqState), newStore) = ResumableResult{wcsResponses = rc, wcsRequests = reqState, wcsFinalState = rs, wcsCheckpointStore = newStore}
   in fmap mkResult
       $ run
       $ E.runError  @e @_
-      $ runReader @(Record (Event s)) @_ rc
+      $ runReader @(Responses (Event s)) @_ rc
       $ ignoreLog
       $ runState @CheckpointStore store
-      $ runState  @(RequestState (Handlers s)) initialRequestState
+      $ runState  @(Requests (Handlers s)) mempty
       $ handleContractEffs @s @e @_ @a action
 
 insertAndUpdate ::
   forall s e a.
   Eff (ContractEffs s e) a
   -> CheckpointStore
-  -> Record (Event s)
+  -> Responses (Event s)
   -> Response (Event s)
   -> Either e (ResumableResult (Event s) (Handlers s) a)
 insertAndUpdate action store record newResponse =
@@ -252,8 +252,8 @@ insertAndUpdate action store record newResponse =
 -- | The result of running a 'Resumable'
 data ResumableResult i o a =
     ResumableResult
-        { wcsRecord          :: Record i -- The record with the resumable's execution history
-        , wcsHandlers        :: RequestState o -- Handlers that the 'Resumable' has registered
+        { wcsResponses          :: Responses i -- The record with the resumable's execution history
+        , wcsRequests        :: Requests o -- Handlers that the 'Resumable' has registered
         , wcsFinalState      :: Maybe a -- Final state of the 'Resumable'
         , wcsCheckpointStore :: CheckpointStore
         }

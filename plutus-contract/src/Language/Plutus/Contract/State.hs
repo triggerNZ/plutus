@@ -30,7 +30,7 @@ import           Language.Plutus.Contract.Types
 -- Types for initialising and running contract instances
 
 data State e = State
-    { record      :: Record e
+    { record      :: Responses e
     , checkpoints :: CheckpointStore
     }
     deriving stock (Generic, Eq, Show, Functor, Foldable, Traversable)
@@ -60,8 +60,8 @@ insertAndUpdateContract (Contract con) ContractRequest{oldState=State record che
     mkResponse <$> insertAndUpdate con checkpoints record event
 
 mkResponse :: forall s e a. ResumableResult s e a -> ContractResponse s e
-mkResponse ResumableResult{wcsRecord, wcsHandlers=RequestState{rsOpenRequests},wcsCheckpointStore} =
-    ContractResponse{hooks = rsOpenRequests, newState = State { record = wcsRecord, checkpoints=wcsCheckpointStore } }
+mkResponse ResumableResult{wcsResponses, wcsRequests=Requests{unRequests},wcsCheckpointStore} =
+    ContractResponse{hooks = unRequests, newState = State { record = wcsResponses, checkpoints=wcsCheckpointStore } }
 
 initialiseContract
     :: forall s e a.

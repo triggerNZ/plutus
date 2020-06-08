@@ -26,7 +26,7 @@ module Language.Plutus.Contract.Test(
     , assertFailedTransaction
     , Outcome(..)
     , assertHooks
-    , assertRecord
+    , assertResponses
     , tx
     , anyTx
     , assertEvents
@@ -67,7 +67,7 @@ import           Test.Tasty.Providers                            (TestTree)
 import qualified Language.PlutusTx.Prelude                       as P
 
 import           Language.Plutus.Contract.Checkpoint             (CheckpointStore)
-import           Language.Plutus.Contract.Resumable              (IterationID, Record, Request (..), RequestID,
+import           Language.Plutus.Contract.Resumable              (IterationID, Responses, Request (..), RequestID,
                                                                   Response (..))
 import qualified Language.Plutus.Contract.Resumable              as State
 import           Language.Plutus.Contract.Types                  (Contract (..))
@@ -120,17 +120,17 @@ hooks
 hooks w rs =
     let (evts, con) = contractEventsWallet rs w
         store       = contractCheckpointStore w rs
-    in either (const mempty) (fmap State.rqRequest . State.rsOpenRequests . Types.wcsHandlers) (Types.runResumable evts store (unContract con))
+    in either (const mempty) (fmap State.rqRequest . State.unRequests . Types.wcsRequests) (Types.runResumable evts store (unContract con))
 
 record
     :: forall s e a.
     Wallet
     -> ContractTraceResult s e a
-    -> Either e (Record (Event s))
+    -> Either e (Responses (Event s))
 record w rs =
     let (evts, con) = contractEventsWallet rs w
         store       = contractCheckpointStore w rs
-    in fmap Types.wcsRecord (Types.runResumable evts store (unContract con))
+    in fmap Types.wcsResponses (Types.runResumable evts store (unContract con))
 
 not :: TracePredicate s e a -> TracePredicate s e a
 not = PredF . fmap (fmap Prelude.not) . unPredF
@@ -182,8 +182,8 @@ renderTraceContext testOutputs st =
         prettyResult result = case result of
             Left err ->
                 hang 2 $ vsep ["Error:", viaShow err]
-            Right (Types.ResumableResult{Types.wcsFinalState=Nothing, Types.wcsHandlers}) ->
-                hang 2 $ vsep ["Running, waiting for input:", pretty wcsHandlers]
+            Right (Types.ResumableResult{Types.wcsFinalState=Nothing, Types.wcsRequests}) ->
+                hang 2 $ vsep ["Running, waiting for input:", pretty wcsRequests]
             Right _ -> "Done"
     in renderStrict $ layoutPretty defaultLayoutOptions $ vsep
         [ hang 2 (vsep ["Test outputs:", testOutputs])
@@ -412,16 +412,17 @@ assertHooks w p nm = PredF $ \(_, rs) ->
             ]
         pure False
 
-assertRecord
+-- | Make an assertion about the responses provided to the contract instance.
+assertResponses
     :: forall s e a.
        ( Forall (Input s) Pretty
        , Show e
        )
     => Wallet
-    -> (Record (Event s) -> Bool)
+    -> (Responses (Event s) -> Bool)
     -> String
     -> TracePredicate s e a
-assertRecord w p nm = PredF $ \(_, rs) ->
+assertResponses w p nm = PredF $ \(_, rs) ->
     case record w rs of
         Right r
             | p r -> pure True
@@ -512,23 +513,23 @@ assertOutcome w p nm = PredF $ \(_, rs) ->
                         , "in" <+> squotes (fromString nm)
                         ]
                     pure False
-            Right (Types.ResumableResult{Types.wcsFinalState=Nothing,Types.wcsHandlers})
+            Right (Types.ResumableResult{Types.wcsFinalState=Nothing,Types.wcsRequests})
                 | p NotDone -> pure True
                 | otherwise -> do
                     tell $ vsep
                         [ "Outcome of" <+> pretty w <> colon
                         , "Open record"
-                        , pretty wcsHandlers
+                        , pretty wcsRequests
                         , "in" <+> squotes (fromString nm)
                         ]
                     pure False
-            Right (Types.ResumableResult{Types.wcsFinalState=Just a,Types.wcsRecord})
+            Right (Types.ResumableResult{Types.wcsFinalState=Just a,Types.wcsResponses})
                 | p (Done a) -> pure True
                 | otherwise -> do
                     tell $ vsep
                         [ "Outcome of" <+> pretty w <> colon
                         , "Closed record"
-                        , pretty wcsRecord
+                        , pretty wcsResponses
                         , "failed with" <+> squotes (fromString nm)
                         ]
                     pure False
