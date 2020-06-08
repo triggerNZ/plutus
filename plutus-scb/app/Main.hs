@@ -315,7 +315,7 @@ runCliCommand _ _ ReportTxHistory = do
     logInfo "Transaction History"
     traverse_ (logInfo . render . pretty) =<< Core.txHistory @ContractExe
 runCliCommand _ _ (UpdateContract uuid endpoint payload) =
-    void $ Instance.callContractEndpoint @ContractExe (ContractInstanceId uuid) (EndpointDescription endpoint) payload
+    void $ Instance.callContractEndpoint @ContractExe (ContractInstanceId uuid) (getEndpointDescription endpoint) payload
 runCliCommand _ _ (ReportContractHistory uuid) = do
     logInfo "Contract History"
     contracts <- Core.activeContractHistory @ContractExe (ContractInstanceId uuid)
