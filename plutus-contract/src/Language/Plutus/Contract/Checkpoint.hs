@@ -34,6 +34,7 @@ import qualified Data.Aeson.Types                        as JSON
 import           Data.Map                                (Map)
 import qualified Data.Map                                as Map
 import qualified Data.Text                               as Text
+import Data.Text (Text)
 import           Data.Text.Prettyprint.Doc               (Pretty (..), colon,
                                                           viaShow, vsep, (<+>))
 import           GHC.Generics                            (Generic)
@@ -58,11 +59,11 @@ import           GHC.Generics                            (Generic)
 --
 -- To handle the checkpoint effect use 'handleCheckpoint' or 'handleCheckpoint'.
 
-newtype CheckpointKey = CheckpointKey Int
+newtype CheckpointKey = CheckpointKey Integer
     deriving stock (Eq, Ord, Show, Generic)
     deriving newtype (FromJSON, ToJSON, ToJSONKey, FromJSONKey, Num, Enum, Pretty)
 
-data CheckpointError = JSONDecodeError String
+data CheckpointError = JSONDecodeError Text
     deriving stock (Eq, Ord, Show, Generic)
     deriving anyclass (FromJSON, ToJSON)
 
@@ -80,7 +81,7 @@ instance Pretty CheckpointStore where
 _CheckpointStore :: Iso' CheckpointStore (Map CheckpointKey Value)
 _CheckpointStore = iso unCheckpointStore CheckpointStore
 
-data CheckpointStoreItem a e =
+data CheckpointStoreItem a =
     CheckpointStoreItem
         { csValue       :: a
         , csNewKey      :: CheckpointKey
@@ -115,14 +116,15 @@ restore ::
     => CheckpointKey
     -> Eff effs (Either CheckpointError (Maybe a))
 restore k = do
-    (result :: Maybe (Either String (CheckpointStoreItem a e))) <- fmap (fmap (JSON.parseEither JSON.parseJSON)) (gets (view $ _CheckpointStore . at k))
+    value <- gets (view $ _CheckpointStore . at k)
+    let (result :: Maybe (Either String (CheckpointStoreItem a))) = fmap (JSON.parseEither JSON.parseJSON) value
     case result of
         Nothing -> do
             logDebug $ "No value for " <> Text.pack (show k)
             pure $ Right Nothing
         Just (Left err) -> do
             logDebug $ "Decoding error at key " <> Text.pack (show k)
-            pure $ Left (JSONDecodeError err)
+            pure $ Left (JSONDecodeError $ Text.pack err)
         Just (Right CheckpointStoreItem{csValue,csNewKey}) -> do
             logDebug "Found a value, restoring previous key"
             put csNewKey

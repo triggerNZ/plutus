@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
@@ -23,6 +24,7 @@ import           Control.Applicative
 import           Control.Lens                       (review)
 import qualified Control.Monad.Freer.Error          as E
 import           Data.Row
+import Data.Text.Extras (tshow)
 
 import           Language.Plutus.Contract.Schema    (Event (..), Handlers (..), Input, Output)
 import qualified Language.Plutus.Contract.Schema    as Events
@@ -57,7 +59,7 @@ request out = Contract $ do
   Event rho <- prompt @(Event s) @(Handlers s) (Events.initialise @s @l out)
   case trial' rho (Label @l) of
     Just v  -> pure v
-    Nothing -> E.throwError @e (review _ResumableError $ WrongVariantError $ "Expected: " ++ show (Label @l))
+    Nothing -> E.throwError @e (review _ResumableError $ WrongVariantError $ "Expected: " <> tshow (Label @l))
 
 -- | Write a request repeatedly until the desired response is returned.
 requestMaybe

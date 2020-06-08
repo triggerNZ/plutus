@@ -29,6 +29,7 @@ import           Data.Map                       (Map)
 import qualified Data.Map                       as Map
 import qualified Data.Text                      as T
 import           Data.Text.Prettyprint.Doc
+import Data.Text.Extras (tshow)
 import           GHC.Generics                   (Generic)
 import           Ledger                         hiding (to, value)
 import qualified Ledger.AddressMap              as AM
@@ -319,9 +320,6 @@ ownFundsEqual wallet value = do
     if value == total
     then pure ()
     else throwError $ GenericAssertion $ T.unwords ["Funds in wallet", tshow wallet, "were", tshow total, ". Expected:", tshow value]
-    where
-    tshow :: Show a => a -> T.Text
-    tshow = T.pack . show
 
 -- | Issue an assertion that the given transaction has been validated.
 isValidated :: (Members MultiAgentEffs effs) => Tx -> Eff effs ()

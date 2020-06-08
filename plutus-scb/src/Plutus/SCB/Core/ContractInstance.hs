@@ -242,7 +242,8 @@ respondtoRequests ::
     => RequestHandler effs ContractSCBRequest ContractResponse
     -> Eff effs ()
 respondtoRequests handler = do
-    state <- fmap (hooks . csCurrentState . getLast) <$> runGlobalQuery (Query.contractState @t)
+    contractStates <- runGlobalQuery (Query.contractState @t)
+    let state = fmap (hooks . csCurrentState . getLast) contractStates
     itraverse_ (runRequestHandler @t handler) state
 
 -- | Run a 'RequestHandler' on the 'ContractSCBRequest' list of a contract

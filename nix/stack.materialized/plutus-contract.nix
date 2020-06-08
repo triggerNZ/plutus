@@ -68,6 +68,7 @@
         buildable = true;
         modules = [
           "Data/Row/Extras"
+          "Data/Text/Extras"
           "Language/Plutus/Contract"
           "Language/Plutus/Contract/App"
           "Language/Plutus/Contract/Effects/AwaitSlot"

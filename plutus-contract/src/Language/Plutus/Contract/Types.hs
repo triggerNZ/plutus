@@ -56,6 +56,7 @@ import           Control.Monad.Freer.State
 import qualified Data.Aeson                          as Aeson
 import           Data.String                         (IsString (..))
 import qualified Data.Text                           as T
+import Data.Text (Text)
 
 import           Language.Plutus.Contract.Schema     (Event (..), Handlers (..))
 
@@ -74,7 +75,7 @@ import           Wallet.API                          (WalletAPIError)
 import           Wallet.Emulator.Types               (AsAssertionError (..), AssertionError)
 
 -- | An error
-newtype MatchingError = WrongVariantError String
+newtype MatchingError = WrongVariantError Text
     deriving (Eq, Ord, Show)
 
 data ContractError =

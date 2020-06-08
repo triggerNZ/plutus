@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE AllowAmbiguousTypes    #-}
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE FlexibleContexts       #-}
@@ -9,7 +10,6 @@
 {-# LANGUAGE NamedFieldPuns         #-}
 {-# LANGUAGE RankNTypes             #-}
 {-# LANGUAGE TemplateHaskell        #-}
--- {-# LANGUAGE TupleSections          #-}
 {-# LANGUAGE TypeApplications       #-}
 -- | A trace is a sequence of actions by simulated wallets that can be run
 --   on the mockchain. This module contains the functions needed to build
@@ -81,6 +81,9 @@ import qualified Data.Row.Internal                                 as V
 import qualified Data.Row.Variants                                 as V
 import           Data.Sequence                                     (Seq, (|>))
 import qualified Data.Set                                          as Set
+import Data.Text (Text)
+import Data.Text.Extras (tshow)
+import qualified Data.Text as Text
 import           Numeric.Natural                                   (Natural)
 
 import           Language.Plutus.Contract                          (Contract (..), HasAwaitSlot, HasTxConfirmation,
@@ -138,7 +141,7 @@ data TraceError e =
     TraceAssertionError EM.AssertionError
     | TContractError e
     | HandleBlockchainEventsMaxIterationsExceeded MaxIterations
-    | HookError String
+    | HookError Text
     deriving (Eq, Show)
 
 type InitialDistribution = Map Wallet Value
@@ -219,9 +222,9 @@ addEvent wallet event = do
             _ <- trial' v (Label @l)
             Just Response{rspRqID=rqID, rspItID=itID, rspResponse=event}
     hks <- mapMaybe filterReq <$> getHooks wallet >>= \case
-            [] -> throwError $ HookError $ "No hooks found for " <> show (Label @l)
+            [] -> throwError $ HookError $ "No hooks found for " <> tshow (Label @l)
             [x] -> pure x
-            _ -> throwError $ HookError $ "More than one hook found for " <> show (Label @l)
+            _ -> throwError $ HookError $ "More than one hook found for " <> tshow (Label @l)
     addResponse wallet hks
 
 -- | A variant of 'addEvent' that takes the name of the endpoint as a value
@@ -248,9 +251,9 @@ addNamedEvent endpointName wallet event = do
                     == (endpointName, ())
             Just Response{rspRqID=rqID, rspItID=itID, rspResponse=event}
     hks <- mapMaybe filterReq <$> getHooks wallet >>= \case
-            [] -> throwError $ HookError $ "No hooks found for " <> endpointName
+            [] -> throwError $ HookError $ "No hooks found for " <> Text.pack endpointName
             [x] -> pure x
-            _ -> throwError $ HookError $ "More than one hook found for " <> endpointName
+            _ -> throwError $ HookError $ "More than one hook found for " <> Text.pack endpointName
     addResponse wallet hks
 
 
@@ -391,7 +394,7 @@ callEndpoint wallet ep = do
     -- check if the endpoint is active and throw an error if it isn't
     hks <- getHooks wallet
     unless (any (Endpoint.isActive @l) $ fmap rqRequest hks) $
-        throwError $ HookError $ "Endpoint " <> show (Label @l) <> " not active on " <> show wallet
+        throwError $ HookError $ "Endpoint " <> tshow (Label @l) <> " not active on " <> tshow wallet
 
     let handleEvent e
             | Endpoint.isActive @l e = Just (Endpoint.event @l ep)

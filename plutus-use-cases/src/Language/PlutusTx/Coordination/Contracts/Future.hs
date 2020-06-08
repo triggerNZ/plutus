@@ -194,7 +194,6 @@ futureContract :: Future -> Contract FutureSchema FutureError ()
 futureContract ft = do
     client <- joinFuture ft `select` initialiseFuture ft
     void $ loopM (const $ selectEither (increaseMargin client) (settleFuture client `select` settleEarly client)) ()
-    -- void $ loopM (const $ selectEither (increaseMargin client) (settleEarly client `select` settleFuture client)) ()
 
 -- | The data needed to initialise the futures contract.
 data FutureSetup =
