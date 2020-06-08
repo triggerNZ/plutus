@@ -57,23 +57,23 @@ import           Control.Monad.Freer.State
 -- $resumable
 -- This module defines the 'Resumable' effect and its handlers. Programs that
 -- use the 'Resumable' effect can non-deterministically ask for values from the
--- environment. Non-deterministically here means that we can issue multiple 
+-- environment. Non-deterministically here means that we can issue multiple
 -- prompts at the same time, each with its own continuation, and continue with
 -- the one that is answered first while discarding the other ones.
 --
 -- == Constructing resumable programs
--- Resumable programs can be constructed using 'prompt' and 'select'. 'prompt' 
+-- Resumable programs can be constructed using 'prompt' and 'select'. 'prompt'
 -- has one argument that describes the request.
 --
 -- >>> (prompt "A") 'select' (prompt "B")
--- 
--- makes two requests and returns the answer of the one that is responded to 
+--
+-- makes two requests and returns the answer of the one that is responded to
 -- first.
 --
 -- == Running resumable programs
 -- The 'Resumable' effect is handled in two stages, using 'handleResumable' and
 -- 'handleNonDetPrompt' (see note [Running resumable programs] for a description
--- of how it works). The types 'Requests' and 'Responses' store the requests 
+-- of how it works). The types 'Requests' and 'Responses' store the requests
 -- made by, and responses given to, a resumable program.
 --
 -- == 'Resumable' and non-determinism
@@ -173,7 +173,7 @@ Running 'Resumable' programs involves two stages. First we transform the program
 
 #### Stage 1
 
-Stage 1 is implemented in 'handleResumable'. The result is a program that uses 'NonDet' and 'Yield' in a very specific way to implement the resumable functionality. The reason why we don't say something like 'type Resumable effs = Members '[NonDet, Yield] effs' instead of the 'Resumable' data type is that 'NonDet' allows for backtracking, which we do not want to expose to the users. 
+Stage 1 is implemented in 'handleResumable'. The result is a program that uses 'NonDet' and 'Yield' in a very specific way to implement the resumable functionality. The reason why we don't say something like 'type Resumable effs = Members '[NonDet, Yield] effs' instead of the 'Resumable' data type is that 'NonDet' allows for backtracking, which we do not want to expose to the users.
 
 The programs produced by 'handleResumable' have at most one level of backtracking (to the next call to 'prompt'). There is no 'empty' constructor (and no 'Alternative' instance for contracts) because the only thing that can cause backtracking to happen is the provisioning of an answer to a 'prompt' call from the environment.
 
@@ -203,7 +203,7 @@ type ResumableInterpreter i o effs =
      ': State RequestID
      ': effs
 
--- | Interpret the 'Resumable' effect in terms of the 'Yield' and 'NonDet' 
+-- | Interpret the 'Resumable' effect in terms of the 'Yield' and 'NonDet'
 --   effects.
 handleResumable ::
     forall i o effs.

@@ -152,7 +152,7 @@ store k1 k2 a = send @Checkpoint (Store k1 k2 a)
 retrieve :: forall a effs. (Member Checkpoint effs, FromJSON a) => CheckpointKey -> Eff effs (Either CheckpointError (Maybe a))
 retrieve k = send @Checkpoint (Retrieve k)
 
--- | Handle the 'Checkpoint' effect in terms of 'CheckpointStore' and 
+-- | Handle the 'Checkpoint' effect in terms of 'CheckpointStore' and
 --   'CheckpointKey' states.
 handleCheckpoint ::
     forall effs.
@@ -185,9 +185,9 @@ handleCheckpoint = interpret $ \case
 {-| Create a checkpoint for an action.
     @handleCheckpoint (jsonCheckpoint action)@ will
 
-    * Obtain a 'CheckpointKey' that identifies the position of the current 
+    * Obtain a 'CheckpointKey' that identifies the position of the current
       checkpoint in the program
-    * Run @action@, convert its result to JSON and store it in the checkpoint 
+    * Run @action@, convert its result to JSON and store it in the checkpoint
       store if there is no value at the key
     * Retrieve the result as a JSON value from the store, parse it, and return
       it *instead* of running @action@ if there is a value at the key.

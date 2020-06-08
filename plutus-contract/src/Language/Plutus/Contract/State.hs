@@ -28,25 +28,25 @@ import           Language.Plutus.Contract.Schema     (Event (..), Handlers (..))
 import           Language.Plutus.Contract.Types
 
 -- $contractstate
--- Types for initialising and running instances of 'Contract's. The types and 
+-- Types for initialising and running instances of 'Contract's. The types and
 -- functions in this module are convenient wrappers around types and functions
 -- from 'Language.Plutus.Contract.Types', exposing an interface that is suitable
--- for consumption by the SCB. In particular this means that 
--- 'insertAndUpdateContract' has a single argument, and its argument & return 
+-- for consumption by the SCB. In particular this means that
+-- 'insertAndUpdateContract' has a single argument, and its argument & return
 -- types can be serialised to JSON easily.
 --
 -- To actually run a contract, follow this workflow:
 --
 -- 1. Call 'initialiseContract' to get the initial 'ContractResponse'.
--- 2. Look at the 'hooks' of this value and generate an answer to one of them. 
+-- 2. Look at the 'hooks' of this value and generate an answer to one of them.
 --    This answer is a 'Response' @s@ value.
--- 3. Call 'insertAndUpdateContract' with a 'ContractRequest' whose 'oldState' 
+-- 3. Call 'insertAndUpdateContract' with a 'ContractRequest' whose 'oldState'
 --    field has the value of 'newState' of the previous response, and whose
 --    'event' is the next answer (step 2).
 -- 4. Take the new 'ContractResponse' and go back to step 2, until you get a
 --    response with no requests, or an error.
 
--- | The state of a 'Contract', containing all responses that have been fed to 
+-- | The state of a 'Contract', containing all responses that have been fed to
 --   it, and checkpoints that it produced.
 data State e = State
     { record      :: Responses e
@@ -65,7 +65,7 @@ data ContractRequest s = ContractRequest
     deriving anyclass (ToJSON, FromJSON)
     deriving Pretty via PrettyShow (ContractRequest s)
 
--- | A response produced by a contract instance. It contains the new 'State', 
+-- | A response produced by a contract instance. It contains the new 'State',
 --   and the list of endpoints that can be called.
 data ContractResponse s h = ContractResponse
     { newState :: State s
@@ -74,7 +74,7 @@ data ContractResponse s h = ContractResponse
     deriving stock (Generic, Eq, Show)
     deriving anyclass (ToJSON, FromJSON)
 
--- | Run one step of the contract by restoring it to its previous state and 
+-- | Run one step of the contract by restoring it to its previous state and
 --   feeding it a single new 'Response' event.
 insertAndUpdateContract ::
     forall s e a.

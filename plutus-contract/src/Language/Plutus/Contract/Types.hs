@@ -252,7 +252,7 @@ insertAndUpdate action store record newResponse =
 -- | The result of running a 'Resumable'
 data ResumableResult i o a =
     ResumableResult
-        { wcsResponses          :: Responses i -- The record with the resumable's execution history
+        { wcsResponses       :: Responses i -- The record with the resumable's execution history
         , wcsRequests        :: Requests o -- Handlers that the 'Resumable' has registered
         , wcsFinalState      :: Maybe a -- Final state of the 'Resumable'
         , wcsCheckpointStore :: CheckpointStore

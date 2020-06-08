@@ -17,8 +17,8 @@ import           Data.Maybe                         (isJust)
 import           Test.Tasty
 import qualified Test.Tasty.HUnit                   as HUnit
 
-import           Language.Plutus.Contract.Resumable (IterationID (..), Responses (..), Request (..), RequestID (..),
-                                                     Requests (..), Resumable, prompt, select)
+import           Language.Plutus.Contract.Resumable (IterationID (..), Request (..), RequestID (..), Requests (..),
+                                                     Responses (..), Resumable, prompt, select)
 import qualified Language.Plutus.Contract.Resumable as S
 import           Language.Plutus.Contract.Util      (loopM)
 

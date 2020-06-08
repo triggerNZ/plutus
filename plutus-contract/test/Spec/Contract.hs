@@ -11,7 +11,7 @@ module Spec.Contract(tests) where
 
 import           Control.Monad                              (void)
 import           Control.Monad.Error.Lens
-import           Control.Monad.Except (throwError, catchError)
+import           Control.Monad.Except                       (catchError, throwError)
 import           Test.Tasty
 
 import           Language.Plutus.Contract                   as Con

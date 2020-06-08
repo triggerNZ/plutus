@@ -67,8 +67,8 @@ import           Test.Tasty.Providers                            (TestTree)
 import qualified Language.PlutusTx.Prelude                       as P
 
 import           Language.Plutus.Contract.Checkpoint             (CheckpointStore)
-import           Language.Plutus.Contract.Resumable              (IterationID, Responses, Request (..), RequestID,
-                                                                  Response (..))
+import           Language.Plutus.Contract.Resumable              (IterationID, Request (..), RequestID, Response (..),
+                                                                  Responses)
 import qualified Language.Plutus.Contract.Resumable              as State
 import           Language.Plutus.Contract.Types                  (Contract (..))
 import qualified Language.Plutus.Contract.Types                  as Types
