@@ -4,7 +4,9 @@ module Main
 
 import           Control.Monad                                     (void)
 import           Language.PlutusTx.Coordination.Contracts.Currency (forgeCurrency)
+import Data.Bifunctor (first)
 import           Plutus.SCB.ContractCLI                            (commandLineApp)
+import Plutus.SCB.Utils (tshow)
 
 main :: IO ()
-main = commandLineApp $ void forgeCurrency
+main = commandLineApp $ first tshow $ void forgeCurrency
