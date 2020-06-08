@@ -14,6 +14,7 @@
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeOperators       #-}
 module Language.Plutus.Contract.Checkpoint(
+    -- * Checkpoints
     -- $checkpoints
     Checkpoint(..)
     , CheckpointError(..)
@@ -43,20 +44,14 @@ import           GHC.Generics              (Generic)
 -- intermediate results of 'Control.Monad.Freer.Eff' programs as JSON values
 -- inside a 'CheckpointStore'. It works similar to the short-circuiting behavior
 -- of 'Control.Monad.Freer.Error.Error': Before we execute an action
--- 'Eff effs a' whose result should be checkpointed, we check if the there is
--- already a value of 'a' for this checkpoint it in the store. If there is, we
--- return it *instead* of running the action. If there isn't we run the action
--- and then store the result.
--- Note that if the checkpoint is present the action will not be executed at
--- all. (That is the point of the checkpoint mechanism). If the action has any
--- side effects that you would like to repeat on restoring the value, you can
--- use the type parameter 'e' (for environment) to do this in
--- 'handleCheckpointEnv'. See 'runCheckpoint' for an example that uses the
--- environment to store the state of a 'State Int' effect.
+-- @Eff effs a@ whose result should be checkpointed, we check if the there is
+-- already a value of @a@ for this checkpoint it in the store. If there is, we
+-- return it /instead/ of running the action. If there isn't, we run the action
+-- @a@ and then store the result.
 --
--- To create a checkpoint use 'jsonCheckpoint'.
---
--- To handle the checkpoint effect use 'handleCheckpoint' or 'handleCheckpoint'.
+-- * To create a checkpoint use 'jsonCheckpoint'.
+-- * To handle the checkpoint effect use 'handleCheckpoint'.
+
 
 newtype CheckpointKey = CheckpointKey Integer
     deriving stock (Eq, Ord, Show, Generic)
@@ -88,11 +83,12 @@ data CheckpointStoreItem a =
     deriving stock (Eq, Ord, Show, Generic)
     deriving anyclass (ToJSON, FromJSON)
 
--- | Insert a new value into the checkpoint store. The first 'CheckpointKey' is
---   the checkpoint key *before* running the checkpointed action, the second
---   'Checkpoint' key is the value *after* running it. When we restore the
---   checkpoint from the state (in 'restore') we set the 'CheckpointKey' state
---   to the second argument to prevent chaos.
+{-| Insert a new value into the checkpoint store. The first 'CheckpointKey' is
+    the checkpoint key *before* running the checkpointed action, the second
+    'Checkpoint' key is the value *after* running it. When we restore the
+    checkpoint from the state (in 'restore') we set the 'CheckpointKey' state
+    to the second argument to prevent chaos.
+-}
 insert ::
     ( ToJSON a
     , Member (State CheckpointStore) effs
@@ -105,6 +101,15 @@ insert k k' v =
     let vl = CheckpointStoreItem{csValue = v, csNewKey = k'}
     in modify (over _CheckpointStore (Map.insert k (JSON.toJSON vl)))
 
+{-| @restore k@ checks for an entry for @k@ in the checkpoint store,
+    and parses the result if there is such an entry. It returns
+
+    * @Right Nothing@ if no entry was found
+    * @Left err@ if an entry was found but failed to parse with the
+      'FromJSON' instance
+    * @Right (Just a)@ if an entry was found and parsed succesfully.
+
+-}
 restore ::
     forall a effs.
     ( FromJSON a
@@ -131,15 +136,15 @@ restore k = do
 
 data Checkpoint r where
     DoCheckpoint :: Checkpoint ()
-    GetKey :: Checkpoint CheckpointKey
+    AllocateKey :: Checkpoint CheckpointKey
     Store :: (ToJSON a) => CheckpointKey -> CheckpointKey -> a -> Checkpoint ()
     Retrieve :: (FromJSON a) => CheckpointKey -> Checkpoint (Either CheckpointError (Maybe a))
 
 doCheckpoint :: forall effs. Member Checkpoint effs => Eff effs ()
 doCheckpoint = send DoCheckpoint
 
-getKey :: forall effs. Member Checkpoint effs => Eff effs CheckpointKey
-getKey = send GetKey
+allocateKey :: forall effs. Member Checkpoint effs => Eff effs CheckpointKey
+allocateKey = send AllocateKey
 
 store :: forall a effs. (Member Checkpoint effs, ToJSON a) => CheckpointKey -> CheckpointKey -> a -> Eff effs ()
 store k1 k2 a = send @Checkpoint (Store k1 k2 a)
@@ -147,7 +152,8 @@ store k1 k2 a = send @Checkpoint (Store k1 k2 a)
 retrieve :: forall a effs. (Member Checkpoint effs, FromJSON a) => CheckpointKey -> Eff effs (Either CheckpointError (Maybe a))
 retrieve k = send @Checkpoint (Retrieve k)
 
--- | Handle the 'Checkpoint' effect in terms of a 'CheckpointStore' effect.
+-- | Handle the 'Checkpoint' effect in terms of 'CheckpointStore' and 
+--   'CheckpointKey' states.
 handleCheckpoint ::
     forall effs.
     ( Member (State CheckpointStore) effs
@@ -160,8 +166,8 @@ handleCheckpoint = interpret $ \case
     DoCheckpoint -> do
         logDebug "handleCheckpoint: doCheckpoint"
         modify @CheckpointKey succ
-    GetKey -> do
-        logDebug "handleCheckpoint: getKey"
+    AllocateKey -> do
+        logDebug "handleCheckpoint: allocateKey"
         get @CheckpointKey
     Store k k' a -> do
         logDebug "handleCheckpoint: store"
@@ -176,6 +182,17 @@ handleCheckpoint = interpret $ \case
         logDebug $ "key now: " <> Text.pack (show k')
         pure result
 
+{-| Create a checkpoint for an action.
+    @handleCheckpoint (jsonCheckpoint action)@ will
+
+    * Obtain a 'CheckpointKey' that identifies the position of the current 
+      checkpoint in the program
+    * Run @action@, convert its result to JSON and store it in the checkpoint 
+      store if there is no value at the key
+    * Retrieve the result as a JSON value from the store, parse it, and return
+      it *instead* of running @action@ if there is a value at the key.
+
+-}
 jsonCheckpoint ::
     forall err a effs.
     ( Member Checkpoint effs
@@ -184,17 +201,17 @@ jsonCheckpoint ::
     , FromJSON a
     , AsCheckpointError err
     )
-    => Eff effs a
+    => Eff effs a -- ^ The @action@ that is checkpointed
     -> Eff effs a
 jsonCheckpoint action = do
     doCheckpoint
-    k <- getKey
+    k <- allocateKey
     vl <- retrieve @_ k
     case vl of
         Left err -> throwError @err (review _CheckpointError err)
         Right (Just a) -> return a
         Right Nothing -> do
             result <- action
-            k' <- getKey
+            k' <- allocateKey
             store  @_ k k' result
             pure result

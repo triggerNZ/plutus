@@ -154,7 +154,7 @@ addEnvToCheckpoint ::
   ~> Eff (Checkpoint ': effs)
 addEnvToCheckpoint = reinterpret @Checkpoint @Checkpoint @effs $ \case
   DoCheckpoint -> send DoCheckpoint
-  GetKey -> send GetKey
+  AllocateKey -> send AllocateKey
   Store k k' a -> do
     env <- getContractEnv
     send $ Store k k' (env, a)
