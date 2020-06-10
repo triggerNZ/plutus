@@ -72,7 +72,8 @@ import           Plutus.SCB.Events                                 (ChainEvent (
 import           Plutus.SCB.Events.Contract                        (ContractEvent (..), ContractInstanceId (..),
                                                                     ContractInstanceState (..), ContractResponse (..),
                                                                     ContractSCBRequest (..), IterationID,
-                                                                    PartiallyDecodedResponse (..))
+                                                                    PartiallyDecodedResponse (..),
+                                                                    unContractHandlersResponse)
 import qualified Plutus.SCB.Events.Contract                        as Events.Contract
 import qualified Plutus.SCB.Query                                  as Query
 import           Plutus.SCB.Types                                  (SCBError (..), Source (ContractEventSource, NodeEventSource, UserEventSource, WalletEventSource))
@@ -219,7 +220,8 @@ activateContract contract = do
     activeContractInstanceId <- ContractInstanceId <$> uuidNextRandom
     logInfo . render $ "Initializing contract instance with ID" <+> pretty activeContractInstanceId
     let initialIteration = succ mempty -- FIXME get max it. from initial response
-    response <- Contract.invokeContract @t $ InitContract contractDef
+    response <- fmap (fmap unContractHandlersResponse) <$> Contract.invokeContract @t $ InitContract contractDef
+    logInfo . render $ "Response was: " <+> pretty response
     sendContractStateMessages @t contract activeContractInstanceId initialIteration response
     logInfo . render $ "Activated contract instance:" <+> pretty activeContractInstanceId
     pure activeContractInstanceId
