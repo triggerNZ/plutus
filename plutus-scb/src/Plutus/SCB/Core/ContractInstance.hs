@@ -1,6 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE DerivingStrategies  #-}
 {-# LANGUAGE DerivingVia         #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE MonoLocalBinds      #-}
@@ -234,7 +233,7 @@ extract p = maybe empty pure . preview p
 newtype RequestHandler effs req resp = RequestHandler { unRequestHandler :: req -> Eff (NonDet ': effs) resp }
     deriving stock (Functor)
     deriving (Profunctor) via (Kleisli (Eff (NonDet ': effs)))
-    deriving (Semigroup, Monoid) via ((Ap ((->) req) (Alt (Eff (NonDet ': effs)) resp)))
+    deriving (Semigroup, Monoid) via (Ap ((->) req) (Alt (Eff (NonDet ': effs)) resp))
 
 respondtoRequests ::
     forall t effs.

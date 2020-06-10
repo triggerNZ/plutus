@@ -3,6 +3,7 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -218,7 +219,7 @@ contractStates ::
     IteratedContractState a
     -> Map ContractInstanceId (IterationID, a)
 contractStates IteratedContractState{icsContractIterations=ContractIterationState its, icsContractState} =
-    Map.mapMaybeWithKey (\k (Max i) -> fmap (\v -> (i, v)) (Map.lookup k icsContractState)) its
+    Map.mapMaybeWithKey (\k (Max i) -> fmap (i,) (Map.lookup k icsContractState)) its
 
 -- Queries about active contracts
 
