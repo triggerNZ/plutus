@@ -411,8 +411,7 @@ handleAction StartContract = do
     Just contract -> do
       assign _initialized true
       assign (_walletLoadedContract <<< _Just <<< _started) true
-      --   updateContractInState (stripParens $ show $ contract.contract)
-      modifying _currentLoadedMarloweState (updatePossibleActions <<< updateContractInStateP (stripParens $ show $ contract.contract))
+      updateContractInState (stripParens $ show $ pretty $ contract.contract)
     Nothing -> assign _loadContractError $ Just "Can't start since no contract has been loaded"
 
 handleAction ResetContract = do
