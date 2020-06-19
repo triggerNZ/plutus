@@ -40,13 +40,15 @@ import Data.Foldable
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Lens.TH
+import Control.Lens
 
 import qualified Language.PlutusCore.Normalize.Internal as Norm
 import qualified Language.PlutusCore.Core as PLC
 import           Data.Map                               (Map)
 import qualified Data.Map                               as Map
 import qualified Language.PlutusIR.MkPir                as PIR
-
+import Data.List
+import qualified Data.Text as T
 {- Note [Global uniqueness]
 WARNING: type inference/checking works under the assumption that the global uniqueness condition
 is satisfied. The invariant is not checked, enforced or automatically fulfilled. So you must ensure
@@ -435,8 +437,17 @@ inferTypeM (Let ann recurs bs inTerm) = do
             inferTypeM inTerm
     -- G !- inTerm :: *
     -- TODO: here is the problem of existential-type escaping
-    checkKindM ann (ann <$ unNormalized tyInTerm) $ Type ()
+    -- FIXME: reenable the check
+    -- checkKindM ann (ann <$ unNormalized tyInTerm) $ Type ()
     pure tyInTerm
+
+  where
+    withBinds :: forall uni ann a. NonEmpty (Binding TyName Name uni ann) -> TypeCheckM uni ann a -> TypeCheckM uni ann a
+    withBinds = flip . foldr $ withBind
+
+    checkWellformBinds :: forall uni ann. (GShow uni, GEq uni, DefaultUni <: uni)
+                       => NonEmpty (Binding TyName Name uni ann) -> TypeCheckM uni ann ()
+    checkWellformBinds = traverse_ checkWellformBind
 
 
 -- See the [Global uniqueness] and [Type rules] notes.
@@ -452,8 +463,9 @@ checkTypeM ann term vTy = do
     vTermTy <- inferTypeM term
     when (vTermTy /= vTy) $ throwError (TypeMismatch ann (void term) (unNormalized vTermTy) vTy)
 
--- | extends the environment with a bind.
--- NOTE: does not do any check of binds-name collision checks (which is needed for letrec)
+-- | Extends the environment(s) with a bind.
+-- NOTE: there are no well-formed or duplication checks here, it just adds to the environment(s) like withVar/withTyVar do.
+-- For checks see `checkWellformBind`.
 withBind :: forall uni ann a.
            Binding TyName Name uni ann
          -> TypeCheckM uni ann a
@@ -461,7 +473,7 @@ withBind :: forall uni ann a.
 withBind b m = case b of
   TermBind _ _ (VarDecl _ n ty) _rhs -> do
       -- OPTIMIZE: redundant, usually this function is called together with `checkWellformBind`,
-      -- which performs normalization here as well
+      -- which performs normalization there as well
       vTy <- normalizeTypeM $ void ty
       withVar n vTy m
   TypeBind _ (TyVarDecl _ tn k) _rhs ->
@@ -506,11 +518,6 @@ withBind b m = case b of
                        vdecls
                      )
 
-withBinds :: forall uni ann a.
-            NonEmpty (Binding TyName Name uni ann)
-          -> TypeCheckM uni ann a
-          -> TypeCheckM uni ann a
-withBinds = flip . foldr $ withBind
 
 -- | check that a binding is well-formed (correctly typed, kinded)
 checkWellformBind :: forall uni ann.
@@ -526,39 +533,39 @@ checkWellformBind = \case
       checkTypeM ann rhs vTy
   TypeBind _ (TyVarDecl ann _ k) rhs ->
       checkKindM ann rhs (void k)
-  DatatypeBind _ (Datatype _ (TyVarDecl _ dt _) tvdecls _des vdecls) ->
-      -- add the type-arguments to environment
+  DatatypeBind _ (Datatype ann tvdecl@(TyVarDecl _ dataName _) tvdecls des vdecls) -> do
+      assertNoDuplicate allNewTyNames
+      assertNoDuplicate allNewNames
       foldr (\(TyVarDecl _ tn k) -> withTyVar tn (void k))
-      -- check the data-constructors' argument-types to be kinded by *
-      (traverse_
-          (\(VarDecl ann _ ty) -> do
-              checkKindM ann ty $ Type ()
-              -- check that the normalized result-type of the data-constructor is
-              -- of the form `[DT tyarg1 tyarg2 ... tyargn]`
-              -- Q: is this normalization absolutely necessary?
-              actualConstrResultType <- normalizeTypeM $ void ty
-              -- TODO: after GADTs are added to the language the expected constructor result type
-              -- has to be "relaxed" from `[DT tyarg1 ... tyargn]` to `[DT Same Arity As ... Tvdecls]`
-              -- i.e. we should only check that `DT` is applied to the correct *number* of tyargs as the number of tvdecls,
-              let expectedConstrResultType = foldl
-                      (\acc (TyVarDecl _ tyarg _) -> TyApp () acc $ TyVar () tyarg)
-                      (TyVar () dt)
-                      tvdecls
-              when (expectedConstrResultType /= unNormalized actualConstrResultType) $
-                  -- TODO: probably introduce a more specialized constructor type error,
-                  -- because we don't have a valid "occuring-in-term" to put in the typemismatch-error
-                  throwError $ TypeMismatch ann dummyTerm expectedConstrResultType actualConstrResultType
-        )
-          vdecls)
-      tvdecls
+          -- check the data-constructors' argument-types to be kinded by *
+          (traverse_
+              (\(VarDecl ann1 _ ty) -> do
+                  checkKindM ann ty $ Type ()
+                  -- check that the normalized result-type of the data-constructor is
+                  -- of the form `[DT tyarg1 tyarg2 ... tyargn]`
+                  -- Q: is this normalization absolutely necessary?
+                  actualConstrResultType <- constrResultTy <$> normalizeTypeM (void ty)
+                  -- TODO: after GADTs are added to the language the expected constructor result type
+                  -- has to be "relaxed" from `[DT tyarg1 ... tyargn]` to `[DT Same Arity As ... Tvdecls]`
+                  -- i.e. we should only check that `DT` is applied to the correct *number* of tyargs as the number of tvdecls.
+                  let expectedConstrResultType = foldl
+                          (\acc (TyVarDecl _ tyarg _) -> TyApp () acc $ TyVar () tyarg)
+                          (TyVar () dataName)
+                          tvdecls
+                  when (expectedConstrResultType /= unNormalized actualConstrResultType) $
+                      throwError $ MalformedDataConstrResType ann1 expectedConstrResultType actualConstrResultType
+              )
+              vdecls)
+          allNewTyDecls
+   where
+      allNewTyDecls = tvdecl:tvdecls
+      allNewTyNames = fmap (nameString . unTyName . tyVarDeclName) allNewTyDecls
+      allNewNames = nameString des : fmap (nameString . varDeclName) vdecls
 
-checkWellformBinds :: forall uni ann.
-                     (GShow uni, GEq uni, DefaultUni <: uni)
-                    => NonEmpty (Binding TyName Name uni ann)
-                    -> TypeCheckM uni ann ()
-checkWellformBinds = traverse_ checkWellformBind
-
-
+      assertNoDuplicate :: [T.Text] -> TypeCheckM uni ann ()
+      assertNoDuplicate = maybe (pure ())
+                                (throwError . DuplicateDeclaredIdent ann)
+                          . hasDuplicate
 -- HELPERS
 
 -- | Get the result type of a constructor's type that has been prior normalized.
@@ -573,4 +580,7 @@ constrResultTy (Normalized t) = Normalized $ constrResultTy' t
           -- Q: is it necessary to descend inside a forall?
           -- TyForall _ _ _ t -> constrResultTy' t
           t' -> t'
+
+hasDuplicate :: Ord a => [a] -> Maybe a
+hasDuplicate l = head <$> (find (\ g -> length g > 1) .  group $ sort l)
 
