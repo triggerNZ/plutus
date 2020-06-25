@@ -69,7 +69,7 @@ import Prelude (class Show, Unit, add, bind, bottom, const, discard, eq, flip, i
 import Servant.PureScript.Ajax (AjaxError, errorToString)
 import Servant.PureScript.Settings (SPSettings_)
 import Simulation.BottomPanel (bottomPanel)
-import Simulation.State (ActionInput(..), ActionInputId, MarloweState, _editorErrors, _editorWarnings, _pendingInputs, _possibleActions, _slot, _state, applyTransactions, emptyMarloweState, hasHistory, updateContractInState, updateContractInStateP, updateMarloweState, updatePossibleActions, updateStateP)
+import Simulation.State (ActionInput(..), ActionInputId, _editorErrors, _editorWarnings, _pendingInputs, _possibleActions, _slot, _state, applyTransactions, emptyMarloweState, hasHistory, updateContractInState, updateMarloweState)
 import Simulation.Types (Action(..), ChildSlots, Message(..), Query(..), State, WebData, _activeDemo, _analysisState, _authStatus, _bottomPanelView, _createGistResult, _currentContract, _currentMarloweState, _editorKeybindings, _editorSlot, _gistUrl, _helpContext, _loadGistResult, _marloweState, _oldContract, _selectedHole, _showBottomPanel, _showErrorDetail, _showRightPanel, isContractValid, mkState)
 import StaticData (marloweBufferLocalStorageKey)
 import StaticData as StaticData
@@ -555,17 +555,15 @@ inputComposer state =
   vs :: forall k v. Map k v -> Array v
   vs m = map snd (kvs m)
 
-  lastKey :: Maybe (Maybe Party)
+  lastKey :: Maybe Party
   lastKey = map (\x -> x.key) (Map.findMax possibleActions)
 
-  parties :: forall v. Array (Tuple (Maybe Party) v) -> Array (Tuple Party v)
+  parties :: forall v. Array (Tuple Party v) -> Array (Tuple Party v)
   parties = foldr f mempty
     where
-    f (Tuple (Just k) v) acc = (Tuple k v) : acc
+    f (Tuple k v) acc = (Tuple k v) : acc
 
-    f _ acc = acc
-
-  actionsForParties :: Map (Maybe Party) (Map ActionInputId ActionInput) -> Array (HTML p Action)
+  actionsForParties :: Map Party (Map ActionInputId ActionInput) -> Array (HTML p Action)
   actionsForParties m = map (\(Tuple k v) -> participant isEnabled k (vs v)) (parties (kvs m))
 
 participant ::

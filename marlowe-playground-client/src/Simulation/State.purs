@@ -71,7 +71,7 @@ data MarloweEvent
   | OutputEvent SlotInterval Payment
 
 type MarloweState
-  = { possibleActions :: Map (Maybe Party) (Map ActionInputId ActionInput)
+  = { possibleActions :: Map Party (Map ActionInputId ActionInput)
     , pendingInputs :: Array (Tuple Input (Maybe PubKey))
     , transactionError :: Maybe TransactionError
     , transactionWarnings :: Array TransactionWarning
@@ -183,11 +183,13 @@ updatePossibleActions oldState =
   insertTuple :: forall k v. Ord k => Tuple k v -> Map k v -> Map k v
   insertTuple (Tuple k v) m = Map.insert k v m
 
-  updateActions :: Map ActionInputId ActionInput -> Map (Maybe Party) (Map ActionInputId ActionInput) -> Map (Maybe Party) (Map ActionInputId ActionInput)
+  updateActions :: Map ActionInputId ActionInput -> Map Party (Map ActionInputId ActionInput) -> Map Party (Map ActionInputId ActionInput)
   updateActions actionInputs oldInputs = foldlWithIndex (addButPreserveActionInputs oldInputs) mempty actionInputs
 
-  addButPreserveActionInputs :: Map (Maybe Party) (Map ActionInputId ActionInput) -> ActionInputId -> Map (Maybe Party) (Map ActionInputId ActionInput) -> ActionInput -> Map (Maybe Party) (Map ActionInputId ActionInput)
-  addButPreserveActionInputs oldInputs actionInputIdx m actionInput = appendValue m oldInputs (actionPerson actionInput) actionInputIdx actionInput
+  addButPreserveActionInputs :: Map Party (Map ActionInputId ActionInput) -> ActionInputId -> Map Party (Map ActionInputId ActionInput) -> ActionInput -> Map Party (Map ActionInputId ActionInput)
+  addButPreserveActionInputs oldInputs actionInputIdx m actionInput = case (actionPerson actionInput) of
+    Just party -> appendValue m oldInputs party actionInputIdx actionInput
+    _ -> m
 
   actionPerson :: ActionInput -> (Maybe Party)
   actionPerson (DepositInput _ party _ _) = Just party

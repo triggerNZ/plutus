@@ -10,10 +10,6 @@ extendWith :: forall a. (a -> a) -> NonEmptyList a -> NonEmptyList a
 extendWith f l = cons ((f <<< head) l) l
 
 tailIfNotEmpty :: forall a. NonEmptyList a -> NonEmptyList a
-tailIfNotEmpty ms =
-  let
-    tail' = tail ms
-  in
-    case fromList tail' of
-      Nothing -> ms
-      Just netail -> netail
+tailIfNotEmpty ms = case fromList (tail ms) of
+  Nothing -> ms
+  Just netail -> netail

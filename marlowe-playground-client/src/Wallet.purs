@@ -1,18 +1,18 @@
 module Wallet where
 
+import Prelude
 import Prelude hiding (div)
-
 import Analytics (class IsEvent, Event)
 import Analytics as A
 import Control.Alt ((<|>))
 import Control.Monad.State (class MonadState)
-import Data.Array (concatMap, delete, drop, find, fold, foldMap, snoc)
+import Data.Array (concatMap, delete, drop, elem, find, fold, foldMap, snoc)
 import Data.Array as Array
 import Data.BigInteger (BigInteger)
 import Data.BigInteger as BigInteger
 import Data.Either (Either(..))
-import Data.Foldable (foldl, intercalate, traverse_)
-import Data.Lens (Getter', Lens', _Just, assign, lens, modifying, over, preview, set, to, traversed, use, (^.), (^?))
+import Data.Foldable (foldl, for_, intercalate, traverse_)
+import Data.Lens (Getter', Lens', _Just, assign, has, lens, modifying, over, preview, set, to, toArrayOf, traversed, use, (^.), (^?))
 import Data.Lens.Extra (peruse)
 import Data.Lens.Index (ix)
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -22,9 +22,11 @@ import Data.List.NonEmpty as NEL
 import Data.List.Types (NonEmptyList)
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing)
+import Data.Map.Lens (_MaxIndex, _NextIndex)
+import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.Newtype (class Newtype, unwrap)
 import Data.NonEmptyList.Extra (extendWith)
+import Data.NonEmptyList.Lens (_Tail)
 import Data.Profunctor.Choice (class Choice)
 import Data.Profunctor.Strong (class Strong)
 import Data.Set (Set)
@@ -39,7 +41,7 @@ import Halogen as H
 import Halogen.Analytics (handleActionWithAnalyticsTracking)
 import Halogen.Classes (aHorizontal, active, bold, closeDrawerIcon, expanded, first, infoIcon, jFlexStart, minusBtn, noMargins, panelSubHeader, panelSubHeaderMain, panelSubHeaderSide, plusBtn, pointer, rTable, rTable4cols, rTableCell, rTableDataRow, rTableEmptyRow, sidebarComposer, smallBtn, spaceLeft, spanText, textSecondaryColor, uppercase)
 import Halogen.Classes as Classes
-import Halogen.HTML (HTML, a, article, aside, b_, button, div, h6, hr_, img, input, li, option, p, p_, pre, section, select, small, small_, span, strong_, text, ul)
+import Halogen.HTML (HTML, a, article, aside, b_, button, div, h6, hr_, img, input, li, option, p, p_, pre_, section, select, small, small_, span, strong_, text, ul)
 import Halogen.HTML (span) as HTML
 import Halogen.HTML.Elements.Keyed as Keyed
 import Halogen.HTML.Events (onClick, onValueChange)
@@ -99,7 +101,7 @@ _parties :: Lens' LoadedContract (Map Party PubKey)
 _parties = prop (SProxy :: SProxy "parties")
 
 isInvolvedInContract :: PubKey -> LoadedContract -> Boolean
-isInvolvedInContract pubKey contract = contract.owner == pubKey || (isJust $ find ((==) pubKey) contract.parties)
+isInvolvedInContract pubKey contract = contract.owner == pubKey || elem pubKey contract.parties
 
 type ChildSlots
   = ()
@@ -191,7 +193,8 @@ mkState =
 findWallet :: State -> PubKey -> Maybe Wallet
 findWallet state walletName =
   let
-    (wallets :: Array Wallet) = state ^. (_wallets <<< to Map.values <<< to Array.fromFoldable)
+    wallets :: Array Wallet
+    wallets = state ^. (_wallets <<< to Map.values <<< to Array.fromFoldable)
   in
     find (\(Wallet { name }) -> name == walletName) wallets
 
@@ -235,8 +238,6 @@ _walletLoadedContract = lens get' set'
     )
       state
 
-  -- in
-  -- state { loadedContract = (Just contract.idx), contracts = Map.insert contract.idx contract state.contracts }
   set' state Nothing = set (_openWallet <<< _Just <<< _loadedContract) Nothing state
 
 _currentLoadedMarloweState ::
@@ -324,53 +325,47 @@ applyTransactions = do
       modifying (_wallets <<< ix owner <<< _assets) (Map.alter addMoney token)
 
 hasHistory :: State -> Boolean
-hasHistory state = fromMaybe false $ state ^? (_loadedMarloweState <<< to NEL.length <<< to ((<) 1))
+hasHistory = has (_loadedMarloweState <<< _Tail)
 
 handleQuery :: forall a m. Query a -> HalogenM State Action ChildSlots Message m (Maybe a)
 handleQuery (LoadContract contractString next) = do
   case parseContract contractString of
-    Left err -> do
-      assign _loadContractError (Just $ show err)
-      pure $ Just next
-    Right contractTerm -> do
-      case fromTerm contractTerm of
-        Nothing -> pure $ Just next
-        Just contract -> do
-          idx <- use (_contracts <<< to Map.size <<< to (add one))
-          mOpenWallet <- use _openWallet
-          case mOpenWallet of
-            Nothing -> pure $ Just next
-            Just openWallet -> do
-              existingWallets <- use _wallets
-              slot <- use _slot
-              let
-                contractData = gatherContractData contractTerm { parties: mempty, tokens: mempty }
+    Left err -> assign _loadContractError (Just $ show err)
+    Right contractTerm ->
+      for_ (fromTerm contractTerm) \contract -> do
+        idx <- use (_contracts <<< _NextIndex)
+        mOpenWallet <- use _openWallet
+        for_ mOpenWallet \openWallet -> do
+          existingWallets <- use _wallets
+          slot <- use _slot
+          let
+            contractData = gatherContractData contractTerm { parties: mempty, tokens: mempty }
 
-                parties = Set.mapMaybe fromTerm contractData.parties
+            parties = Set.mapMaybe fromTerm contractData.parties
 
-                tokens = Map.fromFoldable $ Set.map (\token -> Tuple token zero) $ Set.mapMaybe fromTerm contractData.tokens
+            tokens = Map.fromFoldable $ Set.map (\token -> Tuple token zero) $ Set.mapMaybe fromTerm contractData.tokens
 
-                newWallets = foldl (walletFromPK tokens) existingWallets parties
+            newWallets = foldl (walletFromPK tokens) existingWallets parties
 
-                -- A PK party should be owned by the wallet that is that PK but by default it is owned by the primary wallet
-                partiesMap = Map.fromFoldable $ Set.map (mkPartyPair openWallet newWallets) parties
+            -- A PK party should be owned by the wallet that is that PK but by default it is owned by the primary wallet
+            partiesMap = Map.fromFoldable $ Set.map (mkPartyPair openWallet newWallets) parties
 
-                loadedContract =
-                  { contract
-                  , idx
-                  , owner: openWallet ^. _name
-                  , parties: mempty
-                  , started: false
-                  , marloweState: NEL.singleton (emptyMarloweState slot)
-                  }
-              modifying _wallets (Map.union newWallets)
-              assign _walletLoadedContract (Just loadedContract)
-              modifying _contracts (Map.insert idx loadedContract)
-              assign (_walletLoadedContract <<< _Just <<< _parties) partiesMap
-              modifying (_openWallet <<< _Just <<< _assets) (flip Map.union tokens)
-              modifying _tokens (Set.union (Map.keys tokens))
-              updateContractInState contractString
-              pure $ Just next
+            loadedContract =
+              { contract
+              , idx
+              , owner: openWallet ^. _name
+              , parties: mempty
+              , started: false
+              , marloweState: NEL.singleton (emptyMarloweState slot)
+              }
+          modifying _wallets (Map.union newWallets)
+          assign _walletLoadedContract (Just loadedContract)
+          modifying _contracts (Map.insert idx loadedContract)
+          assign (_walletLoadedContract <<< _Just <<< _parties) partiesMap
+          modifying (_openWallet <<< _Just <<< _assets) (flip Map.union tokens)
+          modifying _tokens (Set.union (Map.keys tokens))
+          updateContractInState contractString
+  pure $ Just next
   where
   walletFromPK :: Map Token BigInteger -> Map String Wallet -> Party -> Map String Wallet
   walletFromPK assets wallets (S.PK pubKey) =
@@ -384,7 +379,7 @@ handleQuery (LoadContract contractString next) = do
   mkPartyPair :: Wallet -> Map String Wallet -> Party -> Tuple Party String
   mkPartyPair defaultOwner wallets (S.PK pubKey) =
     foldl
-      (\(Tuple party owner) wallet@(Wallet { name }) -> if pubKey == name then Tuple party (wallet ^. _name) else Tuple party owner)
+      (\(Tuple party owner) (Wallet { name }) -> if pubKey == name then Tuple party name else Tuple party owner)
       (Tuple (S.PK pubKey) (defaultOwner ^. _name))
       wallets
 
@@ -496,17 +491,17 @@ handleAction (SetChoice choiceId chosenNum) = updateMarloweState (over _possible
 handleAction (ChangeCurrencyInput token money) = modifying _assetChanges (Map.insert token money)
 
 handleAction (AddCurrency token) = do
-  newMoney <- use (_assetChanges <<< to (Map.lookup token) <<< to (fromMaybe zero))
-  modifying (_openWallet <<< _Just <<< _assets) (Map.alter (addMoney newMoney) token)
+  money <- peruse (_assetChanges <<< ix token)
+  modifying (_openWallet <<< _Just <<< _assets) (Map.alter (addMoney money) token)
   where
-  addMoney newMoney (Just oldMoney) = Just $ oldMoney + newMoney
+  addMoney (Just newMoney) (Just oldMoney) = Just $ oldMoney + newMoney
 
-  addMoney newMoney _ = Just newMoney
+  addMoney _ _ = Nothing
 
 handleAction (RenameWallet name) = assign (_openWallet <<< _Just <<< _name) name
 
 handleAction CreateWallet = do
-  idx <- use (_wallets <<< to Map.size <<< to (add one))
+  idx <- use (_wallets <<< _NextIndex)
   let
     name = "Wallet " <> show idx
 
@@ -548,7 +543,7 @@ render state =
             , ul [ classes [ ClassName "wallet-list", aHorizontal ] ]
                 (map (displayWallet walletName) wallets)
             , addWalletButton
-            , a [ class_ (ClassName "clear-all-contracts"), onClick $ Just <<< const ResetAll ] [ text "Clear All" ]
+            , a [ class_ (ClassName "clear-all-contracts"), onClick $ const $ Just ResetAll ] [ text "Clear All" ]
             ]
         , div [ classes [ panelSubHeaderSide, expanded (state ^. _showRightPanel) ] ]
             [ a [ classes [ (ClassName "drawer-icon-click") ], onClick $ const $ Just $ ShowRightPanel (state ^. (_showRightPanel <<< to not)) ]
@@ -561,22 +556,20 @@ render state =
         ]
     ]
   where
-  isRunning = fromMaybe false $ state ^? (_walletLoadedContract <<< _Just <<< _started)
-
   walletName = fromMaybe "No Wallet Open" $ state ^? (_openWallet <<< _Just <<< _name)
 
-  wallets = map snd $ Map.toUnfoldable $ state ^. _wallets
+  wallets = toArrayOf (_wallets <<< traversed) state
 
-  addWalletButton = button [ class_ (ClassName "add-wallet-button"), onClick $ Just <<< const CreateWallet ] [ text "+" ]
+  addWalletButton = button [ class_ (ClassName "add-wallet-button"), onClick $ const $ Just CreateWallet ] [ text "+" ]
 
 displayWallet :: forall p. PubKey -> Wallet -> HTML p Action
 displayWallet openWallet wallet =
   li
-    [ class_
+    [ classes
         ( if wallet ^. _name == openWallet then
-            active
+            [ active ]
           else
-            ClassName mempty
+            mempty
         )
     ]
     [ a [ onClick $ const $ Just $ SelectWallet wallet ] [ text $ show wallet ]
@@ -601,15 +594,15 @@ mainPanel state =
           <> renderContract'
       )
   where
-  isStarted = fromMaybe false $ state ^? (_walletLoadedContract <<< _Just <<< _started)
+  started = has (_walletLoadedContract <<< _Just <<< _started) state
 
-  isLoaded = state ^. (_walletLoadedContract <<< to isJust)
-
-  renderContract'
-    | not isLoaded = []
+  loaded = has _walletLoadedContract state
 
   renderContract'
-    | not isStarted =
+    | not loaded = []
+
+  renderContract'
+    | not started =
       [ button
           [ classes [ ClassName "tooltip", ClassName "start-simulation-btn" ]
           , onClick $ const $ Just $ StartContract
@@ -618,7 +611,7 @@ mainPanel state =
           , text "Start"
           ]
       , div [ classes [ ClassName "code-editor", ClassName "expanded" ] ]
-          [ pre [] [ text contractString ] ]
+          [ pre_ [ text contractString ] ]
       ]
 
   renderContract'
@@ -629,7 +622,7 @@ mainPanel state =
                 ]
           )
       , div [ classes [ ClassName "code-editor", ClassName "expanded" ] ]
-          [ pre [] [ text contractString ] ]
+          [ pre_ [ text contractString ] ]
       ]
 
   contractString =
@@ -670,7 +663,7 @@ renderActions state =
                         [ ul [ classes [ ClassName "demo-list", aHorizontal ] ]
                             [ li [ class_ (ClassName "apply-transaction-button") ]
                                 [ button
-                                    [ onClick $ Just <<< const ApplyTransaction
+                                    [ onClick $ const $ Just ApplyTransaction
                                     , enabled hasTransactions
                                     , class_ (Classes.disabled $ not hasTransactions)
                                     ]
@@ -699,19 +692,17 @@ renderActions state =
             <<< to fold
         )
 
-  walletKeys (Just party) =
+  walletKeys party =
     let
       parties = fromMaybe mempty $ state ^? (_walletLoadedContract <<< _Just <<< _parties)
 
       walletParties = case state ^? (_openWallet <<< _Just) of
-        Just wallet -> Set.fromFoldable $ Map.keys $ Map.filterWithKey (\_ owner -> owner == (wallet ^. _name)) parties
+        Just wallet -> Set.fromFoldable $ Map.keys $ Map.filter (eq (wallet ^. _name)) parties
         Nothing -> mempty
     in
       Set.member party walletParties
 
-  walletKeys _ = false
-
-  hasTransactions = fromMaybe false $ state ^? (_currentLoadedMarloweState <<< _pendingInputs <<< to Array.null <<< to not)
+  hasTransactions = has (_currentLoadedMarloweState <<< _pendingInputs <<< to Array.null <<< to not) state
 
   renderAction :: (Tuple ActionInputId ActionInput) -> HTML p Action
   renderAction (Tuple actionInputId actionInput) = inputItem true "" actionInput
@@ -734,9 +725,9 @@ renderMyRoles me state =
               pure (Tuple contract name)
           )
       $ Map.keys
-      $ Map.filterWithKey (\_ v -> v == me)
+      $ Map.filter (eq me)
       $ joinMaps
-      $ Map.mapMaybe (\v -> Just v.parties)
+      $ map (_.parties)
       $ state.contracts
 
   getRoleName (S.Role name) = Just name
@@ -1045,13 +1036,7 @@ renderAssets state =
         , placeholder "BigInteger"
         , class_ $ ClassName "currency-input"
         , value "0"
-        , onValueChange
-            $ ( \newMoney ->
-                  Just
-                    $ ChangeCurrencyInput token
-                        ( fromMaybe zero (BigInteger.fromString newMoney)
-                        )
-              )
+        , onValueChange (\newMoney -> ChangeCurrencyInput token <$> BigInteger.fromString newMoney)
         ]
 
     addCurrencyButton = button [ onClick $ const $ Just $ AddCurrency token ] [ text "+" ]
@@ -1077,7 +1062,7 @@ renderContracts state =
             )
               <> [ button
                     [ class_ (ClassName "load-contract-from-simulator-button")
-                    , onClick $ Just <<< const LoadContractFromSimulation
+                    , onClick $ const $ Just LoadContractFromSimulation
                     ]
                     [ text "Load Contract from Simulation" ]
                 ]
@@ -1167,13 +1152,7 @@ marloweActionInput isEnabled f current =
     , placeholder "BigInteger"
     , class_ $ ClassName "action-input"
     , value $ show current
-    , onValueChange
-        $ ( \x ->
-              Just
-                $ f
-                    ( fromMaybe zero (BigInteger.fromString x)
-                    )
-          )
+    , onValueChange (map f <<< BigInteger.fromString)
     ]
 
 renderDeposit :: forall p a. AccountId -> S.Party -> Token -> BigInteger -> Array (HTML p a)
@@ -1278,17 +1257,17 @@ rightPanel state =
             [ small [ classes [ textSecondaryColor, bold, uppercase ] ] [ text "Blockchain Status" ] ]
         ]
     , ul []
-        [ li [] [ text ((state ^. (_runningContracts <<< to Map.size <<< to show)) <> " contracts running") ]
+        [ li [] [ text ((state ^. (_runningContracts <<< _MaxIndex <<< to show)) <> " contracts running") ]
         , li [] [ text $ "Current Block: " <> show currentBlock ]
         , li [ classes [ bold, pointer ] ]
             [ a
-                [ onClick $ Just <<< const ResetContract
+                [ onClick $ const $ Just ResetContract
                 ]
                 [ text "Reset Blockchain" ]
             ]
         , li [ classes [ bold, pointer ] ]
             [ a
-                [ onClick $ Just <<< const NextSlot
+                [ onClick $ const $ Just NextSlot
                 ]
                 [ text $ "Next Block" ]
             ]
