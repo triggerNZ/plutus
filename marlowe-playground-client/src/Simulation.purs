@@ -60,24 +60,16 @@ import Marlowe.Linter as Linter
 import Marlowe.Monaco as MM
 import Marlowe.Parser (hole, parseTerm)
 import Marlowe.Parser as P
-<<<<<<< HEAD
-import Marlowe.Semantics (AccountId(..), Bound(..), ChoiceId(..), Input(..), Party, PubKey, Token, TransactionError, inBounds, showPrettyToken)
-=======
-import Marlowe.Semantics (AccountId(..), Bound(..), ChoiceId(..), Input(..), Party(..), PubKey, Token, TransactionError, inBounds)
->>>>>>> Add a new wallets simulation tab to marlowe playground
+import Marlowe.Semantics (AccountId(..), Bound(..), ChoiceId(..), Input(..), Party(..), PubKey, Token, TransactionError, inBounds, showPrettyToken)
 import Monaco (IMarker, isError, isWarning)
 import Monaco (getModel, getMonaco, setTheme, setValue) as Monaco
 import Network.RemoteData (RemoteData(..), _Success)
 import Network.RemoteData as RemoteData
-import Prelude (class Show, Unit, add, bind, bottom, const, discard, eq, flip, identity, mempty, one, pure, show, unit, zero, ($), (/=), (<$>), (<<<), (<>), (=<<), (==))
+import Prelude (class Show, Unit, add, bind, bottom, const, discard, eq, flip, identity, mempty, one, pure, show, unit, zero, ($), (/=), (<$>), (<<<), (<>), (=<<), (==), (>))
 import Servant.PureScript.Ajax (AjaxError, errorToString)
 import Servant.PureScript.Settings (SPSettings_)
 import Simulation.BottomPanel (bottomPanel)
-<<<<<<< HEAD
-import Simulation.State (ActionInput(..), ActionInputId, MarloweState, _editorErrors, _editorWarnings, _pendingInputs, _possibleActions, _slot, _state, emptyMarloweState, updateContractInStateP, updatePossibleActions, updateStateP)
-=======
-import Simulation.State (ActionInput(..), ActionInputId, _editorErrors, _editorWarnings, _pendingInputs, _possibleActions, _slot, _state, applyTransactions, emptyMarloweState, hasHistory, updateContractInState, updateMarloweState)
->>>>>>> Add a new wallets simulation tab to marlowe playground
+import Simulation.State (ActionInput(..), ActionInputId, MarloweState, _editorErrors, _editorWarnings, _pendingInputs, _possibleActions, _slot, _state, applyTransactions, emptyMarloweState, hasHistory, updateContractInState, updateContractInStateP, updateMarloweState, updatePossibleActions, updateStateP)
 import Simulation.Types (Action(..), ChildSlots, Message(..), Query(..), State, WebData, _activeDemo, _analysisState, _authStatus, _bottomPanelView, _createGistResult, _currentContract, _currentMarloweState, _editorKeybindings, _editorSlot, _gistUrl, _helpContext, _loadGistResult, _marloweState, _oldContract, _selectedHole, _showBottomPanel, _showErrorDetail, _showRightPanel, isContractValid, mkState)
 import StaticData (marloweBufferLocalStorageKey)
 import StaticData as StaticData
@@ -125,18 +117,16 @@ handleQuery (WebsocketResponse response next) = do
   assign _analysisState response
   pure (Just next)
 
-<<<<<<< HEAD
 handleQuery (HasStarted f) = do
   state <- use _marloweState
   pure $ Just $ f (NEL.length state > 1)
-=======
+
 handleQuery (GetCurrentContract next) = do
   oldContract <- use _oldContract
   currContract <- editorGetValue
   let
     newContract = fromMaybe mempty $ oldContract <|> currContract
   pure $ Just $ next newContract
->>>>>>> Add a new wallets simulation tab to marlowe playground
 
 handleAction ::
   forall m.
@@ -401,18 +391,6 @@ saveInitialState = do
         _ -> x
     )
 
-<<<<<<< HEAD
-updateMarloweState :: forall m. MonadState State m => (MarloweState -> MarloweState) -> m Unit
-updateMarloweState f = modifying _marloweState (extendWith (updatePossibleActions <<< f))
-
-updateContractInState :: forall m. MonadState State m => String -> m Unit
-updateContractInState contents = modifying _currentMarloweState (updatePossibleActions <<< updateContractInStateP contents)
-
-applyTransactions :: forall m. MonadState State m => m Unit
-applyTransactions = modifying _marloweState (extendWith (updatePossibleActions <<< updateStateP))
-
-=======
->>>>>>> Add a new wallets simulation tab to marlowe playground
 resetContract :: forall m. HalogenM State Action ChildSlots Message m Unit
 resetContract = do
   newContract <- editorGetValue

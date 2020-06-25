@@ -1,11 +1,11 @@
 module Simulation.State where
 
 import Control.Monad.State (class MonadState)
-import Data.Array (foldl, fromFoldable, uncons)
+import Data.Array (foldl, fromFoldable, mapMaybe, uncons)
 import Data.BigInteger (BigInteger)
 import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldlWithIndex)
-import Data.Lens (Lens', modifying, over, set, to, view, (^.))
+import Data.Lens (Getter', Lens', modifying, over, set, to, view, (^.))
 import Data.Lens.NonEmptyList (_Head)
 import Data.Lens.Record (prop)
 import Data.List as List
@@ -24,7 +24,7 @@ import Marlowe.Linter as L
 import Marlowe.Parser (parseContract)
 import Marlowe.Semantics (AccountId, Action(..), Assets, Bound, ChoiceId(..), ChosenNum, Contract(..), Environment(..), Input, Party, Payment, PubKey, Slot, SlotInterval(..), State, Token, TransactionError, TransactionInput(..), TransactionOutput(..), TransactionWarning, _minSlot, boundFrom, computeTransaction, emptyState, evalValue, extractRequiredActionsWithTxs, moneyInContract)
 import Monaco (IMarker)
-import Prelude (class Eq, class Ord, append, map, mempty, min, zero, ($), (<<<))
+import Prelude (class Eq, class Ord, Unit, append, map, mempty, min, zero, ($), (<<<), (<))
 
 data ActionInputId
   = DepositInputId AccountId Party Token BigInteger
@@ -124,6 +124,13 @@ _result = prop (SProxy :: SProxy "result")
 
 _log :: forall s a. Lens' { log :: a | s } a
 _log = prop (SProxy :: SProxy "log")
+
+_payments :: forall s. Getter' { log :: Array MarloweEvent | s } (Array Payment)
+_payments = _log <<< to (mapMaybe f)
+  where
+  f (InputEvent _) = Nothing
+
+  f (OutputEvent _ payment) = Just payment
 
 emptyMarloweState :: Slot -> MarloweState
 emptyMarloweState sn =
@@ -245,7 +252,7 @@ _currentMarloweState :: forall s. Lens' { marloweState :: NonEmptyList MarloweSt
 _currentMarloweState = _marloweState <<< _Head
 
 updateMarloweState :: forall s m. MonadState { marloweState :: NonEmptyList MarloweState | s } m => (MarloweState -> MarloweState) -> m Unit
-updateMarloweState f = modifying _marloweState (extendWith (set _currentTransactionInput Nothing <<< updatePossibleActions <<< f))
+updateMarloweState f = modifying _marloweState (extendWith (updatePossibleActions <<< f))
 
 updateContractInState :: forall s m. MonadState { marloweState :: NonEmptyList MarloweState | s } m => String -> m Unit
 updateContractInState contents = modifying _currentMarloweState (updatePossibleActions <<< updateContractInStateP contents)
