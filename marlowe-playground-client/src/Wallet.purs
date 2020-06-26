@@ -1,7 +1,5 @@
 module Wallet where
 
-import Prelude (class Eq, class Ord, class Show, Unit, add, bind, const, discard, eq, flip, map, mempty, not, one, otherwise, pure, show, unit, zero, ($), (&&), (+), (-), (<$>), (<<<), (<>), (=<<), (==), (>=), (||))
-import Prelude (class Eq, class Ord, class Show, Unit, add, bind, const, discard, eq, flip, map, mempty, not, one, otherwise, pure, show, unit, zero, ($), (&&), (+), (-), (<$>), (<<<), (<>), (=<<), (==), (>=), (||))
 import Analytics (class IsEvent, Event)
 import Analytics as A
 import Control.Alt ((<|>))
@@ -42,7 +40,7 @@ import Halogen as H
 import Halogen.Analytics (handleActionWithAnalyticsTracking)
 import Halogen.Classes (aHorizontal, active, bold, closeDrawerIcon, expanded, first, infoIcon, jFlexStart, minusBtn, noMargins, panelSubHeader, panelSubHeaderMain, panelSubHeaderSide, plusBtn, pointer, rTable, rTable4cols, rTableCell, rTableDataRow, rTableEmptyRow, sidebarComposer, smallBtn, spaceLeft, spanText, textSecondaryColor, uppercase)
 import Halogen.Classes as Classes
-import Halogen.HTML (HTML, a, article, aside, b_, button, div, h6, hr_, img, input, li, option, p, p_, section, select, small, small_, span, strong_, text, ul)
+import Halogen.HTML (HTML, a, article, aside, b_, button, div, h6, hr_, img, input, li, option, p, p_, section, select, small, small_, strong_, text, ul)
 import Halogen.HTML (code_, span) as HTML
 import Halogen.HTML.Elements.Keyed as Keyed
 import Halogen.HTML.Events (onClick, onValueChange)
@@ -53,6 +51,7 @@ import Marlowe.Holes (fromTerm, gatherContractData)
 import Marlowe.Parser (parseContract)
 import Marlowe.Semantics (AccountId(..), Assets(..), Bound(..), ChoiceId(..), ChosenNum, Input(..), Party, Payee(..), Payment(..), PubKey, Slot, Token(..), TransactionWarning(..), ValueId(..), _accounts, _boundValues, _choices, inBounds, maxTime)
 import Marlowe.Semantics as S
+import Prelude (class Eq, class Ord, class Show, Unit, add, bind, const, discard, eq, flip, map, mempty, not, one, otherwise, pure, show, unit, when, zero, ($), (&&), (+), (-), (<$>), (<<<), (<>), (=<<), (==), (>=), (||), (>))
 import Simulation.State (ActionInput(..), ActionInputId, MarloweState, _contract, _currentMarloweState, _marloweState, _payments, _pendingInputs, _possibleActions, _slot, _state, _transactionError, _transactionWarnings, emptyMarloweState, updateContractInStateP, updatePossibleActions, updateStateP)
 import Text.Extra (stripParens)
 import Text.Pretty (pretty)
@@ -433,7 +432,11 @@ handleAction ApplyTransaction = do
   assign _addInputError Nothing
   applyTransactions
 
-handleAction (ChangeRoleOwner contractId party newName) = assign (_contracts <<< ix contractId <<< _parties <<< ix party) newName
+handleAction (ChangeRoleOwner contractId party newName) = do
+  assign (_contracts <<< ix contractId <<< _parties <<< ix party) newName
+  pubKey <- fromMaybe mempty <$> peruse (_openWallet <<< _Just <<< _name)
+  contracts <- use (_walletContracts pubKey <<< to Map.values <<< to Array.fromFoldable)
+  when (Array.null contracts) $ assign _walletLoadedContract Nothing
 
 handleAction (SelectWallet wallet) = do
   mContract <- use _walletLoadedContract
@@ -495,9 +498,10 @@ handleAction (AddCurrency token) = do
   money <- peruse (_assetChanges <<< ix token)
   modifying (_openWallet <<< _Just <<< _assets) (Map.alter (addMoney money) token)
   where
-  addMoney (Just newMoney) (Just oldMoney) = Just $ oldMoney + newMoney
+  addMoney (Just newMoney) (Just oldMoney)
+    | newMoney > zero = Just $ oldMoney + newMoney
 
-  addMoney _ _ = Nothing
+  addMoney _ oldValue = oldValue
 
 handleAction (RenameWallet name) = assign (_openWallet <<< _Just <<< _name) name
 
@@ -506,7 +510,7 @@ handleAction CreateWallet = do
   let
     name = "Wallet " <> show idx
 
-    wallet = Wallet { name, assets: mempty, loadedContract: Nothing }
+    wallet = Wallet { name, assets: Map.singleton (Token "" "") zero, loadedContract: Nothing }
   modifying _wallets (Map.insert name wallet)
   assign _openWallet (Just wallet)
   assign _view $ WalletView $ wallet ^. _name
