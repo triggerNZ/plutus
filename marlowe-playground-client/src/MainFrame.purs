@@ -38,7 +38,6 @@ import Monaco (IMarkerData, markerSeverity)
 import Network.RemoteData (RemoteData(..))
 import Network.RemoteData as RemoteData
 import Prelude (Unit, bind, const, discard, eq, flip, identity, mempty, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>))
-import Prim.TypeError (class Warn, Text)
 import Servant.PureScript.Ajax (AjaxError)
 import Servant.PureScript.Settings (SPSettings_)
 import Simulation as Simulation
@@ -49,10 +48,10 @@ import Types (ChildSlots, FrontendState(FrontendState), HAction(..), HQuery(..),
 import Wallet as Wallet
 import WebSocket (WebSocketResponseMessage(..))
 
-initialState :: Warn (Text "Change default view to Simulation") => FrontendState
+initialState :: FrontendState
 initialState =
   FrontendState
-    { view: WalletEmulator
+    { view: Simulation
     , compilationResult: NotAsked
     , blocklyState: Nothing
     , showBottomPanel: true
@@ -315,7 +314,7 @@ render settings state =
                 , MB.workspaceBlocks
                 ]
             -- wallet panel
-            , div [ classes ([ hide ] <> isActiveTab state WalletEmulator) ]
+            , div [ classes ([ hide, ClassName "full-height" ] <> isActiveTab state WalletEmulator) ]
                 [ slot _walletSlot unit Wallet.mkComponent unit (Just <<< HandleWalletMessage) ]
             , bottomPanel
             ]

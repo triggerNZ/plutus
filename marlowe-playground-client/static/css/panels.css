@@ -463,3 +463,39 @@ button.minus-btn:hover {
   display: flex;
   justify-content: space-between;
 }
+
+.full-height {
+  height: 100%;
+}
+
+.wallet-contents .code {
+  height: auto;
+  min-height: 100px;
+  white-space: pre;
+  font-family: "Menlo", "Monaco", "Courier New", monospace;
+  padding-bottom: 3rem;
+}
+
+.wallet-contents .code code {
+  display: block;
+}
+
+.wallet-contents .code:before {
+  counter-reset: listing;
+}
+
+.wallet-contents .code code {
+  counter-increment: listing;
+}
+
+.wallet-contents .code code::before {
+  content: counter(listing);
+  display: inline-block;
+  margin-right: 1rem;
+  width: 36px;
+  padding-left: auto;
+  margin-left: auto;
+  text-align: right;
+  color: #237893;
+  background: var(--white);
+}

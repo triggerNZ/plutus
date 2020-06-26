@@ -1,7 +1,7 @@
 module Wallet where
 
-import Prelude
-import Prelude hiding (div)
+import Prelude (class Eq, class Ord, class Show, Unit, add, bind, const, discard, eq, flip, map, mempty, not, one, otherwise, pure, show, unit, zero, ($), (&&), (+), (-), (<$>), (<<<), (<>), (=<<), (==), (>=), (||))
+import Prelude (class Eq, class Ord, class Show, Unit, add, bind, const, discard, eq, flip, map, mempty, not, one, otherwise, pure, show, unit, zero, ($), (&&), (+), (-), (<$>), (<<<), (<>), (=<<), (==), (>=), (||))
 import Analytics (class IsEvent, Event)
 import Analytics as A
 import Control.Alt ((<|>))
@@ -12,7 +12,7 @@ import Data.BigInteger (BigInteger)
 import Data.BigInteger as BigInteger
 import Data.Either (Either(..))
 import Data.Foldable (foldl, for_, intercalate, traverse_)
-import Data.Lens (Getter', Lens', _Just, assign, has, lens, modifying, over, preview, set, to, toArrayOf, traversed, use, (^.), (^?))
+import Data.Lens (Getter', Lens', _Just, assign, has, lens, modifying, over, preview, set, to, toArrayOf, traversed, use, view, (^.), (^?))
 import Data.Lens.Extra (peruse)
 import Data.Lens.Index (ix)
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -23,7 +23,7 @@ import Data.List.Types (NonEmptyList)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Map.Lens (_MaxIndex, _NextIndex)
-import Data.Maybe (Maybe(..), fromMaybe, isNothing)
+import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing)
 import Data.Newtype (class Newtype, unwrap)
 import Data.NonEmptyList.Extra (extendWith)
 import Data.NonEmptyList.Lens (_Tail)
@@ -31,6 +31,7 @@ import Data.Profunctor.Choice (class Choice)
 import Data.Profunctor.Strong (class Strong)
 import Data.Set (Set)
 import Data.Set as Set
+import Data.String (Pattern(..), split)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..), snd)
@@ -41,8 +42,8 @@ import Halogen as H
 import Halogen.Analytics (handleActionWithAnalyticsTracking)
 import Halogen.Classes (aHorizontal, active, bold, closeDrawerIcon, expanded, first, infoIcon, jFlexStart, minusBtn, noMargins, panelSubHeader, panelSubHeaderMain, panelSubHeaderSide, plusBtn, pointer, rTable, rTable4cols, rTableCell, rTableDataRow, rTableEmptyRow, sidebarComposer, smallBtn, spaceLeft, spanText, textSecondaryColor, uppercase)
 import Halogen.Classes as Classes
-import Halogen.HTML (HTML, a, article, aside, b_, button, div, h6, hr_, img, input, li, option, p, p_, pre_, section, select, small, small_, span, strong_, text, ul)
-import Halogen.HTML (span) as HTML
+import Halogen.HTML (HTML, a, article, aside, b_, button, div, h6, hr_, img, input, li, option, p, p_, section, select, small, small_, span, strong_, text, ul)
+import Halogen.HTML (code_, span) as HTML
 import Halogen.HTML.Elements.Keyed as Keyed
 import Halogen.HTML.Events (onClick, onValueChange)
 import Halogen.HTML.Properties (InputType(..), alt, class_, classes, enabled, placeholder, selected, src, type_, value)
@@ -532,7 +533,7 @@ scrollHelpPanel =
 
 render :: forall p. State -> HTML p Action
 render state =
-  div []
+  div [ classes [ ClassName "full-height" ] ]
     [ section [ classes [ panelSubHeader, aHorizontal ] ]
         [ div [ classes [ panelSubHeaderMain, aHorizontal ] ]
             [ div [ classes [ ClassName "wallet-title", aHorizontal, jFlexStart ] ]
@@ -550,7 +551,7 @@ render state =
                 [ img [ src closeDrawerIcon, class_ (ClassName "drawer-icon") ] ]
             ]
         ]
-    , section [ class_ (ClassName "code-panel") ]
+    , section [ classes [ ClassName "code-panel", ClassName "full-height" ] ]
         [ mainPanel state
         , rightPanel state
         ]
@@ -594,9 +595,9 @@ mainPanel state =
           <> renderContract'
       )
   where
-  started = has (_walletLoadedContract <<< _Just <<< _started) state
+  started = fromMaybe false $ preview (_walletLoadedContract <<< _Just <<< _started) state
 
-  loaded = has _walletLoadedContract state
+  loaded = isJust $ view _walletLoadedContract state
 
   renderContract'
     | not loaded = []
@@ -607,12 +608,13 @@ mainPanel state =
           [ classes [ ClassName "tooltip", ClassName "start-simulation-btn" ]
           , onClick $ const $ Just $ StartContract
           ]
-          [ span [ class_ (ClassName "tooltiptext") ] [ text "Start Contract" ]
-          , text "Start"
+          [ text "Start"
           ]
-      , div [ classes [ ClassName "code-editor", ClassName "expanded" ] ]
-          [ pre_ [ text contractString ] ]
+      , div [ classes [ ClassName "code-editor", ClassName "expanded", ClassName "code" ] ]
+          numberedText
       ]
+      where
+      numberedText = (HTML.code_ <<< Array.singleton <<< text) <$> split (Pattern "\n") contractString
 
   renderContract'
     | otherwise =
@@ -621,9 +623,11 @@ mainPanel state =
               <> [ renderCurrentState state
                 ]
           )
-      , div [ classes [ ClassName "code-editor", ClassName "expanded" ] ]
-          [ pre_ [ text contractString ] ]
+      , div [ classes [ ClassName "code-editor", ClassName "expanded", ClassName "code" ] ]
+          numberedText
       ]
+      where
+      numberedText = (HTML.code_ <<< Array.singleton <<< text) <$> split (Pattern "\n") contractString
 
   contractString =
     fromMaybe mempty do
