@@ -274,20 +274,20 @@ computeCek
     => Context uni -> WithMemory Term uni -> CekM uni (Plain Term uni)
 -- s ; ρ ▻ {L A}  ↦ s , {_ A} ; ρ ▻ L
 computeCek ctx t@(TyInst _ body ty) = do
-    spendBudget BTyInst t (ExBudget 1 1) -- TODO
+--    spendBudget BTyInst t (ExBudget 1 1) -- TODO
     computeCek (FrameTyInstArg ty : ctx) body
 -- s ; ρ ▻ [L M]  ↦  s , [_ (M,ρ)]  ; ρ ▻ L
 computeCek ctx t@(Apply _ fun arg) = do
-    spendBudget BApply t (ExBudget 1 1) -- TODO
+--    spendBudget BApply t (ExBudget 1 1) -- TODO
     env <- getEnv
     computeCek (FrameApplyArg env arg : ctx) fun
 -- s ; ρ ▻ wrap A B L  ↦  s , wrap A B _ ; ρ ▻ L
 computeCek ctx t@(IWrap ann pat arg term) = do
-    spendBudget BIWrap t (ExBudget 1 1) -- TODO
+--    spendBudget BIWrap t (ExBudget 1 1) -- TODO
     computeCek (FrameIWrap ann pat arg : ctx) term
 -- s ; ρ ▻ unwrap L  ↦  s , unwrap _ ; ρ ▻ L
 computeCek ctx t@(Unwrap _ term) = do
-    spendBudget BUnwrap t (ExBudget 1 1) -- TODO
+--    spendBudget BUnwrap t (ExBudget 1 1) -- TODO
     computeCek (FrameUnwrap : ctx) term
 -- s ; ρ ▻ abs α L  ↦  s ◅ abs α (L , ρ)
 computeCek ctx (TyAbs _ tn k body)  = do
@@ -307,7 +307,7 @@ computeCek _   err@Error{} =
     throwingWithCause _EvaluationError (UserEvaluationError CekEvaluationFailure) $ Just (void err)
 --  s ; ρ ▻ x  ↦  s ◅ ρ[ x ]
 computeCek ctx t@(Var _ varName)   = do
-    spendBudget BVar t (ExBudget 1 1) -- TODO
+--    spendBudget BVar t (ExBudget 1 1) -- TODO
     val <- lookupVarName varName
     returnCek ctx val
 
@@ -449,10 +449,11 @@ runCek means mode params term =
             -- We generate fresh variables during evaluation, see Note [Saved mapping example],
             -- hence making sure here that no accidental variable capture can occur.
             markNonFreshTerm term
-            spendBudget BAST memTerm (ExBudget 0 (termAnn memTerm))
-            computeCek [] memTerm
+--            spendBudget BAST memTerm (ExBudget 0 (termAnn memTerm))
+            computeCek [] memTerm2
     where
         memTerm = withMemory term
+        memTerm2 = (ExMemory 0) <$ term
 
 -- | Evaluate a term using the CEK machine in the 'Counting' mode.
 runCekCounting
