@@ -222,9 +222,26 @@ in rec {
       };
   });
 
-  inherit (haskell.packages.plutus-scb.components.exes) plutus-game plutus-currency;
-
   plutus-scb = pkgs.recurseIntoAttrs (rec {
+    plutus-scb-contracts =
+      pkgs.stdenv.mkDerivation {
+        name = "plutus-scb-contracts";
+        buildInputs = [
+          haskell.packages.plutus-scb.components.exes.plutus-atomic-swap
+          haskell.packages.plutus-scb.components.exes.plutus-currency
+          haskell.packages.plutus-scb.components.exes.plutus-game
+        ];
+        unpackPhase = "true";
+        installPhase = ''
+          mkdir -p $out/bin
+          cp \
+            ${haskell.packages.plutus-scb.components.exes.plutus-atomic-swap}/bin/plutus-atomic-swap \
+            ${haskell.packages.plutus-scb.components.exes.plutus-currency}/bin/plutus-currency \
+            ${haskell.packages.plutus-scb.components.exes.plutus-game}/bin/plutus-game \
+            $out/bin
+        '';
+      };
+
     server-invoker = set-git-rev haskell.packages.plutus-scb.components.exes.plutus-scb;
 
     generated-purescript = pkgs.runCommand "plutus-scb-purescript" {} ''
