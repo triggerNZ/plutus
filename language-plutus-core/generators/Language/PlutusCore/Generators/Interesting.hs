@@ -154,7 +154,7 @@ natSum :: uni `Includes` Integer => Term TyName Name uni ()
 natSum = runQuote $ do
     let int = mkTyBuiltin @Integer ()
         nat = _recursiveType natData
-        add = Builtin () (BuiltinName () AddInteger)
+        add = Builtin () (StaticBuiltinName () AddInteger 2)
     acc <- freshName "acc"
     n <- freshName "n"
     return

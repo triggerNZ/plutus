@@ -164,36 +164,37 @@ fixStr :: Token ann -> Token ann
 fixStr (TkString ann s) = TkString ann (read s)   
 fixStr t = t
   
-getBuiltinName :: T.Text -> Maybe BuiltinName
-getBuiltinName = \case
-    "addInteger"               -> Just AddInteger
-    "subtractInteger"          -> Just SubtractInteger
-    "multiplyInteger"          -> Just MultiplyInteger
-    "divideInteger"            -> Just DivideInteger
-    "quotientInteger"          -> Just QuotientInteger
-    "modInteger"               -> Just ModInteger
-    "remainderInteger"         -> Just RemainderInteger
-    "lessThanInteger"          -> Just LessThanInteger
-    "lessThanEqualsInteger"    -> Just LessThanEqInteger
-    "greaterThanInteger"       -> Just GreaterThanInteger
-    "greaterThanEqualsInteger" -> Just GreaterThanEqInteger
-    "equalsInteger"            -> Just EqInteger
-    "concatenate"              -> Just Concatenate
-    "takeByteString"           -> Just TakeByteString
-    "dropByteString"           -> Just DropByteString
-    "equalsByteString"         -> Just EqByteString
-    "lessThanByteString"       -> Just LtByteString
-    "greaterThanByteString"    -> Just GtByteString
-    "sha2_256"                 -> Just SHA2
-    "sha3_256"                 -> Just SHA3
-    "verifySignature"          -> Just VerifySignature
-    "ifThenElse"               -> Just IfThenElse
-    _                          -> Nothing
+getBuiltinName :: T.Text -> Maybe (StaticBuiltinName, Int)
+getBuiltinName =
+  \case
+     "addInteger"               -> Just (AddInteger, 2)
+     "subtractInteger"          -> Just (SubtractInteger, 2)
+     "multiplyInteger"          -> Just (MultiplyInteger, 2)
+     "divideInteger"            -> Just (DivideInteger, 2)
+     "quotientInteger"          -> Just (QuotientInteger, 2)
+     "modInteger"               -> Just (ModInteger, 2)
+     "remainderInteger"         -> Just (RemainderInteger, 2)
+     "lessThanInteger"          -> Just (LessThanInteger, 2)
+     "lessThanEqualsInteger"    -> Just (LessThanEqInteger, 2)
+     "greaterThanInteger"       -> Just (GreaterThanInteger, 2)
+     "greaterThanEqualsInteger" -> Just (GreaterThanEqInteger, 2)
+     "equalsInteger"            -> Just (EqInteger, 2)
+     "concatenate"              -> Just (Concatenate, 2)
+     "takeByteString"           -> Just (TakeByteString, 2)
+     "dropByteString"           -> Just (DropByteString, 2)
+     "equalsByteString"         -> Just (EqByteString, 2)
+     "lessThanByteString"       -> Just (LtByteString, 2)
+     "greaterThanByteString"    -> Just (GtByteString, 2)
+     "sha2_256"                 -> Just (SHA2, 1)
+     "sha3_256"                 -> Just (SHA3, 1)
+     "verifySignature"          -> Just (VerifySignature, 3)
+     "ifThenElse"               -> Just (IfThenElse, 3)
+     _                          -> Nothing
 
 mkBuiltin :: a -> a -> T.Text -> Term TyName Name uni a
 mkBuiltin loc loc' ident = 
    case getBuiltinName ident of 
-      Just b  -> Builtin loc $ BuiltinName loc' b
+      Just (b,arity)  -> Builtin loc $ StaticBuiltinName loc' b arity
       Nothing -> Builtin loc (DynBuiltinName loc' (DynamicBuiltinName ident))
 
 -- FIXME: at this point it would be good to have access to the current

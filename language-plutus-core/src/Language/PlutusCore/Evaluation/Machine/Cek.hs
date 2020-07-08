@@ -263,10 +263,10 @@ substitution, anything).
 -- 3. returns 'EvaluationFailure' ('Error')
 -- 4. looks up a variable in the environment and calls 'returnCek' ('Var')
 
+
 getArgsCount
-    :: forall uni ann. (GShow uni, GEq uni, DefaultUni <: uni) => Builtin ann -> CekM uni Int
-getArgsCount (BuiltinName _ name) =
-    pure $ withTypedBuiltinName @uni name $ \(TypedBuiltinName _ sch) -> countArgs sch
+    :: forall uni ann. Builtin ann -> CekM uni Int
+getArgsCount (StaticBuiltinName _ _name arity) = pure arity
 getArgsCount (DynBuiltinName _ name) = do
     DynamicBuiltinNameMeaning sch _ _ <- lookupDynamicBuiltinName name
     pure $ countArgs sch
@@ -301,10 +301,13 @@ computeCek ctx (LamAbs _ name ty body)  = do
     returnCek ctx (VLamAbs name ty body env)
 -- s ; ρ ▻ con c  ↦  s ◅ con c
 computeCek ctx constant@Constant{} = returnCek ctx (VCon constant)
-computeCek ctx (Builtin _ bn)        = do
+computeCek ctx (Builtin _ bn@(StaticBuiltinName _ _ arity)) = do
   env <- getEnv
-  count <- getArgsCount bn
-  returnCek ctx (VBuiltin env env (constantAsStagedBuiltinName bn) count [] [])
+  returnCek ctx (VBuiltin env env (constantAsStagedBuiltinName bn) arity [] [])
+computeCek ctx (Builtin _ bn@(DynBuiltinName _ name))        = do
+    env <- getEnv
+    DynamicBuiltinNameMeaning sch _ _ <- lookupDynamicBuiltinName name
+    returnCek ctx (VBuiltin env env (constantAsStagedBuiltinName bn) (countArgs sch) [] [])
 -- s ; ρ ▻ error A  ↦  <> A
 computeCek _   err@Error{} =
     throwingWithCause _EvaluationError (UserEvaluationError CekEvaluationFailure) $ Just (void err)
@@ -431,7 +434,7 @@ applyStagedBuiltinName
 applyStagedBuiltinName n@(DynamicStagedBuiltinName name) args = do
     DynamicBuiltinNameMeaning sch x exX <- lookupDynamicBuiltinName name
     applyTypeSchemed n sch x exX args
-applyStagedBuiltinName (StaticStagedBuiltinName name) args = do
+applyStagedBuiltinName (StaticStagedBuiltinName name _arity) args = do
     params <- builtinCostParams
     applyBuiltinName params name args
 

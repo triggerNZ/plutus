@@ -48,7 +48,7 @@ module Language.PlutusCore
     , Unique (..)
     , UniqueMap (..)
     , Value
-    , BuiltinName (..)
+    , StaticBuiltinName (..)
     , DynamicBuiltinName (..)
     , StagedBuiltinName (..)
     , Normalized (..)

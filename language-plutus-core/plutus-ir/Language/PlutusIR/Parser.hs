@@ -159,9 +159,9 @@ reservedWord w = lexeme $ try $ do
     notFollowedBy (satisfy isIdentifierChar)
     return p
 
-builtinName :: Parser PLC.BuiltinName
+builtinName :: Parser PLC.StaticBuiltinName
 builtinName = lexeme $ choice $ map parseBuiltinName PLC.allBuiltinNames
-    where parseBuiltinName :: PLC.BuiltinName -> Parser PLC.BuiltinName
+    where parseBuiltinName :: PLC.StaticBuiltinName -> Parser PLC.StaticBuiltinName
           parseBuiltinName builtin = try $ string (display builtin) >> pure builtin
 
 name :: Parser Name
@@ -179,7 +179,7 @@ tyVar :: Parser TyName
 tyVar = TyName <$> name
 
 builtinVar :: Parser (PLC.Builtin SourcePos)
-builtinVar = PLC.BuiltinName <$> getSourcePos <*> builtinName
+builtinVar = PLC.StaticBuiltinName <$> getSourcePos <*> builtinName <*> undefined -- FIXME!!!
 
 -- This should not accept spaces after the sign, hence the `return ()`
 integer :: Parser Integer

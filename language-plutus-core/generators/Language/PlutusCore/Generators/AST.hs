@@ -79,11 +79,11 @@ genKind = simpleRecursive nonRecursive recursive where
     nonRecursive = pure <$> sequence [Type] ()
     recursive = [KindArrow () <$> genKind <*> genKind]
 
-genBuiltinName :: AstGen BuiltinName
+genBuiltinName :: AstGen StaticBuiltinName
 genBuiltinName = Gen.element allBuiltinNames
 
 genBuiltin :: AstGen (Builtin ())
-genBuiltin = BuiltinName () <$> genBuiltinName
+genBuiltin = StaticBuiltinName () <$> genBuiltinName <*> undefined -- FIXME !!!
 
 genConstant :: AstGen (Some (ValueOf DefaultUni))
 genConstant = Gen.choice

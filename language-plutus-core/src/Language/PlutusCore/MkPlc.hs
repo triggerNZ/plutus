@@ -67,8 +67,8 @@ class TermLike term tyname name uni | term -> tyname, term -> name, term -> uni 
     typeLet  :: ann -> TypeDef tyname uni ann -> term ann -> term ann
 
 -- | Lift a 'BuiltinName' to 'Term'.
-builtinNameAsTerm :: TermLike term tyname name uni => BuiltinName -> term ()
-builtinNameAsTerm = builtin () . BuiltinName ()
+builtinNameAsTerm :: TermLike term tyname name uni => StaticBuiltinName -> term ()
+builtinNameAsTerm bn = undefined -- builtin () . StaticBuiltinName () bn 2  -- FIXME!!!
 
 -- | Lift a 'DynamicBuiltinName' to 'Term'.
 dynamicBuiltinNameAsTerm :: TermLike term tyname name uni => DynamicBuiltinName -> term ()

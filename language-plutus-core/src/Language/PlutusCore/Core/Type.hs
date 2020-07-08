@@ -10,7 +10,7 @@ module Language.PlutusCore.Core.Type
     ( Gas(..)
     , Kind(..)
     , Type(..)
-    , BuiltinName(..)
+    , StaticBuiltinName(..)
     , DynamicBuiltinName(..)
     , StagedBuiltinName(..)
     , Builtin(..)
@@ -67,7 +67,7 @@ data Type tyname uni ann
     deriving (Show, Functor, Generic, NFData, Lift, Hashable)
 
 -- | Builtin functions
-data BuiltinName
+data StaticBuiltinName
     = AddInteger
     | SubtractInteger
     | MultiplyInteger
@@ -102,12 +102,12 @@ newtype DynamicBuiltinName = DynamicBuiltinName
 
 -- | Either a 'BuiltinName' (known statically) or a 'DynamicBuiltinName' (known dynamically).
 data StagedBuiltinName
-    = StaticStagedBuiltinName  BuiltinName
+    = StaticStagedBuiltinName  StaticBuiltinName Int
     | DynamicStagedBuiltinName DynamicBuiltinName
     deriving (Show, Eq, Generic, NFData, Lift, Hashable)
 
 data Builtin ann
-    = BuiltinName ann BuiltinName
+    = StaticBuiltinName ann StaticBuiltinName Int  -- arity
     | DynBuiltinName ann DynamicBuiltinName
     deriving (Show, Functor, Generic, NFData, Lift, Hashable)
 
@@ -155,7 +155,7 @@ defaultVersion :: ann -> Version ann
 defaultVersion ann = Version ann 1 0 0
 
 -- | The list of all 'BuiltinName's.
-allBuiltinNames :: [BuiltinName]
+allBuiltinNames :: [StaticBuiltinName]
 allBuiltinNames = [minBound .. maxBound]
 -- The way it's defined ensures that it's enough to add a new built-in to 'BuiltinName' and it'll be
 -- automatically handled by tests and other stuff that deals with all built-in names at once.

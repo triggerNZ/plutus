@@ -283,7 +283,7 @@ checkKindOfPatternFunctorM ann pat k =
 -- | Return the 'Type' of a 'BuiltinName'.
 typeOfBuiltinName
     :: (GShow uni, GEq uni, DefaultUni <: uni)
-    => BuiltinName -> Type TyName uni ()
+    => StaticBuiltinName -> Type TyName uni ()
 typeOfBuiltinName bn = withTypedBuiltinName bn typeOfTypedBuiltinName
 
 -- | @unfoldFixOf pat arg k = NORM (vPat (\(a :: k) -> ifix vPat a) arg)@
@@ -311,9 +311,9 @@ inferTypeOfBuiltinM
 -- to be normalized. For dynamic built-in names we store a map from them to their *normalized types*,
 -- with the normalization happening in this module, but what should we do for static built-in names?
 -- Right now we just renormalize the type of a static built-in name each time we encounter that name.
-inferTypeOfBuiltinM (BuiltinName    _   name) = normalizeType $ typeOfBuiltinName name
+inferTypeOfBuiltinM (StaticBuiltinName    _   name _ ) = normalizeType $ typeOfBuiltinName name
 -- TODO: inline this definition once we have only dynamic built-in names.
-inferTypeOfBuiltinM (DynBuiltinName ann name) = lookupDynamicBuiltinNameM ann name
+inferTypeOfBuiltinM (DynBuiltinName ann name)          = lookupDynamicBuiltinNameM ann name
 
 -- See the [Global uniqueness] and [Type rules] notes.
 -- | Synthesize the type of a term, returning a normalized type.

@@ -105,7 +105,7 @@ applyTypedBuiltinName
     -> [Value TyName Name uni ExMemory]
     -> m (WithMemory Term uni)
 applyTypedBuiltinName (TypedBuiltinName name schema) =
-    applyTypeSchemed (StaticStagedBuiltinName name) schema
+    applyTypeSchemed (StaticStagedBuiltinName name (nargsOfTypeScheme schema)) schema
 
 -- | Apply a 'TypedBuiltinName' to a list of 'Value's.
 -- Checks that the values are of expected types.
@@ -114,7 +114,7 @@ applyBuiltinName
     , SpendBudget m uni, Closed uni, uni `Everywhere` ExMemoryUsage
     , GShow uni, GEq uni, DefaultUni <: uni
     )
-    => CostModel -> BuiltinName -> [Value TyName Name uni ExMemory] -> m (WithMemory Term uni)
+    => CostModel -> StaticBuiltinName -> [Value TyName Name uni ExMemory] -> m (WithMemory Term uni)
 applyBuiltinName params AddInteger           =
     applyTypedBuiltinName typedAddInteger           (+) (runCostingFunTwoArguments $ paramAddInteger params)
 applyBuiltinName params SubtractInteger      =

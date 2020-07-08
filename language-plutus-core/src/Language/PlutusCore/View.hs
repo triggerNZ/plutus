@@ -39,8 +39,8 @@ instance (PrettyBy config head, PrettyBy config arg) => PrettyBy config (IterApp
 
 -- | View a 'Constant' as a 'StagedBuiltinName'.
 constantAsStagedBuiltinName :: Builtin a -> StagedBuiltinName
-constantAsStagedBuiltinName (BuiltinName    _ name) = StaticStagedBuiltinName  name
-constantAsStagedBuiltinName (DynBuiltinName _ name) = DynamicStagedBuiltinName name
+constantAsStagedBuiltinName (StaticBuiltinName  _ name arity) = StaticStagedBuiltinName  name arity
+constantAsStagedBuiltinName (DynBuiltinName _ name)           = DynamicStagedBuiltinName name
 
 -- | View a 'Term' as a 'Constant'.
 termAsBuiltin :: Term tyname name uni a -> Maybe (Builtin a)
