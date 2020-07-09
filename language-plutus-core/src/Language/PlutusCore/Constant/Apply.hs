@@ -105,7 +105,7 @@ applyTypedBuiltinName
     -> [Value TyName Name uni ExMemory]
     -> m (WithMemory Term uni)
 applyTypedBuiltinName (TypedBuiltinName name schema) =
-    applyTypeSchemed (StaticStagedBuiltinName name (nargsOfTypeScheme schema)) schema
+    applyTypeSchemed (StaticStagedBuiltinName name 0) schema
 
 -- | Apply a 'TypedBuiltinName' to a list of 'Value's.
 -- Checks that the values are of expected types.

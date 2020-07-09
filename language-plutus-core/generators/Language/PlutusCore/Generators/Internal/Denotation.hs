@@ -76,7 +76,7 @@ denoteVariable name meta = Denotation name (Var ()) meta (TypeSchemeResult Proxy
 denoteTypedBuiltinName
     :: TypedBuiltinName uni args res -> FoldArgs args res -> Denotation uni StaticBuiltinName res
 denoteTypedBuiltinName (TypedBuiltinName name scheme) meta =
-    Denotation name (\t -> Builtin () (StaticBuiltinName () t (nargsOfTypeScheme scheme))) meta scheme
+    Denotation name (\t -> Builtin () (StaticBuiltinName () t (countArgs scheme))) meta scheme
 
 -- | Insert the 'Denotation' of an object into a 'DenotationContext'.
 insertDenotation

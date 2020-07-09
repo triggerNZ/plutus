@@ -27,7 +27,6 @@ module Language.PlutusCore.Constant.Typed
     , unliftConstant
     , OpaqueTerm (..)
     , KnownType (..)
-    , nargsOfTypeScheme
     ) where
 
 import           PlutusPrelude
@@ -87,15 +86,6 @@ data TypeScheme uni (args :: [GHC.Type]) res where
            -- > reverse : all a. list a -> list a
         -> (forall ot. ot ~ OpaqueTerm uni text uniq => Proxy ot -> TypeScheme uni args res)
         -> TypeScheme uni args res
-
-nargsOfTypeScheme :: TypeScheme uni args res -> Int
-nargsOfTypeScheme s = nargs 0 s
-    where nargs :: Int -> TypeScheme uni args res -> Int
-          nargs count (TypeSchemeResult _)       = count
-          nargs count (TypeSchemeArrow _ sch2)   = nargs (count+1) sch2
-          nargs count (TypeSchemeAllType _ schK) = nargs count (schK Proxy)
--- FIXME: very crude, relies on scheme being well-formed
-
 
 
 -- | A 'BuiltinName' with an associated 'TypeScheme'.

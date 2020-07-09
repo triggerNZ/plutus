@@ -264,12 +264,12 @@ substitution, anything).
 -- 4. looks up a variable in the environment and calls 'returnCek' ('Var')
 
 
-getArgsCount
-    :: forall uni ann. Builtin ann -> CekM uni Int
-getArgsCount (StaticBuiltinName _ _name arity) = pure arity
-getArgsCount (DynBuiltinName _ name) = do
-    DynamicBuiltinNameMeaning sch _ _ <- lookupDynamicBuiltinName name
-    pure $ countArgs sch
+-- getArgsCount
+--     :: forall uni ann. Builtin ann -> CekM uni Int
+-- getArgsCount (StaticBuiltinName _ _name arity) = pure arity
+-- getArgsCount (DynBuiltinName _ name) = do
+--     DynamicBuiltinNameMeaning sch _ _ <- lookupDynamicBuiltinName name
+--     pure $ countArgs sch
 
 computeCek
     :: (GShow uni, GEq uni, DefaultUni <: uni, Closed uni, uni `Everywhere` ExMemoryUsage)
