@@ -95,6 +95,7 @@ datatypes = testNested "datatypes"
     [ goldenPlcFromPir term "maybe"
     , goldenPlcFromPir term "listMatch"
     , goldenEvalPir term "listMatchEval"
+    , goldenPlcFromPir term "bindDataTypeNormalize"
     ]
 
 recursion :: TestNested

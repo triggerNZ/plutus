@@ -45,6 +45,7 @@ constructorCaseType resultType = replaceFunTyTarget resultType . varDeclType
 
 -- | Get the argument types of a function type.
 -- @funTyArgs (A->B->C) = [A, B]@
+-- FIXME: this perhaps should be first normalized before taking the resulttype
 funTyArgs :: Type tyname uni a -> [Type tyname uni a]
 funTyArgs t = case t of
     TyFun _ t1 t2 -> t1 : funTyArgs t2

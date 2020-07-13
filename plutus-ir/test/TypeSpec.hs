@@ -43,6 +43,7 @@ types = testNested "types"
   ,"strictValueValue"
   ,"even3Eval"
   ,"sameNameDifferentEnv"
+  ,"bindDataTypeNormalize"
   ]
 
 typeErrors :: TestNested
@@ -52,4 +53,5 @@ typeErrors = testNested "type-errors"
     , "duplicateDataConstrs"
     , "duplicateTypeConstrs"
     , "wrongDataConstrReturnType"
+    ,"nonSelfRecursive"
     ]
