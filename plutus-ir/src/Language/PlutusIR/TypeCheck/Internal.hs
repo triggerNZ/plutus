@@ -10,7 +10,7 @@
 {-# LANGUAGE RankNTypes        #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeOperators     #-}
-
+{-# LANGUAGE TupleSections #-}
 module Language.PlutusIR.TypeCheck.Internal
     ( DynamicBuiltinNameTypes (..)
     , TypeCheckConfig (..)
@@ -199,7 +199,7 @@ dummyTerm = Var () (Name "__var" dummyUnique)
 -- ########################
 
 -- | Normalize a 'Type'.
-normalizeTypeM :: Type TyName uni () -> TypeCheckM uni ann (Normalized (Type TyName uni ()))
+normalizeTypeM :: Type TyName uni ann1 -> TypeCheckM uni ann (Normalized (Type TyName uni ann1))
 normalizeTypeM ty = Norm.runNormalizeTypeM $ Norm.normalizeTypeM ty
 
 -- | Substitute a type for a variable in a type and normalize the result.
@@ -427,8 +427,8 @@ inferTypeM (Let ann recurs bs inTerm) = do
     tyInTerm <- case recurs of
         NonRec ->
             foldr
-               (\ b acc -> do
-                   checkWellformBind b
+               (\b acc -> do
+                   checkWellformBind NonRec b
                    withBind b acc)
                (inferTypeM inTerm)
                bs
@@ -447,7 +447,7 @@ inferTypeM (Let ann recurs bs inTerm) = do
 
     checkWellformBinds :: forall uni ann. (GShow uni, GEq uni, DefaultUni <: uni)
                        => NonEmpty (Binding TyName Name uni ann) -> TypeCheckM uni ann ()
-    checkWellformBinds = traverse_ checkWellformBind
+    checkWellformBinds = traverse_ (checkWellformBind Rec)
 
 
 -- See the [Global uniqueness] and [Type rules] notes.
@@ -478,27 +478,16 @@ withBind b m = case b of
       withVar n vTy m
   TypeBind _ (TyVarDecl _ tn k) _rhs ->
       withTyVar tn (void k) m
-  DatatypeBind _ dt@(Datatype ann (TyVarDecl _ tn k) tyargs des vdecls) ->
-      -- add type constructor to environment
-      -- FIXME: somebody has to check if it's not recursive
-      -- that it is not in scope for the argumenttypes and in scope for the result type
-      -- another way to fix it is to change PIR syntax.
-      withTyVar tn (void k) $ do
-          -- add destructor to environment
-          desType <- mkDestructorType
-          -- TODO: this does not have to be here, maybe later
-          withVar des desType $ do
-              -- normalize types of data-constructors
-              normConstrsTypes <- for vdecls $ \ (VarDecl _ n ty) -> do
-                                        -- adds explicit forall tyargs. to the front of each constructor
-                                        vTy <- normalizeTypeM $ void $ PIR.mkIterTyForall tyargs ty
-                                        pure (n,vTy)
-              -- add data constructors to environment
-              -- TODO: refactor to withVars
-              foldr
-                 (uncurry withVar)
-                 m
-                 normConstrsTypes
+  DatatypeBind _ dt@(Datatype ann (TyVarDecl _ tn k) tyargs des vdecls) -> do
+      desType <- mkDestructorType
+      -- normalize all data-constructors's types.
+      normConstrs <- for vdecls $ \(VarDecl _ n ty) ->
+                                     -- make sure to add the implicitly-qualified tyargs foralls for each constructor.
+                                     (n,) <$> (normalizeTypeM $ void $ PIR.mkIterTyForall tyargs ty)
+      -- extend the type-environment with data-destructor+data-constructors
+      withVars ((des,desType):normConstrs) $
+          -- extend the kind-environment with type-constructor
+          withTyVar tn (void k) m
    where
        -- TODO: why not reuse the pir-compiler code for this?
        mkDestructorType :: TypeCheckM uni ann (Normalized (Type TyName uni ()))
@@ -523,13 +512,18 @@ withBind b m = case b of
                        vdecls
                      )
 
+       withVars :: Foldable t
+                => t (Name, Normalized (Type TyName uni ()))
+                -> TypeCheckM uni ann a -> TypeCheckM uni ann a
+       withVars names m1 = foldr (uncurry withVar) m1 names
 
 -- | check that a binding is well-formed (correctly typed, kinded)
 checkWellformBind :: forall uni ann.
                      (GShow uni, GEq uni, DefaultUni <: uni)
-                    => Binding TyName Name uni ann
+                    => Recursivity
+                    -> Binding TyName Name uni ann
                     -> TypeCheckM uni ann ()
-checkWellformBind = \case
+checkWellformBind recurs = \case
   -- W-Term
   TermBind _ _ (VarDecl ann _ ty) rhs -> do
       checkKindM ann ty $ Type ()
@@ -541,40 +535,37 @@ checkWellformBind = \case
   TypeBind _ (TyVarDecl ann _ k) rhs ->
       checkKindM ann rhs (void k)
   -- W-Data + W-Con
-  DatatypeBind _ (Datatype ann tvdecl@(TyVarDecl _ dataName _) tvdecls des vdecls) -> do
+  DatatypeBind _ (Datatype ann tvdecl@(TyVarDecl _ dataName _) tyargs des vdecls) -> do
       -- TODO: move them to a different step ,e.g. in renaming phase
       assertNoDuplicate allNewTyNames
       assertNoDuplicate allNewNames
-
-      foldr (\(TyVarDecl _ tn k) -> withTyVar tn (void k))
-          -- check the data-constructors' argument-types to be kinded by *
-          (for_ vdecls $ \(VarDecl ann1 _ ty) -> do
-                  -- W-Con
-                  checkKindM ann ty $ Type ()
-
-                  -- in the paper we don't have the result type,
-                  -- but since in practice PIR has the result type
-                  -- let's check here that the result type it is of the right form
-
-                  -- So here checks that the *normalized* result-type of the data-constructor is
-                  -- of the form `[DT tyarg1 tyarg2 ... tyargn]`. Normalized because the user may
-                  -- have written some "typecomputation" inside the declared typ
-
-                  -- Note: if GADTs are added to the language the expected constructor result type
-                  -- has to be "relaxed" from `[DT tyarg1 ... tyargn]` to `[DT Same Arity As ... Tvdecls]`
-                  -- i.e. we should only check that `DT` is applied to the correct *number* of tyargs as the number of tvdecls.
-
-                  actualConstrResultType <- constrResultTy <$> normalizeTypeM (void ty)
-                  let expectedConstrResultType = foldl
-                          (\acc (TyVarDecl _ tyarg _) -> TyApp () acc $ TyVar () tyarg)
-                          (TyVar () dataName)
-                          tvdecls
-                  when (expectedConstrResultType /= unNormalized actualConstrResultType) $
-                      throwError $ MalformedDataConstrResType ann1 expectedConstrResultType actualConstrResultType
-          )
-          allNewTyDecls
+      -- check the data-constructors' to be kinded by *
+      for_ vdecls $ \(VarDecl ann1 _ ty) -> do
+                  -- we normalize the type, since the user might have written some type-computation in the dataconstructor.
+                  -- we split the normalized type to a bunch of constructors arguments and a result-type.
+                  Normalized (actualArgsTypes, actualResType) <- splitDataConsType <$> normalizeTypeM ty
+                  -- Check that the result-type is *-kinded, inside the whole env scope.
+                  -- The result-type can see all tyvardecls (tyargs + currently-defined type constructor).
+                  withTyVarDecls allNewTyDecls $
+                      checkKindM ann actualResType $ Type ()
+                  -- Check the dataconstructor arguments' types to also be *-kinded,
+                  -- but the environment defers for rec and nonrec bindings.
+                  withTyVarDecls
+                      (case recurs of
+                           -- With the whole env  in scope.
+                           Rec -> allNewTyDecls
+                           -- The type-constructor is *not visible* in the arguments' types.
+                           NonRec -> tyargs
+                      ) $ -- check each argument in the defined environment.
+                          for_ actualArgsTypes $ \actualArgType ->
+                             checkKindM ann actualArgType $ Type ()
+                  -- Check for wellformedness of the result-type to be in the expected form (see `expectedDataConsResType`)
+                  -- Note1: in the paper this check for the result-type welformnedness is not needed,
+                  -- because the result-type is "implicit" (and not explicit in the FIR syntax).
+                  when (expectedDataConsResType /= void actualResType) $
+                      throwError $ MalformedDataConstrResType ann1 expectedDataConsResType (void ty)
    where
-      allNewTyDecls = tvdecl:tvdecls
+      allNewTyDecls = tvdecl:tyargs
       allNewTyNames = fmap (nameString . unTyName . tyVarDeclName) allNewTyDecls
       allNewNames = nameString des : fmap (nameString . varDeclName) vdecls
 
@@ -582,12 +573,29 @@ checkWellformBind = \case
       assertNoDuplicate = maybe (pure ())
                                 (throwError . DuplicateDeclaredIdent ann)
                           . hasDuplicate
+
+      withTyVarDecls :: [TyVarDecl TyName ann] -> TypeCheckM uni ann () -> TypeCheckM uni ann ()
+      withTyVarDecls tyvardecls m1 = foldr (\(TyVarDecl _ n k) -> withTyVar n (void k)) m1 tyvardecls
+
+      -- The expected dataconstructor's result-type is of the form `[TyCon tyarg1 tyarg2 ... tyargn]`
+      -- Note2: if GADTs are later added to the language, the expected constructor result type has to be relaxed,
+      -- i.e. we should only check that`DT` is applied to the correct *number* of tyargs as the number of tvdecls.
+      expectedDataConsResType = foldl
+          (\acc (TyVarDecl _ tyarg _) -> TyApp () acc $ TyVar () tyarg)
+          (TyVar () dataName)
+          tyargs
+
+
+
+-- | Extend the context of a 'TypeCheckM' computation with a typed variable.
+
 -- HELPERS
 
 -- | Get the result type of a constructor's type that has been prior normalized.
 -- ex1 (A->B->C) = C
 -- ex2 forall b. b -> c = forall b. b ->c
 -- TODO: codeshare it with compiler
+-- FIXME: deadcode?
 constrResultTy :: Normalized (Type tyname uni a) -> Normalized (Type tyname uni a)
 constrResultTy (Normalized t) = Normalized $ constrResultTy' t
     where
@@ -596,6 +604,18 @@ constrResultTy (Normalized t) = Normalized $ constrResultTy' t
           TyFun _ _ t2 -> constrResultTy' t2
           t' -> t'
 
+-- | Split a type to all its arguments and the result type.
+-- Used exclusively for data-constructor types.
+splitDataConsType :: Normalized (Type tyname uni a)
+                  -> Normalized ( [Type tyname uni a]
+                               , Type tyname uni a
+                               )
+splitDataConsType (Normalized t) = Normalized $ go ([], t)
+  where
+    go self@(args, rest)= case rest of
+        TyFun _ t1 t2 -> go (t1:args, t2)
+        _ -> self
+
 hasDuplicate :: Ord a => [a] -> Maybe a
-hasDuplicate l = head <$> (find (\ g -> length g > 1) .  group $ sort l)
+hasDuplicate l = head <$> (find (\g -> length g > 1) .  group $ sort l)
 

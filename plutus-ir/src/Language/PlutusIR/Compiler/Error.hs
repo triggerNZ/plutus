@@ -56,8 +56,8 @@ data TypeError uni ann
     | MalformedDataConstrResType ann
         --  expected
         (PLC.Type PLC.TyName uni ())
-        -- actual
-        (PLC.Normalized (PLC.Type PLC.TyName uni ()))
+        -- inside unnormalized actual type
+        (PLC.Type PLC.TyName uni ())
     -- TODO: enable back deriving NFData because PIR.Term does not have it
     -- TODO: enable back deriving Eq because PIR.Term does not have it, see similar src/Language/PlutusCore/Core/Instance/Eq.hs
     deriving (Show, Generic) 
