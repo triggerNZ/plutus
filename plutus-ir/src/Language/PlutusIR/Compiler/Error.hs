@@ -50,14 +50,11 @@ data TypeError uni ann
     | InternalTypeErrorE ann (PLC.InternalTypeError uni ann)
     | FreeTypeVariableE ann PLC.TyName
     | FreeVariableE ann PLC.Name
-    -- FIXME: attach info
-    | ConflictingRecBinds
+    | ConflictingRecBinds ann T.Text
     | DuplicateDeclaredIdent ann T.Text
     | MalformedDataConstrResType ann
-        --  expected
-        (PLC.Type PLC.TyName uni ())
-        -- inside unnormalized actual type
-        (PLC.Type PLC.TyName uni ())
+        (PLC.Type PLC.TyName uni ())  --  expected
+        (PLC.Type PLC.TyName uni ())  -- occuring inside (unnormalized) actual type
     -- TODO: enable back deriving NFData because PIR.Term does not have it
     -- TODO: enable back deriving Eq because PIR.Term does not have it, see similar src/Language/PlutusCore/Core/Instance/Eq.hs
     deriving (Show, Generic) 

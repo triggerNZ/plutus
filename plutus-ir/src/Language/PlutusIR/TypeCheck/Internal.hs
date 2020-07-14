@@ -40,7 +40,6 @@ import Data.Foldable
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Lens.TH
-import Control.Lens
 
 import qualified Language.PlutusCore.Normalize.Internal as Norm
 import qualified Language.PlutusCore.Core as PLC
@@ -49,6 +48,7 @@ import qualified Data.Map                               as Map
 import qualified Language.PlutusIR.MkPir                as PIR
 import Data.List
 import qualified Data.Text as T
+import Data.Maybe
 {- Note [Global uniqueness]
 WARNING: type inference/checking works under the assumption that the global uniqueness condition
 is satisfied. The invariant is not checked, enforced or automatically fulfilled. So you must ensure
@@ -331,7 +331,7 @@ inferTypeOfBuiltinM (PLC.DynBuiltinName ann name) = lookupDynamicBuiltinNameM an
 -- See the [Global uniqueness] and [Type rules] notes.
 -- | Synthesize the type of a term, returning a normalized type.
 inferTypeM
-    :: (GShow uni, GEq uni, DefaultUni <: uni)
+    :: forall uni ann. (GShow uni, GEq uni, DefaultUni <: uni)
     => Term TyName Name uni ann -> TypeCheckM uni ann (Normalized (Type TyName uni ()))
 
 -- c : vTy
@@ -423,18 +423,28 @@ inferTypeM (Error ann ty)           = do
     normalizeTypeM $ void ty
 
 
-inferTypeM (Let ann recurs bs inTerm) = do
+inferTypeM (Let ann1 recurs bs inTerm) = do
     tyInTerm <- case recurs of
         NonRec ->
             foldr
                (\b acc -> do
                    checkWellformBind NonRec b
+                   -- linear scope: the new identifiers will be visible in the next binding
                    withBind b acc)
                (inferTypeM inTerm)
                bs
-        Rec -> withBinds bs $ do
-            checkWellformBinds bs
-            inferTypeM inTerm
+        Rec -> do
+            -- Check that there are no conflicting new identifiers (same-name)
+            -- that are introduced by the bindings of this the letrec
+            -- separately check the VarTypes environment for conflicts
+            -- TODO: move these 2 checks to a different pass, e.g. in renaming phase
+            assertNoRecConflict $ foldMap bindingNewIds bs
+            -- separately check the VarkInds environment for conflicts
+            assertNoRecConflict . catMaybes . toList $ fmap bindingNewTyId bs
+            -- now with all bindings in the env, check for wellformedness
+            withBinds bs $ do
+              checkWellformBinds bs
+              inferTypeM inTerm
     -- G !- inTerm :: *
     -- TODO: here is the problem of existential-type escaping
     -- FIXME: reenable the check
@@ -442,13 +452,34 @@ inferTypeM (Let ann recurs bs inTerm) = do
     pure tyInTerm
 
   where
-    withBinds :: forall uni ann a. NonEmpty (Binding TyName Name uni ann) -> TypeCheckM uni ann a -> TypeCheckM uni ann a
+    withBinds :: NonEmpty (Binding TyName Name uni ann) -> TypeCheckM uni ann a -> TypeCheckM uni ann a
     withBinds = flip . foldr $ withBind
 
-    checkWellformBinds :: forall uni ann. (GShow uni, GEq uni, DefaultUni <: uni)
-                       => NonEmpty (Binding TyName Name uni ann) -> TypeCheckM uni ann ()
-    checkWellformBinds = traverse_ (checkWellformBind Rec)
+    checkWellformBinds :: NonEmpty (Binding TyName Name uni ann) -> TypeCheckM uni ann ()
+    checkWellformBinds = traverse_ $ checkWellformBind Rec
 
+    assertNoRecConflict :: [T.Text] -> TypeCheckM uni ann ()
+    assertNoRecConflict = maybe (pure ())
+                          (throwError . ConflictingRecBinds ann1)
+                           . hasDuplicate
+
+    -- TODO: duplicate code, also move to PlutusIR.hs
+    bindingNewIds :: Binding TyName Name uni ann -> [T.Text]
+    bindingNewIds = \case
+        TermBind _ _ d _ -> [nameString $ varDeclName d]
+        DatatypeBind _ (Datatype _ _ _ des vdecls) ->
+            nameString des : fmap (nameString . varDeclName) vdecls
+        _typebind -> []
+
+    -- a binding may introduce max. 1 new id in scope, hence maybe
+    -- TODO: duplicate code, also move to PlutusIR.hs
+    bindingNewTyId :: Binding TyName Name uni ann -> Maybe T.Text
+    bindingNewTyId = \case
+        TypeBind _ tvdecl _ ->
+            pure . nameString . unTyName $ tyVarDeclName tvdecl
+        DatatypeBind _ (Datatype _ tvdecl _ _ _) ->
+            pure . nameString . unTyName $ tyVarDeclName tvdecl
+        _termbind -> mempty
 
 -- See the [Global uniqueness] and [Type rules] notes.
 -- | Check a 'Term' against a 'NormalizedType'.
@@ -535,19 +566,20 @@ checkWellformBind recurs = \case
   TypeBind _ (TyVarDecl ann _ k) rhs ->
       checkKindM ann rhs (void k)
   -- W-Data + W-Con
-  DatatypeBind _ (Datatype ann tvdecl@(TyVarDecl _ dataName _) tyargs des vdecls) -> do
-      -- TODO: move them to a different step ,e.g. in renaming phase
+  DatatypeBind _ (Datatype annD tvdecl@(TyVarDecl _ dataName _) tyargs des vdecls) -> do
+      -- Checks that tycons+tyargs are unique among eachother, and dataconstructors are unique among eachother
+      -- TODO: move these 2 checks to a different pass, e.g. in renaming phase
       assertNoDuplicate allNewTyNames
       assertNoDuplicate allNewNames
       -- check the data-constructors' to be kinded by *
-      for_ vdecls $ \(VarDecl ann1 _ ty) -> do
+      for_ vdecls $ \(VarDecl annV _ ty) -> do
                   -- we normalize the type, since the user might have written some type-computation in the dataconstructor.
                   -- we split the normalized type to a bunch of constructors arguments and a result-type.
                   Normalized (actualArgsTypes, actualResType) <- splitDataConsType <$> normalizeTypeM ty
                   -- Check that the result-type is *-kinded, inside the whole env scope.
                   -- The result-type can see all tyvardecls (tyargs + currently-defined type constructor).
                   withTyVarDecls allNewTyDecls $
-                      checkKindM ann actualResType $ Type ()
+                      checkKindM annV actualResType $ Type ()
                   -- Check the dataconstructor arguments' types to also be *-kinded,
                   -- but the environment defers for rec and nonrec bindings.
                   withTyVarDecls
@@ -558,20 +590,25 @@ checkWellformBind recurs = \case
                            NonRec -> tyargs
                       ) $ -- check each argument in the defined environment.
                           for_ actualArgsTypes $ \actualArgType ->
-                             checkKindM ann actualArgType $ Type ()
+                             checkKindM annV actualArgType $ Type ()
                   -- Check for wellformedness of the result-type to be in the expected form (see `expectedDataConsResType`)
                   -- Note1: in the paper this check for the result-type welformnedness is not needed,
                   -- because the result-type is "implicit" (and not explicit in the FIR syntax).
                   when (expectedDataConsResType /= void actualResType) $
-                      throwError $ MalformedDataConstrResType ann1 expectedDataConsResType (void ty)
+                      throwError $ MalformedDataConstrResType annV expectedDataConsResType (void ty)
    where
+      allNewTyDecls :: [TyVarDecl TyName ann]
       allNewTyDecls = tvdecl:tyargs
+
+      allNewTyNames :: [T.Text]
       allNewTyNames = fmap (nameString . unTyName . tyVarDeclName) allNewTyDecls
+
+      allNewNames :: [T.Text]
       allNewNames = nameString des : fmap (nameString . varDeclName) vdecls
 
       assertNoDuplicate :: [T.Text] -> TypeCheckM uni ann ()
       assertNoDuplicate = maybe (pure ())
-                                (throwError . DuplicateDeclaredIdent ann)
+                                (throwError . DuplicateDeclaredIdent annD)
                           . hasDuplicate
 
       withTyVarDecls :: [TyVarDecl TyName ann] -> TypeCheckM uni ann () -> TypeCheckM uni ann ()
@@ -580,6 +617,7 @@ checkWellformBind recurs = \case
       -- The expected dataconstructor's result-type is of the form `[TyCon tyarg1 tyarg2 ... tyargn]`
       -- Note2: if GADTs are later added to the language, the expected constructor result type has to be relaxed,
       -- i.e. we should only check that`DT` is applied to the correct *number* of tyargs as the number of tvdecls.
+      expectedDataConsResType :: Type TyName uni ()
       expectedDataConsResType = foldl
           (\acc (TyVarDecl _ tyarg _) -> TyApp () acc $ TyVar () tyarg)
           (TyVar () dataName)
@@ -612,6 +650,8 @@ splitDataConsType :: Normalized (Type tyname uni a)
                                )
 splitDataConsType (Normalized t) = Normalized $ go ([], t)
   where
+    go :: ([Type tyname uni a], Type tyname uni a)
+       -> ([Type tyname uni a], Type tyname uni a)
     go self@(args, rest)= case rest of
         TyFun _ t1 t2 -> go (t1:args, t2)
         _ -> self
