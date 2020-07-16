@@ -422,9 +422,11 @@ inferTypeM (Error ann ty)           = do
     checkKindM ann ty $ Type ()
     normalizeTypeM $ void ty
 
-
 inferTypeM (Let ann1 recurs bs inTerm) = do
     tyInTerm <- case recurs of
+        -- [check| G !- ty :: *]  [infer| G,withBindsLinear(b) !- inT : ty] (forall b in bs. [checkWellFormed| Glinear !- b]) 
+        -- -------------------------------------------------
+        -- [infer| G !- (let (nonrec) bs in inT) :: ty
         NonRec ->
             foldr
                (\b acc -> do
@@ -433,6 +435,9 @@ inferTypeM (Let ann1 recurs bs inTerm) = do
                    withBind b acc)
                (inferTypeM inTerm)
                bs
+        -- [check| G !- ty :: *]  G'=G,withBinds(bs)  [infer| G' !- inT : ty] (forall b in bs. [checkWellFormed| G' !- b])
+        -- -------------------------------------------------
+        -- [infer| G !- (let (rec) bs in inT) :: ty
         Rec -> do
             -- Check that there are no conflicting new identifiers (same-name)
             -- that are introduced by the bindings of this the letrec
@@ -440,14 +445,14 @@ inferTypeM (Let ann1 recurs bs inTerm) = do
             -- TODO: move these 2 checks to a different pass, e.g. in renaming phase
             assertNoRecConflict $ foldMap bindingNewIds bs
             -- separately check the VarkInds environment for conflicts
-            assertNoRecConflict . catMaybes . toList $ fmap bindingNewTyId bs
+            assertNoRecConflict . mapMaybe bindingNewTyId $ toList bs
             -- now with all bindings in the env, check for wellformedness
             withBinds bs $ do
               checkWellformBinds bs
               inferTypeM inTerm
     -- G !- inTerm :: *
-    -- TODO: here is the problem of existential-type escaping
-    -- FIXME: reenable the check
+    -- FIXME: here is the problem of existential-type escaping
+    -- FIXME: reenable the checkKindM after fixing the problem
     -- checkKindM ann (ann <$ unNormalized tyInTerm) $ Type ()
     pure tyInTerm
 
@@ -520,7 +525,6 @@ withBind b m = case b of
           -- extend the kind-environment with type-constructor
           withTyVar tn (void k) m
    where
-       -- TODO: why not reuse the pir-compiler code for this?
        mkDestructorType :: TypeCheckM uni ann (Normalized (Type TyName uni ()))
        mkDestructorType = do
            -- get a fresh result type
@@ -575,7 +579,9 @@ checkWellformBind recurs = \case
       for_ vdecls $ \(VarDecl annV _ ty) -> do
                   -- we normalize the type, since the user might have written some type-computation in the dataconstructor.
                   -- we split the normalized type to a bunch of constructors arguments and a result-type.
-                  Normalized (actualArgsTypes, actualResType) <- splitDataConsType <$> normalizeTypeM ty
+                  Normalized normTy <- normalizeTypeM ty
+                  let actualArgsTypes = funTyArgs normTy
+                      actualResType = funResultType normTy
                   -- Check that the result-type is *-kinded, inside the whole env scope.
                   -- The result-type can see all tyvardecls (tyargs + currently-defined type constructor).
                   withTyVarDecls allNewTyDecls $
@@ -595,7 +601,7 @@ checkWellformBind recurs = \case
                   -- Note1: in the paper this check for the result-type welformnedness is not needed,
                   -- because the result-type is "implicit" (and not explicit in the FIR syntax).
                   when (expectedDataConsResType /= void actualResType) $
-                      throwError $ MalformedDataConstrResType annV expectedDataConsResType (void ty)
+                      throwError $ MalformedDataConstrResType annV expectedDataConsResType
    where
       allNewTyDecls :: [TyVarDecl TyName ann]
       allNewTyDecls = tvdecl:tyargs
@@ -628,33 +634,6 @@ checkWellformBind recurs = \case
 -- | Extend the context of a 'TypeCheckM' computation with a typed variable.
 
 -- HELPERS
-
--- | Get the result type of a constructor's type that has been prior normalized.
--- ex1 (A->B->C) = C
--- ex2 forall b. b -> c = forall b. b ->c
--- TODO: codeshare it with compiler
--- FIXME: deadcode?
-constrResultTy :: Normalized (Type tyname uni a) -> Normalized (Type tyname uni a)
-constrResultTy (Normalized t) = Normalized $ constrResultTy' t
-    where
-      constrResultTy' ::  Type tyname uni a -> Type tyname uni a
-      constrResultTy' = \case
-          TyFun _ _ t2 -> constrResultTy' t2
-          t' -> t'
-
--- | Split a type to all its arguments and the result type.
--- Used exclusively for data-constructor types.
-splitDataConsType :: Normalized (Type tyname uni a)
-                  -> Normalized ( [Type tyname uni a]
-                               , Type tyname uni a
-                               )
-splitDataConsType (Normalized t) = Normalized $ go ([], t)
-  where
-    go :: ([Type tyname uni a], Type tyname uni a)
-       -> ([Type tyname uni a], Type tyname uni a)
-    go self@(args, rest)= case rest of
-        TyFun _ t1 t2 -> go (t1:args, t2)
-        _ -> self
 
 hasDuplicate :: Ord a => [a] -> Maybe a
 hasDuplicate l = head <$> (find (\g -> length g > 1) .  group $ sort l)
