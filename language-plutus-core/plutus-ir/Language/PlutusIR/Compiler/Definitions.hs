@@ -48,6 +48,7 @@ import qualified Data.Map                             as Map
 import           Data.Maybe
 import qualified Data.Set                             as Set
 
+
 -- | A map from keys to pairs of bindings and their dependencies (as a list of keys).
 type DefMap key def = Map.Map key (def, Set.Set key)
 
@@ -66,7 +67,7 @@ data DefState key uni ann = DefState {
 makeLenses ''DefState
 
 newtype DefT key uni ann m a = DefT { unDefT :: StateT (DefState key uni ann) m a }
-    deriving (Functor, Applicative, Monad, MonadTrans, MM.MFunctor, MonadError e, MonadReader r, MonadQuote)
+    deriving (Functor, Applicative, Monad, MonadTrans, MM.MFunctor, MonadError e, MonadReader r, MonadQuote, MonadIO)
 
 -- Need to write this by hand, deriving wants to derive the one for DefState
 instance MonadState s m => MonadState s (DefT key uni ann m) where

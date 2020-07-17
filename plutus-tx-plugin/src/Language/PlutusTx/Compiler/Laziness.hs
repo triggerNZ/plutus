@@ -8,6 +8,7 @@ import {-# SOURCE #-} Language.PlutusTx.Compiler.Expr
 import {-# SOURCE #-} Language.PlutusTx.Compiler.Type
 import           Language.PlutusTx.Compiler.Types
 import           Language.PlutusTx.PIRTypes
+import Control.Monad.IO.Class
 
 import qualified Language.PlutusIR                as PIR
 
@@ -40,7 +41,7 @@ delayVar (PIR.VarDecl () n ty) = do
     pure $ PIR.VarDecl () n ty'
 
 force
-    :: (Compiling uni m, PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni)
+    :: (MonadIO m, Compiling uni m, PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni)
     => PIRTerm uni -> m (PIRTerm uni)
 force thunk = PIR.Apply () thunk <$> compileExpr (GHC.Var GHC.unitDataConId)
 
@@ -54,6 +55,6 @@ maybeDelayType :: Compiling uni m => Bool -> PIRType uni -> m (PIRType uni)
 maybeDelayType yes t = if yes then delayType t else pure t
 
 maybeForce
-    :: (Compiling uni m, PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni)
+    :: (MonadIO m, Compiling uni m, PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni)
     => Bool -> PIRTerm uni -> m (PIRTerm uni)
 maybeForce yes t = if yes then force t else pure t

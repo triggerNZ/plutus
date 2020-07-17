@@ -28,6 +28,8 @@ import qualified Data.Set                               as Set
 
 import qualified Language.Haskell.TH.Syntax             as TH
 
+import qualified TcRnMonad as GHC
+
 type BuiltinNameInfo = Map.Map TH.Name GHC.TyThing
 
 -- | Compilation options. Empty currently.
@@ -39,10 +41,44 @@ data CompileContext uni = CompileContext {
     ccFamInstEnvs     :: GHC.FamInstEnvs,
     ccBuiltinNameInfo :: BuiltinNameInfo,
     ccScopes          :: ScopeStack uni,
-    ccBlackholed      :: Set.Set GHC.Name
+    ccBlackholed      :: Set.Set GHC.Name,
+    ccHscEnv          :: GHC.HscEnv
     }
 
-data CompileState = CompileState {}
+data CompileState = CompileState {
+    coreMods :: GHC.ModuleEnv (Maybe (GHC.NameEnv (GHC.Bind GHC.CoreBndr)))
+    }
+
+loadCoreBindings :: GHC.ModIface -> GHC.IfL (Maybe [GHC.Bind GHC.CoreBndr])
+loadCoreBindings _iface@GHC.ModIface{GHC.mi_module = _mod} = undefined
+
+lookupCore :: (Compiling uni m, MonadIO m) => GHC.Name -> m (Maybe (GHC.Bind GHC.CoreBndr))
+lookupCore name = do
+    st@CompileState{coreMods=modBinds} <- get
+    CompileContext{ccFlags=dflags, ccHscEnv=env} <- ask
+    eps <- liftIO $ GHC.hscEPS env
+    case GHC.nameModule_maybe name of
+      Just m | Just iface <- GHC.lookupIfaceByModule dflags (GHC.hsc_HPT env) (GHC.eps_PIT eps) m -> do
+        case GHC.lookupModuleEnv modBinds m of
+          Just Nothing -> return Nothing
+          Just (Just binds) -> return $ GHC.lookupNameEnv binds name
+          Nothing -> do
+               bnds <- liftIO $
+                       GHC.initIfaceLoad env $
+                       GHC.initIfaceLcl (GHC.mi_semantic_module iface) (GHC.text "core") False $
+                         loadCoreBindings iface
+               case bnds of
+                 Just bds -> do
+                   let binds' = GHC.mkNameEnv $ map (\x -> (nameOf x, x)) bds
+                   put st{coreMods = GHC.extendModuleEnv modBinds m (Just binds')}
+                   return $ GHC.lookupNameEnv binds' name
+                 Nothing -> do
+                   put st{coreMods = GHC.extendModuleEnv modBinds m Nothing}
+                   return Nothing
+      _ -> return Nothing
+  where
+    nameOf (GHC.NonRec n _)     = GHC.idName n
+    nameOf (GHC.Rec ((n, _):_)) = GHC.idName n
 
 -- | A wrapper around 'GHC.Name' with a stable 'Ord' instance. Use this where the ordering
 -- will affect the output of the compiler, i.e. when sorting or so on. It's  fine to use

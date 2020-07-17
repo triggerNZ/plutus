@@ -253,6 +253,7 @@ mkCompiledCode plcBS pirBS = SerializedCode plcBS (Just pirBS)
 compileCoreExpr :: (PluginOptions, GHC.FamInstEnvs) -> String -> GHC.Type -> GHC.CoreExpr -> GHC.CoreM GHC.CoreExpr
 compileCoreExpr (opts, famEnvs) locStr codeTy origE = do
     flags <- GHC.getDynFlags
+    env   <- GHC.getHscEnv
 
     -- We need to do this out here, since it has to run in CoreM
     nameInfo <- makePrimitiveNameInfo builtinNames
@@ -262,9 +263,12 @@ compileCoreExpr (opts, famEnvs) locStr codeTy origE = do
             ccFamInstEnvs=famEnvs,
             ccBuiltinNameInfo=nameInfo,
             ccScopes=initialScopeStack,
-            ccBlackholed=mempty
+            ccBlackholed=mempty,
+            ccHscEnv=env
             }
-        initialState = CompileState {}
+        initialState = CompileState {
+            coreMods=GHC.emptyModuleEnv
+            }
     res <- runExceptT . runQuoteT . flip evalStateT initialState . flip runReaderT context $
         withContextM 1 (sdToTxt $ "Compiling expr at" GHC.<+> GHC.text locStr) $ runCompiler opts origE
     case res of

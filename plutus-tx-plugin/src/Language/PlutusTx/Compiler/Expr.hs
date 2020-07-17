@@ -87,7 +87,7 @@ So we use another horrible hack and pretend that `Addr#` is `String`, since we t
 -}
 
 compileLiteral
-    :: (Compiling uni m, PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni)
+    :: (MonadIO m, Compiling uni m, PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni)
     => GHC.Literal -> m (PIRTerm uni)
 compileLiteral = \case
     -- Just accept any kind of number literal, we'll complain about types we don't support elsewhere
@@ -138,7 +138,7 @@ findAlt dc alts t = case GHC.findAlt (GHC.DataAlt dc) alts of
 
 -- | Make the alternative for a given 'CoreAlt'.
 compileAlt
-    :: (Compiling uni m, PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni)
+    :: (MonadIO m, Compiling uni m, PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni)
     => Bool -- ^ Whether we must delay the alternative.
     -> [GHC.Type] -- ^ The instantiated type arguments for the data constructor.
     -> GHC.CoreAlt -- ^ The 'CoreAlt' representing the branch itself.
@@ -285,7 +285,7 @@ Conveniently, we can just use PIR's support for non-strict let bindings to imple
 -}
 
 hoistExpr
-    :: (Compiling uni m, PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni)
+    :: (MonadIO m, Compiling uni m, PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni)
     => GHC.Var -> GHC.CoreExpr -> m (PIRTerm uni)
 hoistExpr var t =
     let
@@ -327,7 +327,7 @@ hoistExpr var t =
 -- Expressions
 
 compileExpr
-    :: (Compiling uni m, PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni)
+    :: (MonadIO m, Compiling uni m, PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni)
     => GHC.CoreExpr -> m (PIRTerm uni)
 compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $ do
     -- See Note [Scopes]
@@ -475,7 +475,7 @@ compileExpr e = withContextM 2 (sdToTxt $ "Compiling expr:" GHC.<+> GHC.ppr e) $
         GHC.Coercion _ -> throwPlain $ UnsupportedError "Coercions as expressions"
 
 compileExprWithDefs
-    :: (Compiling uni m, PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni)
+    :: (MonadIO m, Compiling uni m, PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni)
     => GHC.CoreExpr -> m (PIRTerm uni)
 compileExprWithDefs e = do
     defineBuiltinTypes
