@@ -29,6 +29,7 @@ import Halogen.Query (HalogenM)
 import Halogen.SVG (GradientUnits(..), Translate(..), d, defs, gradientUnits, linearGradient, offset, path, stop, stopColour, svg, transform, x1, x2, y2)
 import Halogen.SVG as SVG
 import HaskellEditor as HaskellEditor
+import JSEditor as JSEditor
 import Language.Haskell.Interpreter (CompilationError(CompilationError, RawError), InterpreterError(CompilationErrors, TimeoutError), SourceCode(SourceCode), _InterpreterResult)
 import Language.Haskell.Monaco as HM
 import LocalStorage as LocalStorage
@@ -45,10 +46,10 @@ import Servant.PureScript.Settings (SPSettings_)
 import Simulation as Simulation
 import Simulation.State (_result)
 import Simulation.Types as ST
-import StaticData (bufferLocalStorageKey)
+import StaticData (bufferLocalStorageKey, jsBufferLocalStorageKey)
 import StaticData as StaticData
 import Text.Pretty (pretty)
-import Types (ChildSlots, FrontendState(FrontendState), HAction(..), HQuery(..), Message(..), View(..), WebData, _activeHaskellDemo, _blocklySlot, _compilationResult, _haskellEditorKeybindings, _haskellEditorSlot, _showBottomPanel, _simulationSlot, _view, _walletSlot)
+import Types (ChildSlots, FrontendState(FrontendState), HAction(..), HQuery(..), Message(..), View(..), WebData, _activeHaskellDemo, _activeJSDemo, _blocklySlot, _compilationResult, _haskellEditorKeybindings, _haskellEditorSlot, _jsEditorKeybindings, _jsEditorSlot, _showBottomPanel, _simulationSlot, _view, _walletSlot)
 import Wallet as Wallet
 import WebSocket (WebSocketResponseMessage(..))
 
@@ -57,10 +58,13 @@ initialState =
   FrontendState
     { view: Simulation
     , compilationResult: NotAsked
+    , jsCompilationResult: Nothing
     , blocklyState: Nothing
     , showBottomPanel: true
     , haskellEditorKeybindings: DefaultBindings
+    , jsEditorKeybindings: DefaultBindings
     , activeHaskellDemo: mempty
+    , activeJSDemo: mempty
     }
 
 ------------------------------------------------------------
@@ -123,11 +127,21 @@ handleAction _ (HaskellHandleEditorMessage (Monaco.TextChanged text)) = do
   liftEffect $ LocalStorage.setItem bufferLocalStorageKey text
   assign _activeHaskellDemo ""
 
+handleAction _ (JSHandleEditorMessage (Monaco.TextChanged text)) = do
+  liftEffect $ LocalStorage.setItem jsBufferLocalStorageKey text
+  assign _activeJSDemo ""
+
 handleAction _ (HaskellSelectEditorKeyBindings bindings) = do
   assign _haskellEditorKeybindings bindings
   void $ query _haskellEditorSlot unit (Monaco.SetKeyBindings bindings unit)
 
+handleAction _ (JSSelectEditorKeyBindings bindings) = do
+  assign _jsEditorKeybindings bindings
+  void $ query _jsEditorSlot unit (Monaco.SetKeyBindings bindings unit)
+
 handleAction _ (ChangeView HaskellEditor) = selectHaskellView
+
+handleAction _ (ChangeView JSEditor) = selectJSView
 
 handleAction _ (ChangeView Simulation) = selectSimulationView
 
@@ -152,12 +166,21 @@ handleAction settings CompileHaskellProgram = do
           _ -> []
       void $ query _haskellEditorSlot unit (Monaco.SetModelMarkers markers identity)
 
+handleAction _ CompileJSProgram = pure unit
+
 handleAction _ (LoadHaskellScript key) = do
   case Map.lookup key StaticData.demoFiles of
     Nothing -> pure unit
     Just contents -> do
       void $ query _haskellEditorSlot unit (Monaco.SetText contents unit)
       assign _activeHaskellDemo key
+
+handleAction _ (LoadJSScript key) = do
+  case Map.lookup key StaticData.demoFiles of
+    Nothing -> pure unit
+    Just contents -> do
+      void $ query _jsEditorSlot unit (Monaco.SetText contents unit)
+      assign _activeJSDemo key
 
 handleAction _ SendResultToSimulator = do
   mContract <- use _compilationResult
@@ -224,6 +247,14 @@ selectHaskellView = do
   assign _view (HaskellEditor)
   void $ query _haskellEditorSlot unit (Monaco.Resize unit)
   void $ query _haskellEditorSlot unit (Monaco.SetTheme HM.daylightTheme.name unit)
+
+selectJSView ::
+  forall m.
+  HalogenM FrontendState HAction ChildSlots Message m Unit
+selectJSView = do
+  assign _view (JSEditor)
+  void $ query _jsEditorSlot unit (Monaco.Resize unit)
+  void $ query _jsEditorSlot unit (Monaco.SetTheme HM.daylightTheme.name unit)
 
 selectWalletView ::
   forall m.
@@ -294,6 +325,13 @@ render settings state =
                 , div [] [ text "Simulation" ]
                 ]
             , div
+                [ classes ([ tabLink, aCenter, flexCol, ClassName "js-tab" ] <> isActiveTab state JSEditor)
+                , onClick $ const $ Just $ ChangeView JSEditor
+                ]
+                [ div [ class_ tabIcon ] []
+                , div [] [ text "JS Editor" ]
+                ]
+            , div
                 [ classes ([ tabLink, aCenter, flexCol, ClassName "haskell-tab" ] <> isActiveTab state HaskellEditor)
                 , onClick $ const $ Just $ ChangeView HaskellEditor
                 ]
@@ -330,6 +368,9 @@ render settings state =
             -- haskell panel
             , div [ classes ([ hide ] <> isActiveTab state HaskellEditor) ]
                 (HaskellEditor.render state)
+            -- javascript panel
+            , div [ classes ([ hide ] <> isActiveTab state JSEditor) ]
+                (JSEditor.render state)
             -- blockly panel
             , div [ classes ([ hide ] <> isActiveTab state BlocklyEditor) ]
                 [ slot _blocklySlot unit (blockly MB.rootBlockName MB.blockDefinitions) unit (Just <<< HandleBlocklyMessage)
