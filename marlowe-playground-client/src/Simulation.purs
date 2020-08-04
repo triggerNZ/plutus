@@ -26,6 +26,7 @@ import Data.String (codePointFromChar)
 import Data.String as String
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
+import Debug.Trace (trace)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import FileEvents (readFileFromDragEvent)
@@ -285,7 +286,7 @@ handleAction _ AnalyseContract = do
   checkContractForWarnings contract state = do
     let
       msgString = unsafeStringify <<< encode $ CheckForWarnings (encodeJSON false) contract state
-    H.raise (WebsocketMessage msgString)
+    trace msgString \_ -> H.raise (WebsocketMessage msgString)
 
 handleAction _ AnalyseReachabilityContract = do
   currContract <- use _currentContract

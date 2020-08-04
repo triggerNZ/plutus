@@ -11,6 +11,7 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap)
 import Data.String as String
+import Debug.Trace (trace)
 import Effect.Aff.Class (class MonadAff)
 import Foreign.Class (decode)
 import Foreign.JSON (parseJSON)
@@ -32,11 +33,14 @@ import HaskellEditor as HaskellEditor
 import JSEditor as JSEditor
 import Language.Haskell.Interpreter (CompilationError(CompilationError, RawError), InterpreterError(CompilationErrors, TimeoutError), SourceCode(SourceCode), _InterpreterResult)
 import Language.Haskell.Monaco as HM
+import Language.Javascript.Interpreter as JSI
+import Language.Javascript.Interpreter as JSInterpreter
 import LocalStorage as LocalStorage
 import Marlowe (SPParams_)
 import Marlowe as Server
 import Marlowe.Blockly as MB
 import Marlowe.Parser (parseContract)
+import Marlowe.Semantics (Contract)
 import Monaco (IMarkerData, markerSeverity)
 import Network.RemoteData (RemoteData(..))
 import Network.RemoteData as RemoteData
@@ -49,7 +53,7 @@ import Simulation.Types as ST
 import StaticData (bufferLocalStorageKey, jsBufferLocalStorageKey)
 import StaticData as StaticData
 import Text.Pretty (pretty)
-import Types (ChildSlots, FrontendState(FrontendState), HAction(..), HQuery(..), Message(..), View(..), WebData, _activeHaskellDemo, _activeJSDemo, _blocklySlot, _compilationResult, _haskellEditorKeybindings, _haskellEditorSlot, _jsEditorKeybindings, _jsEditorSlot, _showBottomPanel, _simulationSlot, _view, _walletSlot)
+import Types (ChildSlots, FrontendState(FrontendState), HAction(..), HQuery(..), Message(..), View(..), WebData, _activeHaskellDemo, _activeJSDemo, _blocklySlot, _compilationResult, _haskellEditorKeybindings, _haskellEditorSlot, _jsCompilationResult, _jsEditorKeybindings, _jsEditorSlot, _showBottomPanel, _simulationSlot, _view, _walletSlot)
 import Wallet as Wallet
 import WebSocket (WebSocketResponseMessage(..))
 
@@ -166,7 +170,14 @@ handleAction settings CompileHaskellProgram = do
           _ -> []
       void $ query _haskellEditorSlot unit (Monaco.SetModelMarkers markers identity)
 
-handleAction _ CompileJSProgram = pure unit
+handleAction _ CompileJSProgram = do
+  mContents <- query _jsEditorSlot unit (Monaco.GetText identity)
+  case mContents of
+    Nothing -> pure unit
+    Just contents -> do
+      let
+        res = JSInterpreter.eval contents
+      assign _jsCompilationResult (Just res)
 
 handleAction _ (LoadHaskellScript key) = do
   case Map.lookup key StaticData.demoFiles of
@@ -197,6 +208,25 @@ handleAction _ SendResultToSimulator = do
   void $ query _simulationSlot unit (ST.SetEditorText contract unit)
   void $ query _simulationSlot unit (ST.ResetContract unit)
   selectSimulationView
+
+handleAction _ SendResultJSToSimulator = do
+  mContract <- use _jsCompilationResult
+  case mContract of
+    Nothing -> pure unit
+    Just (Left err) -> pure unit
+    Just (Right (JSI.InterpreterResult { result })) -> do
+      let
+        (resultDecoded :: Either _ Contract) =
+          unwrap <<< runExceptT
+            $ do
+                f <- parseJSON result
+                decode f
+      case trace resultDecoded \_ -> resultDecoded of
+        Left err -> pure unit
+        Right contract -> do
+          void $ query _simulationSlot unit (ST.SetEditorText (show $ pretty contract) unit)
+          void $ query _simulationSlot unit (ST.ResetContract unit)
+          selectSimulationView
 
 handleAction _ SendResultToBlockly = do
   mContract <- use _compilationResult
@@ -387,6 +417,7 @@ render settings state =
   where
   bottomPanel = case state ^. _view of
     HaskellEditor -> HaskellEditor.bottomPanel state
+    JSEditor -> JSEditor.bottomPanel state
     _ -> text mempty
 
   isActiveTab state' activeView = if state' ^. _view <<< to (eq activeView) then [ active ] else []

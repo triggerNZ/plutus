@@ -2064,6 +2064,14 @@
     }
 
     {
+      name = "esprima___esprima_1.0.4.tgz";
+      path = fetchurl {
+        name = "esprima___esprima_1.0.4.tgz";
+        url  = "https://registry.yarnpkg.com/esprima/-/esprima-1.0.4.tgz";
+        sha1 = "9f557e08fc3b4d26ece9dd34f8fbf476b62585ad";
+      };
+    }
+    {
       name = "esrecurse___esrecurse_4.2.1.tgz";
       path = fetchurl {
         name = "esrecurse___esrecurse_4.2.1.tgz";
@@ -2828,6 +2836,14 @@
       };
     }
 
+    {
+      name = "hoister___hoister_0.0.2.tgz";
+      path = fetchurl {
+        name = "hoister___hoister_0.0.2.tgz";
+        url  = "https://registry.yarnpkg.com/hoister/-/hoister-0.0.2.tgz";
+        sha1 = "0d0d8b1ce0f191553e61afec654f6b180eb96e5d";
+      };
+    }
     {
       name = "homedir_polyfill___homedir_polyfill_1.0.3.tgz";
       path = fetchurl {
@@ -4511,6 +4527,14 @@
       };
     }
 
+    {
+      name = "notevil___notevil_1.3.3.tgz";
+      path = fetchurl {
+        name = "notevil___notevil_1.3.3.tgz";
+        url  = "https://registry.yarnpkg.com/notevil/-/notevil-1.3.3.tgz";
+        sha1 = "56b8a935d8978e0c000749621aca3928b823cb01";
+      };
+    }
     {
       name = "npm_bundled___npm_bundled_1.0.6.tgz";
       path = fetchurl {

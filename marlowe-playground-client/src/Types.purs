@@ -47,6 +47,7 @@ data HAction
   | CompileJSProgram
   | ChangeView View
   | SendResultToSimulator
+  | SendResultJSToSimulator
   | SendResultToBlockly
   | LoadHaskellScript String
   | LoadJSScript String
@@ -74,6 +75,7 @@ instance actionIsEvent :: IsEvent HAction where
   toEvent (HandleBlocklyMessage _) = Just $ (defaultEvent "HandleBlocklyMessage") { category = Just "Blockly" }
   toEvent (ShowBottomPanel _) = Just $ defaultEvent "ShowBottomPanel"
   toEvent SendResultToSimulator = Just $ defaultEvent "SendResultToSimulator"
+  toEvent SendResultJSToSimulator = Just $ defaultEvent "SendResultJSToSimulator"
   toEvent SendResultToBlockly = Just $ defaultEvent "SendResultToBlockly"
 
 ------------------------------------------------------------
