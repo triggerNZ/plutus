@@ -11,7 +11,6 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap)
 import Data.String as String
-import Debug.Trace (trace)
 import Effect.Aff.Class (class MonadAff)
 import Foreign.Class (decode)
 import Foreign.JSON (parseJSON)
@@ -40,7 +39,6 @@ import Marlowe (SPParams_)
 import Marlowe as Server
 import Marlowe.Blockly as MB
 import Marlowe.Parser (parseContract)
-import Marlowe.Semantics (Contract)
 import Monaco (IMarkerData, markerSeverity)
 import Network.RemoteData (RemoteData(..))
 import Network.RemoteData as RemoteData
@@ -214,19 +212,10 @@ handleAction _ SendResultJSToSimulator = do
   case mContract of
     Nothing -> pure unit
     Just (Left err) -> pure unit
-    Just (Right (JSI.InterpreterResult { result })) -> do
-      let
-        (resultDecoded :: Either _ Contract) =
-          unwrap <<< runExceptT
-            $ do
-                f <- parseJSON result
-                decode f
-      case trace resultDecoded \_ -> resultDecoded of
-        Left err -> pure unit
-        Right contract -> do
-          void $ query _simulationSlot unit (ST.SetEditorText (show $ pretty contract) unit)
-          void $ query _simulationSlot unit (ST.ResetContract unit)
-          selectSimulationView
+    Just (Right (JSI.InterpreterResult { result: contract })) -> do
+      void $ query _simulationSlot unit (ST.SetEditorText (show $ pretty contract) unit)
+      void $ query _simulationSlot unit (ST.ResetContract unit)
+      selectSimulationView
 
 handleAction _ SendResultToBlockly = do
   mContract <- use _compilationResult

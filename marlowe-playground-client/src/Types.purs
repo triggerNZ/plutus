@@ -22,6 +22,7 @@ import Halogen.Monaco (KeyBindings)
 import Halogen.Monaco as Monaco
 import Language.Haskell.Interpreter (InterpreterError, InterpreterResult)
 import Language.Javascript.Interpreter as JS
+import Marlowe.Semantics (Contract)
 import Network.RemoteData (RemoteData)
 import Prelude (class Eq, class Show, Unit, eq, show, (<<<), ($))
 import Servant.PureScript.Ajax (AjaxError)
@@ -121,7 +122,7 @@ newtype FrontendState
   = FrontendState
   { view :: View
   , compilationResult :: WebData (JsonEither InterpreterError (InterpreterResult RunResult))
-  , jsCompilationResult :: Maybe (Either JS.CompilationError (JS.InterpreterResult String))
+  , jsCompilationResult :: Maybe (Either JS.CompilationError (JS.InterpreterResult Contract))
   , blocklyState :: Maybe BlocklyState
   , haskellEditorKeybindings :: KeyBindings
   , jsEditorKeybindings :: KeyBindings
@@ -144,7 +145,7 @@ _view = _Newtype <<< prop (SProxy :: SProxy "view")
 _compilationResult :: Lens' FrontendState (WebData (JsonEither InterpreterError (InterpreterResult RunResult)))
 _compilationResult = _Newtype <<< prop (SProxy :: SProxy "compilationResult")
 
-_jsCompilationResult :: Lens' FrontendState (Maybe (Either JS.CompilationError (JS.InterpreterResult String)))
+_jsCompilationResult :: Lens' FrontendState (Maybe (Either JS.CompilationError (JS.InterpreterResult Contract)))
 _jsCompilationResult = _Newtype <<< prop (SProxy :: SProxy "jsCompilationResult")
 
 _blocklyState :: Lens' FrontendState (Maybe BlocklyState)
