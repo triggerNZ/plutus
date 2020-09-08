@@ -401,8 +401,8 @@ in rec {
             installPhase = ''
               mkdir -p $out
               cd $out
-              ln ${start-all-servers} start-all-servers.sh
-              ln ${start-second-scb} start-second-scb.sh
+              ln --symbolic ${start-all-servers} start-all-servers.sh
+              ln --symbolic ${start-second-scb} start-second-scb.sh
             '';
           }; 
   });
