@@ -68,6 +68,7 @@
           (hsPkgs."mtl" or (errorHandler.buildDepError "mtl"))
           (hsPkgs."network" or (errorHandler.buildDepError "network"))
           (hsPkgs."network-mux" or (errorHandler.buildDepError "network-mux"))
+          (hsPkgs."newtype-generics" or (errorHandler.buildDepError "newtype-generics"))
           (hsPkgs."optparse-applicative" or (errorHandler.buildDepError "optparse-applicative"))
           (hsPkgs."ouroboros-network" or (errorHandler.buildDepError "ouroboros-network"))
           (hsPkgs."ouroboros-network-framework" or (errorHandler.buildDepError "ouroboros-network-framework"))
@@ -296,6 +297,7 @@
             "Plutus/SCB/CoreSpec"
             "Plutus/SCB/RelationSpec"
             "Plutus/SCB/Events/ContractSpec"
+            "Cardano/Metadata/TypesSpec"
             ];
           hsSourceDirs = [ "test" ];
           mainPath = [ "Spec.hs" ];

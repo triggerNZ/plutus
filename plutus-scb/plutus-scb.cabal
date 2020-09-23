@@ -149,6 +149,7 @@ library
         freer-simple -any,
         generic-arbitrary -any,
         http-client -any,
+        http-client-tls -any,
         io-sim-classes -any,
         lens -any,
         memory -any,
@@ -156,6 +157,7 @@ library
         mtl -any,
         network -any,
         network-mux -any,
+        newtype-generics -any,
         optparse-applicative -any,
         ouroboros-network -any,
         ouroboros-network-framework -any,
@@ -297,6 +299,7 @@ test-suite plutus-scb-test
         Plutus.SCB.CoreSpec
         Plutus.SCB.RelationSpec
         Plutus.SCB.Events.ContractSpec
+        Cardano.Metadata.TypesSpec
 
     build-depends:
         QuickCheck -any,
@@ -319,6 +322,8 @@ test-suite plutus-scb-test
         servant-client -any,
         tasty -any,
         tasty-hunit -any,
+        smallcheck -any,
+        tasty-smallcheck -any,
         tasty-quickcheck -any,
         text -any,
         transformers -any,
