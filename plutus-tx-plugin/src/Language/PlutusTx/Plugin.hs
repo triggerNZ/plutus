@@ -2,7 +2,6 @@
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE TemplateHaskell            #-}
@@ -312,7 +311,7 @@ runCompiler opts expr = do
 
     let ctx = PIR.defaultCompilationCtx
               & set (PIR.ccOpts . PIR.coOptimize) (poOptimize opts)
-              & set (PIR.ccBuiltinMeanings) PLC.getStringBuiltinMeanings
+              & set PIR.ccBuiltinMeanings PLC.getStringBuiltinMeanings
               & set PIR.ccTypeCheckConfig stringBuiltinTCConfig
 
     pirT <- PIR.runDefT () $ compileExprWithDefs expr

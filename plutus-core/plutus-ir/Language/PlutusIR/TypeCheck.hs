@@ -9,24 +9,16 @@ module Language.PlutusIR.TypeCheck
     , tccDynamicBuiltinNameTypes
     , PLC.defConfig
     , PLC.dynamicBuiltinNameMeaningsToTypes
-    -- * Type inference/checking, extending the plc typechecker
-    , inferType
-    , checkType
-    , inferTypeOfProgram
+    -- * Type checking, extending the plc typechecker
     , checkTypeOfProgram
-    -- * Kind inference/checking, taken directly from plc typechecker
-    , PLC.inferKind
-    , PLC.checkKind
     ) where
 
 import           Language.PlutusCore.Quote
-import           Language.PlutusCore.Rename
-import qualified Language.PlutusCore.TypeCheck          as PLC
-import qualified Language.PlutusCore.TypeCheck.Internal as PLC
+import qualified Language.PlutusCore.TypeCheck        as PLC
 import           Language.PlutusCore.Universe
 import           Language.PlutusIR
 import           Language.PlutusIR.Error
-import           Language.PlutusIR.Transform.Rename     ()
+import           Language.PlutusIR.Transform.Rename   ()
 import           Language.PlutusIR.TypeCheck.Internal
 
 import           Control.Monad.Except
@@ -57,49 +49,21 @@ would be better written as `let (nonrec) x = 3 in`. In such cases we could signa
 - In general, as an extra source of (type) safety.
 -}
 
+{- NOTE [Escaping Types not user-exposed]
+As per Note [PIR vs paper FIR Difference-2], the "inferred types" at PIR top-level (`program`) location are allowed to escape their scope.
+However for scope-consistency reasons, we do not let the library-user see/compare those types, but only allow to
+witness if the PIR program is well-typed, by using the following safe `checkTypeOfProgram :: MonadError e m => m ()`.
+Using instead the "internal" `runTypeCheckM` can allow for witnessing the actual types (for debugging/testing purposes only).
+-}
 
--- | Infer the type of a term.
-inferType
-    :: ( AsTypeError e (Term TyName Name uni ()) uni ann, AsTypeErrorExt e uni ann, MonadError e m, MonadQuote m
-       , GShow uni, GEq uni, DefaultUni <: uni
-       )
-    => TypeCheckConfig uni -> Term TyName Name uni ann -> m (Normalized (Type TyName uni ()))
-inferType config = rename >=> PLC.runTypeCheckM config . inferTypeM
 
--- | Check a term against a type.
--- Infers the type of the term and checks that it's equal to the given type
+-- | Check that a PIR program is well-typed,
 -- throwing a 'TypeError' (annotated with the value of the @ann@ argument) otherwise.
-checkType
-    :: ( AsTypeError e (Term TyName Name uni ()) uni ann, AsTypeErrorExt e uni ann, MonadError e m, MonadQuote m
-       , GShow uni, GEq uni, DefaultUni <: uni
-       )
-    => TypeCheckConfig uni
-    -> ann
-    -> Term TyName Name uni ann
-    -> Normalized (Type TyName uni ())
-    -> m ()
-checkType config ann term ty = do
-    termRen <- rename term
-    PLC.runTypeCheckM config $ checkTypeM ann termRen ty
-
--- | Infer the type of a program.
-inferTypeOfProgram
-    :: ( AsTypeError e (Term TyName Name uni ()) uni ann, AsTypeErrorExt e uni ann, MonadError e m, MonadQuote m
-       , GShow uni, GEq uni, DefaultUni <: uni
-       )
-    => TypeCheckConfig uni -> Program TyName Name uni ann -> m (Normalized (Type TyName uni ()))
-inferTypeOfProgram config (Program _ term) = inferType config term
-
--- | Check a program against a type.
--- Infers the type of the program and checks that it's equal to the given type
--- throwing a 'TypeError' (annotated with the value of the @ann@ argument) otherwise.
+-- This function differs from PLC's same name, in that it does not allow the PIR-program's actual type to be returned,
+-- because the type would then escape its scope. See NOTE [Escaping Types not user-exposed].
 checkTypeOfProgram
-    :: (AsTypeError e (Term TyName Name uni ()) uni ann, AsTypeErrorExt e uni ann, MonadError e m, MonadQuote m
+    :: ( AsTypeError e (Term TyName Name uni ()) uni ann, AsTypeErrorExt e uni ann, MonadError e m, MonadQuote m
        , GShow uni, GEq uni, DefaultUni <: uni
        )
-    => TypeCheckConfig uni
-    -> ann
-    -> Program TyName Name uni ann
-    -> Normalized (Type TyName uni ())
-    -> m ()
-checkTypeOfProgram config ann (Program _ term) = checkType config ann term
+    => TypeCheckConfig uni -> Program TyName Name uni ann -> m ()
+checkTypeOfProgram config (Program _ term) = void $ inferType config term

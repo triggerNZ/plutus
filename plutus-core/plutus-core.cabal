@@ -116,6 +116,7 @@ library
         Language.PlutusIR.Transform.LetFloat
         Language.PlutusIR.Transform.Inline
         Language.PlutusIR.TypeCheck
+        Language.PlutusIR.TypeCheck.Internal
 
         Language.UntypedPlutusCore
         Language.UntypedPlutusCore.DeBruijn
@@ -191,7 +192,6 @@ library
         Language.PlutusIR.Compiler.Types
         Language.PlutusIR.Compiler.Lower
         Language.PlutusIR.Normalize
-        Language.PlutusIR.TypeCheck.Internal
 
         Language.UntypedPlutusCore.Core
         Language.UntypedPlutusCore.Core.Instance

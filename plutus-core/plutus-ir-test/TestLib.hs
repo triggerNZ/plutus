@@ -27,6 +27,7 @@ import           Language.PlutusIR            as PIR
 import           Language.PlutusIR.Compiler   as PIR
 import           Language.PlutusIR.Parser     as Parser
 import           Language.PlutusIR.TypeCheck
+import           Language.PlutusIR.TypeCheck.Internal
 import qualified Language.UntypedPlutusCore as UPLC
 import           System.FilePath              (joinPath, (</>))
 import           Text.Megaparsec.Pos
