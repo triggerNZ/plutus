@@ -39,7 +39,7 @@ data ChainReport t =
         { transactionMap      :: Map TxId Tx
         , utxoIndex           :: UtxoIndex
         , annotatedBlockchain :: [[AnnotatedTx]]
-        , relatedMetadata     :: [Metadata.Property]
+        , relatedMetadata     :: Map Metadata.Subject [Metadata.PropertyDescription]
         }
     deriving (Show, Eq, Generic)
     deriving anyclass (FromJSON, ToJSON)
@@ -62,8 +62,7 @@ data ContractSignatureResponse t =
     deriving anyclass (FromJSON, ToJSON)
 
 data StreamToServer
-    = Ping
-    | FetchProperties Metadata.Subject
+    = FetchProperties Metadata.Subject
     | FetchProperty Metadata.Subject Metadata.PropertyKey
     deriving (Show, Eq, Generic)
     deriving anyclass (FromJSON, ToJSON)
@@ -75,9 +74,8 @@ data StreamToClient
     = NewChainReport (ChainReport ContractExe)
     | NewContractReport (ContractReport ContractExe)
     | NewChainEvents [ChainEvent ContractExe]
-    | FetchedProperties [Metadata.Property]
-    | FetchedProperty Metadata.Property
-    | Pong
+    | FetchedProperties Metadata.SubjectProperties
+    | FetchedProperty Metadata.Subject Metadata.PropertyDescription
     | ErrorResponse Text
     deriving (Show, Eq, Generic)
     deriving anyclass (FromJSON, ToJSON)

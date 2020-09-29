@@ -1,7 +1,11 @@
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE DerivingVia       #-}
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs             #-}
+{-# LANGUAGE KindSignatures    #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData        #-}
@@ -10,11 +14,9 @@
 module Cardano.Metadata.Types where
 
 import           Control.Applicative       (Alternative, (<|>))
-import           Control.Lens              (makeLenses)
 import           Control.Monad.Freer.TH    (makeEffect)
-import           Control.Newtype.Generics  (Newtype)
-import qualified Control.Newtype.Generics  as Newtype
-import           Data.Aeson                (FromJSON, ToJSON, parseJSON, toJSON, withObject, withText, (.:))
+import           Data.Aeson                (FromJSON, FromJSONKey, ToJSON, ToJSONKey, parseJSON, toJSON, withObject,
+                                            withText, (.:))
 import qualified Data.Aeson                as JSON
 import           Data.Aeson.Extras         (decodeByteString, encodeByteString)
 import           Data.Aeson.Types          (Parser)
@@ -22,14 +24,16 @@ import qualified Data.ByteString           as BS
 import           Data.List.NonEmpty        (NonEmpty)
 import           Data.Text                 (Text)
 import qualified Data.Text                 as Text
-import           Data.Text.Prettyprint.Doc (Pretty, pretty, viaShow, (<+>))
+import           Data.Text.Encoding        (encodeUtf8)
+import           Data.Text.Prettyprint.Doc (Pretty, pretty, (<+>))
 import           GHC.Generics              (Generic)
 import           Ledger.Crypto             (PubKey (PubKey), PubKeyHash, Signature (Signature), getPubKey,
                                             getPubKeyHash)
 import           LedgerBytes               (LedgerBytes)
 import qualified LedgerBytes
+import           Plutus.SCB.Instances      ()
 import           Servant.API               (FromHttpApiData, ToHttpApiData)
-import           Servant.Client            (BaseUrl)
+import           Servant.Client            (BaseUrl, ClientError)
 
 newtype MetadataConfig =
     MetadataConfig
@@ -42,7 +46,14 @@ newtype MetadataConfig =
 newtype Subject =
     Subject Text
     deriving (Show, Eq, Ord, Generic)
-    deriving newtype (ToJSON, FromJSON, FromHttpApiData, ToHttpApiData, Pretty)
+    deriving newtype ( ToJSON
+                     , FromJSON
+                     , FromHttpApiData
+                     , ToHttpApiData
+                     , Pretty
+                     , ToJSONKey
+                     , FromJSONKey
+                     )
 
 class ToSubject a where
     toSubject :: a -> Subject
@@ -70,34 +81,17 @@ newtype PropertyName =
     deriving (Show, Eq, Generic)
     deriving newtype (ToJSON, FromJSON, Pretty)
 
-data Property =
-    Property
-        { _propertySubject     :: Subject
-        , _propertyDescription :: PropertyDescription
-        }
+data SubjectProperties =
+    SubjectProperties Subject [PropertyDescription]
     deriving (Show, Eq, Generic)
-    deriving anyclass (ToJSON, FromJSON)
 
-newtype LivePropertyDescription =
-    LivePropertyDescription PropertyDescription
-    deriving (Eq, Show, Generic)
-    deriving anyclass (Newtype)
+deriving anyclass instance ToJSON SubjectProperties
 
-instance FromJSON LivePropertyDescription where
+instance FromJSON SubjectProperties where
     parseJSON =
-        withObject "PropertyDescription" $ \o ->
-            LivePropertyDescription <$>
-            (parseName o <|> parseDescription o <|> parsePreimage o <|>
-             parseOwner o)
-
-data LivePropertyDescriptions =
-    LivePropertyDescriptions Subject [PropertyDescription]
-
-instance FromJSON LivePropertyDescriptions where
-    parseJSON =
-        withObject "PropertyDescriptions" $ \o -> do
+        withObject "SubjectProperties" $ \o -> do
             subject <- o .: "subject"
-            LivePropertyDescriptions subject <$>
+            SubjectProperties subject <$>
                 accumulateSuccesses
                     [ parseName o
                     , parseDescription o
@@ -105,6 +99,7 @@ instance FromJSON LivePropertyDescriptions where
                     , parseOwner o
                     ]
 
+-- | Accumulate the results from _every_ matching parser.
 accumulateSuccesses ::
        ( Alternative f
        , Applicative m
@@ -118,49 +113,42 @@ accumulateSuccesses = foldMap (\parser -> (pure <$> parser) <|> pure mempty)
 
 parseName :: JSON.Object -> Parser PropertyDescription
 parseName =
-    subParser
-        "name"
+    parseAtKey
         "name"
         (\subObject -> do
              value <- subObject .: "value"
-             signatures :: NonEmpty LiveAnnotatedSignature <-
+             signatures :: NonEmpty AnnotatedSignature <-
                  subObject .: "anSignatures"
-             pure $ Name value (Newtype.unpack <$> signatures))
+             pure $ Name value signatures)
 
 parseDescription :: JSON.Object -> Parser PropertyDescription
 parseDescription =
-    subParser
-        "description"
+    parseAtKey
         "description"
         (\description -> do
              value <- description .: "value"
-             signatures :: NonEmpty LiveAnnotatedSignature <-
-                 description .: "anSignatures"
-             pure $ Description value (Newtype.unpack <$> signatures))
+             signatures <- description .: "anSignatures"
+             pure $ Description value signatures)
 
 parsePreimage :: JSON.Object -> Parser PropertyDescription
 parsePreimage =
-    subParser
+    parseAtKey
         "preImage"
-        "preImage"
-        (\image -> do
-             hash <- image .: "hashFn"
-             hex <- image .: "hex"
+        (\preImage -> do
+             hash <- preImage .: "hashFn"
+             hex <- preImage .: "hex"
              pure $ Preimage hash hex)
 
 parseOwner :: JSON.Object -> Parser PropertyDescription
 parseOwner subObject = do
-    sig :: LiveAnnotatedSignature <- subObject .: "owner"
-    pure $ Other "owner" (JSON.Object subObject) (pure (Newtype.unpack sig))
+    sig <- subObject .: "owner"
+    pure $ Other "owner" (JSON.Object subObject) (pure sig)
 
-subParser ::
-       Text -> String -> (JSON.Object -> Parser a) -> JSON.Object -> Parser a
-subParser key name parser o = do
+parseAtKey ::
+       Text -> (JSON.Object -> Parser a) -> JSON.Object -> Parser a
+parseAtKey key parser o = do
     subValue <- o .: key
-    withObject name parser subValue
-
-instance Pretty Property where
-    pretty = viaShow
+    withObject (Text.unpack key) parser subValue
 
 data HashFunction
     = SHA256
@@ -178,38 +166,37 @@ instance ToJSON HashFunction where
     toJSON SHA256     = JSON.String "SHA256"
     toJSON Blake2B256 = JSON.String "blake2b-256"
 
+data AnnotatedSignature =
+    AnnotatedSignature PubKey Signature
+    deriving (Show, Eq, Ord, Generic)
+
+deriving anyclass instance ToJSON AnnotatedSignature
+
+instance FromJSON AnnotatedSignature where
+    parseJSON =
+        withObject "AnnotatedSignature" $ \o -> do
+            sigRaw <- o .: "signature"
+            sigBytes <- decodeByteString sigRaw
+            let sig = Signature sigBytes
+            pubKeyRaw :: Text <- o .: "publicKey"
+            case PubKey <$> LedgerBytes.fromHex (encodeUtf8 pubKeyRaw) of
+                Right pubKey -> pure $ AnnotatedSignature pubKey sig
+                Left err     -> fail (show (err, pubKeyRaw))
+
 data PropertyDescription
     = Preimage HashFunction LedgerBytes
     | Name Text (NonEmpty AnnotatedSignature)
     | Description Text (NonEmpty AnnotatedSignature)
     | Other Text JSON.Value (NonEmpty AnnotatedSignature)
     deriving (Show, Eq, Generic)
-    deriving anyclass (ToJSON, FromJSON)
 
-data AnnotatedSignature =
-    AnnotatedSignature PubKey Signature
-    deriving (Show, Eq, Ord, Generic)
-    deriving anyclass (ToJSON, FromJSON)
+deriving anyclass instance ToJSON PropertyDescription
 
-newtype LiveAnnotatedSignature =
-    LiveAnnotatedSignature AnnotatedSignature
-    deriving (Eq, Show, Generic)
-    deriving anyclass (Newtype)
-
-instance FromJSON LiveAnnotatedSignature where
+instance FromJSON PropertyDescription where
     parseJSON =
-        withObject "AnnotatedSignature" $ \o -> do
-            pubKeyRaw <- o .: "publicKey"
-            sigRaw <- o .: "signature"
-            sigBytes <- decodeByteString sigRaw
-            let pubKey = PubKey $ LedgerBytes.fromHex pubKeyRaw
-                sig = Signature sigBytes
-            pure $ LiveAnnotatedSignature $ AnnotatedSignature pubKey sig
-
-makeLenses ''Property
-
-toId :: Property -> (Subject, PropertyKey)
-toId (Property subject description) = (subject, toPropertyKey description)
+        withObject "PropertyDescription" $ \o ->
+            parseName o <|> parseDescription o <|> parsePreimage o <|>
+            parseOwner o
 
 toPropertyKey :: PropertyDescription -> PropertyKey
 toPropertyKey (Preimage _ _)    = PropertyKey "preimage"
@@ -217,22 +204,18 @@ toPropertyKey (Name _ _)        = PropertyKey "name"
 toPropertyKey (Description _ _) = PropertyKey "description"
 toPropertyKey (Other name _ _)  = PropertyKey name
 
-toPropertyList :: LivePropertyDescriptions -> [Property]
-toPropertyList (LivePropertyDescriptions subject descriptions) =
-    Property subject <$> descriptions
-
 ------------------------------------------------------------
 data MetadataEffect r where
-    GetProperties :: Subject -> MetadataEffect [Property]
-    GetProperty :: Subject -> PropertyKey -> MetadataEffect Property
+    GetProperties :: Subject -> MetadataEffect SubjectProperties
+    GetProperty :: Subject -> PropertyKey -> MetadataEffect PropertyDescription
 
 makeEffect ''MetadataEffect
 
 ------------------------------------------------------------
-
 data MetadataError
     = SubjectNotFound Subject
     | PropertyNotFound Subject PropertyKey
+    | MetadataClientError ClientError
     deriving (Show, Eq, Generic)
     deriving anyclass (ToJSON, FromJSON)
 

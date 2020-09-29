@@ -18,7 +18,7 @@ module Plutus.SCB.Webserver.Handler
     , contractSchema
     ) where
 
-import           Cardano.Metadata.Types                          (MetadataEffect)
+import           Cardano.Metadata.Types                          (MetadataEffect, SubjectProperties (SubjectProperties))
 import qualified Cardano.Metadata.Types                          as Metadata
 import           Control.Monad.Freer                             (Eff, Member)
 import           Control.Monad.Freer.Error                       (Error, throwError)
@@ -87,7 +87,10 @@ getChainReport = do
     relatedMetadata <-
         mconcat <$>
         traverse
-            (Metadata.getProperties . Metadata.toSubject . pubKeyHash . walletPubKey)
+            (\wallet -> do
+               let subject =  Metadata.toSubject . pubKeyHash . walletPubKey $ wallet
+               SubjectProperties _ properties <- Metadata.getProperties subject
+               pure $ Map.singleton subject properties)
             wallets
     annotatedBlockchain <- Rollup.doAnnotateBlockchain chainOverviewBlockchain
     pure

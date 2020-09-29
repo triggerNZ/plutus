@@ -1,40 +1,53 @@
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs            #-}
-{-# LANGUAGE LambdaCase       #-}
-{-# LANGUAGE RankNTypes       #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
 
-module Cardano.Metadata.Client where
+module Cardano.Metadata.Client
+    ( handleMetadataClient
+    ) where
 
 import           Cardano.Metadata.API      (API)
-import           Cardano.Metadata.Types    (MetadataEffect (GetProperties, GetProperty), Property, PropertyKey, Subject)
+import           Cardano.Metadata.Types    (MetadataEffect (GetProperties, GetProperty),
+                                            MetadataError (MetadataClientError, PropertyNotFound, SubjectNotFound))
 import           Control.Monad.Freer       (Eff, LastMember, Member, type (~>), interpret, sendM)
 import           Control.Monad.Freer.Error (Error, throwError)
 import           Control.Monad.IO.Class    (MonadIO, liftIO)
 import           Data.Proxy                (Proxy (Proxy))
-import           Servant.Client            (ClientEnv, ClientError, ClientM, client, runClientM)
+import           Network.HTTP.Types        (status404)
+import           Servant.Client            (ClientEnv, ClientError (FailureResponse), ClientM, client,
+                                            responseStatusCode, runClientM)
 import           Servant.Extra             (left, right)
-
-getProperties :: Subject -> ClientM [Property]
-getProperty :: Subject -> PropertyKey -> ClientM Property
-(getProperties, getProperty) = (_getProperties, _getProperty)
-  where
-    _getProperties = left . api
-    _getProperty = right . api
-    api = client (Proxy @API)
 
 handleMetadataClient ::
        forall m effs.
-       (LastMember m effs, MonadIO m, Member (Error ClientError) effs)
+       (LastMember m effs, MonadIO m, Member (Error MetadataError) effs)
     => ClientEnv
     -> Eff (MetadataEffect ': effs) ~> Eff effs
 handleMetadataClient clientEnv =
-    let runClient :: forall a. ClientM a -> Eff effs a
-        runClient a =
-            (sendM $ liftIO $ runClientM a clientEnv) >>= either throwError pure
+    let (getProperties, getProperty) = (_getProperties, _getProperty)
+          where
+            _getProperties = left . api
+            _getProperty = right . api
+            api = client (Proxy @API)
+
+        handleError :: MetadataError -> ClientError -> MetadataError
+        handleError onNotFound (FailureResponse _ response)
+            | responseStatusCode response == status404 = onNotFound
+        handleError _ err = (MetadataClientError err)
+
+        runClient :: forall a. MetadataError -> ClientM a -> Eff effs a
+        runClient onNotFound a =
+            (sendM $ liftIO $ runClientM a clientEnv) >>=
+            either (throwError . handleError onNotFound) pure
      in interpret $ \case
-            GetProperties subject -> runClient $ getProperties subject
+            GetProperties subject ->
+                runClient (SubjectNotFound subject) (getProperties subject)
             GetProperty subject propertyKey ->
-                runClient $ getProperty subject propertyKey
+                runClient
+                    (PropertyNotFound subject propertyKey)
+                    (getProperty subject propertyKey)

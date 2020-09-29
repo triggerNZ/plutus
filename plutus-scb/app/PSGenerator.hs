@@ -13,8 +13,9 @@ module PSGenerator
     ( generate
     ) where
 
-import           Cardano.Metadata.Types                            (AnnotatedSignature, HashFunction, Property,
-                                                                    PropertyDescription, PropertyKey, Subject)
+import           Cardano.Metadata.Types                            (AnnotatedSignature, HashFunction,
+                                                                    PropertyDescription, PropertyKey, Subject,
+                                                                    SubjectProperties)
 import           Control.Applicative                               ((<|>))
 import           Control.Lens                                      (set, (&))
 import           Control.Monad                                     (void)
@@ -138,7 +139,7 @@ myTypes =
 
     -- Metadata types
     , (order <*> (genericShow <*> mkSumType)) (Proxy @Subject)
-    , (equal <*> (genericShow <*> mkSumType)) (Proxy @Property)
+    , (equal <*> (genericShow <*> mkSumType)) (Proxy @SubjectProperties)
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @PropertyDescription)
     , (order <*> (genericShow <*> mkSumType)) (Proxy @PropertyKey)
     , (equal <*> (genericShow <*> mkSumType)) (Proxy @HashFunction)

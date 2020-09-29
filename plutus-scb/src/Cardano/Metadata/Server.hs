@@ -31,6 +31,8 @@ import qualified Data.ByteString.Lazy.Char8      as BSL8
 import           Data.Function                   ((&))
 import           Data.List                       (find)
 import           Data.List.NonEmpty              (NonEmpty ((:|)))
+import           Data.Map                        (Map)
+import qualified Data.Map                        as Map
 import           Data.Proxy                      (Proxy (Proxy))
 import           Data.Text.Encoding              (encodeUtf8)
 import           Ledger.Crypto                   (PrivateKey, PubKey, getPubKey, pubKeyHash, sign)
@@ -39,7 +41,7 @@ import qualified Network.Wai.Handler.Warp        as Warp
 import           Plutus.SCB.App                  (App)
 import           Plutus.SCB.SCBLogMsg            (ContractExeLogMsg (StartingMetadataServer))
 import           Plutus.SCB.Utils                (tshow)
-import           Servant                         (Application, Handler (Handler), ServerError, err404, errBody,
+import           Servant                         (Application, Handler (Handler), ServerError, err404, err500, errBody,
                                                   hoistServer, serve)
 import           Servant.API                     ((:<|>) ((:<|>)))
 import           Servant.Client                  (baseUrlPort)
@@ -54,19 +56,20 @@ toServerError (PropertyNotFound subject propertyKey) =
               BSL8.pack $
               "Property not found: " <> show subject <> ", " <> show propertyKey
         }
+toServerError (MetadataClientError err) =
+    err500 {errBody = BSL8.pack $ "Error contacting metadata server: " <> show err}
 
 fetchSubject ::
        ( Member (LogMsg MetadataLogMessage) effs
        , Member (Error MetadataError) effs
        )
     => Subject
-    -> Eff effs [Property]
+    -> Eff effs SubjectProperties
 fetchSubject subject = do
     logInfo $ FetchingSubject subject
-    let matches = filter (\v -> _propertySubject v == subject) testDatabase
-    case matches of
-        [] -> throwError $ SubjectNotFound subject
-        _  -> pure matches
+    case Map.lookup subject testDatabase of
+        Nothing    -> throwError $ SubjectNotFound subject
+        Just match -> pure $ SubjectProperties subject match
 
 fetchById ::
        ( Member (LogMsg MetadataLogMessage) effs
@@ -74,10 +77,11 @@ fetchById ::
        )
     => Subject
     -> PropertyKey
-    -> Eff effs Property
+    -> Eff effs PropertyDescription
 fetchById subject propertyKey = do
     logInfo $ FetchingProperty subject propertyKey
-    let match = find (\v -> toId v == (subject, propertyKey)) testDatabase
+    SubjectProperties _ properties <- fetchSubject subject
+    let match = find (\v -> toPropertyKey v == propertyKey) properties
     case match of
         Nothing     -> throwError $ PropertyNotFound subject propertyKey
         Just result -> pure result
@@ -87,8 +91,8 @@ handler ::
        , Member (Error MetadataError) effs
        )
     => Subject
-    -> Eff effs [Property]
-       :<|> (PropertyKey -> Eff effs Property)
+    -> Eff effs SubjectProperties
+       :<|> (PropertyKey -> Eff effs PropertyDescription)
 handler subject = fetchSubject subject :<|> fetchById subject
 
 asHandler ::
@@ -131,37 +135,38 @@ script1 = "0001abc1"
 
 -- | The test database contains a mix of example properties from the
 -- | spec document, and mock wallet details.
-testDatabase :: [Property]
+testDatabase :: Map Subject [PropertyDescription]
 testDatabase =
-    [ Property (toSubject script1) (Preimage SHA256 script1)
-    , Property
-          (toSubject script1)
-          (Name "Fred's Script" (annotatedSignature1 :| []))
-    , Property (toSubject pubKey1) (Preimage SHA256 (getPubKey pubKey1))
-    , Property
-          (toSubject pubKey1)
-          (Name "Fred's Key" (annotatedSignature1 :| [annotatedSignature2]))
-    , Property
-          (Subject "UTXO 0001")
-          (Other
-               "Exchange Offer"
-               (JSON.object
-                    [ "fromCur" .= JSON.String "Ada"
-                    , "fromAmount" .= JSON.Number 5
-                    , "toCur" .= JSON.String "FredTokens"
-                    , "toAmount" .= JSON.Number 20
-                    ])
-               (annotatedSignature1 :| []))
-    , Property
-          (Subject "gold_price_usd")
-          (Other
-               "on-chain location"
-               (JSON.String "UTXO 0002")
-               (annotatedSignature1 :| []))
-    ] <>
-    foldMap propertiesForWalletId [1 .. 10]
+    Map.fromList
+        ([ ( toSubject script1
+           , [ Preimage SHA256 script1
+             , Name "Fred's Script" (annotatedSignature1 :| [])
+             ])
+         , ( toSubject pubKey1
+           , [ Preimage SHA256 (getPubKey pubKey1)
+             , Name "Fred's Key" (annotatedSignature1 :| [annotatedSignature2])
+             ])
+         , ( Subject "UTXO 0001"
+           , [ Other
+                   "Exchange Offer"
+                   (JSON.object
+                        [ "fromCur" .= JSON.String "Ada"
+                        , "fromAmount" .= JSON.Number 5
+                        , "toCur" .= JSON.String "FredTokens"
+                        , "toAmount" .= JSON.Number 20
+                        ])
+                   (annotatedSignature1 :| [])
+             ])
+         , ( Subject "gold_price_usd"
+           , [ Other
+                   "on-chain location"
+                   (JSON.String "UTXO 0002")
+                   (annotatedSignature1 :| [])
+             ])
+         ] <>
+         foldMap propertiesForWalletId [1 .. 10])
   where
-    propertiesForWalletId :: Integer -> [Property]
+    propertiesForWalletId :: Integer -> [(Subject, [PropertyDescription])]
     propertiesForWalletId index =
         let name = ("Wallet #" <> tshow index)
             wallet = Wallet index
@@ -170,8 +175,8 @@ testDatabase =
             publicHash = pubKeyHash public
             signatures =
                 AnnotatedSignature public (sign (encodeUtf8 name) private) :| []
-         in [ Property (toSubject public) (Name name signatures)
-            , Property (toSubject publicHash) (Name name signatures)
+         in [ (toSubject public, [Name name signatures])
+            , (toSubject publicHash, [Name name signatures])
             ]
 
 handleMetadata ::
