@@ -320,6 +320,11 @@ shrinkContract cont = case cont of
     Close -> []
     Let vid val cont -> Close : cont : ([Let vid v cont | v <- shrinkValue val]
               ++ [Let vid val c | c <- shrinkContract cont])
+    Mint payee tok cont ->
+        [Close, cont]
+            ++ [Mint p tok cont | p <- shrinkPayee payee]
+            ++ [Mint payee t cont | t <- shrinkToken tok]
+
     Pay accId payee tok val cont ->
         Close:cont:([Pay accId payee tok val c | c <- shrinkContract cont]
               ++ [Pay accId payee tok v cont | v <- shrinkValue val]

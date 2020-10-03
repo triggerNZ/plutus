@@ -256,6 +256,7 @@ data Case a = Case Action a
     it is possible that effects – payments – and warnings can be generated too.
 -}
 data Contract = Close
+              | Mint Payee Token Contract 
               | Pay AccountId Payee Token (Value Observation) Contract
               | If Observation Contract Contract
               | When [Case Contract] Timeout Contract
@@ -600,6 +601,12 @@ reduceContractStep env state contract = case contract of
             in Reduced ReduceNoWarning (ReduceWithPayment (Payment party money)) newState Close
         Nothing -> NotReduced
 
+    Mint payee tok cont -> let
+        (payment, finalAccs) = giveMoney payee tok 1 (accounts state)
+        newState = state { accounts = finalAccs }
+        warning = ReduceNoWarning
+        in Reduced warning payment newState cont
+
     Pay accId payee tok val cont -> let
         amountToPay = evalValue env state val
         in  if amountToPay <= 0
@@ -795,6 +802,7 @@ computeTransaction tx state contract = let
 contractLifespanUpperBound :: Contract -> Integer
 contractLifespanUpperBound contract = case contract of
     Close -> 0
+    Mint _ _ cont -> contractLifespanUpperBound cont
     Pay _ _ _ _ cont -> contractLifespanUpperBound cont
     If _ contract1 contract2 ->
         max (contractLifespanUpperBound contract1) (contractLifespanUpperBound contract2)
@@ -1223,6 +1231,9 @@ instance FromJSON Contract where
              <*> (v .: "token")
              <*> (v .: "pay")
              <*> (v .: "then"))
+    <|> (Mint <$> (v .: "mint_to")
+             <*> (v .: "token")
+             <*> (v .: "then"))         
     <|> (If <$> (v .: "if")
             <*> (v .: "then")
             <*> (v .: "else"))
@@ -1241,6 +1252,13 @@ instance FromJSON Contract where
 
 instance ToJSON Contract where
   toJSON Close = JSON.String $ pack "close"
+  toJSON (Mint payee token contract) = object
+    [
+        "mint_to" .= payee
+      , "token" .= token
+      , "then" .= contract
+    ]
+
   toJSON (Pay accountId payee token value contract) = object
       [ "from_account" .= accountId
       , "to" .= payee
