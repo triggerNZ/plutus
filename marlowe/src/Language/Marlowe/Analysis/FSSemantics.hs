@@ -304,6 +304,12 @@ isValidAndFailsAux oa hasErr Close sState =
   return (hasErr .&& convertToSymbolicTrace ((lowSlot sState, highSlot sState,
                                               symInput sState, whenPos sState)
                                               :traces sState) (paramTrace sState))
+-- wrong. return to this
+isValidAndFailsAux oa hasErr (Mint _ _ cont) sState = 
+    return (hasErr .&& convertToSymbolicTrace ((lowSlot sState, highSlot sState,
+                                              symInput sState, whenPos sState)
+                                              :traces sState) (paramTrace sState))
+
 isValidAndFailsAux oa hasErr (Pay accId payee token val cont) sState =
   do let concVal = symEvalVal val sState
      let originalMoney = M.findWithDefault 0 (accId, token) (symAccounts sState)
@@ -452,6 +458,7 @@ isValidAndFailsWhen oa hasErr (Case (Notify obs) cont:rest)
 -- has been proven in TransactionBound.thy
 countWhens :: Contract -> Integer
 countWhens Close               = 0
+countWhens (Mint _ _ c)        = countWhens c
 countWhens (Pay uv uw ux uy c) = countWhens c
 countWhens (If uz c c2)        = max (countWhens c) (countWhens c2)
 countWhens (When cl t c)       = 1 + max (countWhensCaseList cl) (countWhens c)

@@ -286,6 +286,7 @@ shrinkCase (Case act cont) = [Case act x | x <- shrinkContract cont]
 contractRelGenSized :: Int -> Integer -> Gen Contract
 contractRelGenSized s bn
   | s > 0 = oneof [ return Close
+                  , Mint <$> payeeGen <*> tokenGen <*> contractRelGenSized (s - 1) bn
                   , Pay <$> accountIdGen <*> payeeGen <*> tokenGen
                         <*> valueGenSized (s `quot` 4)
                         <*> contractRelGenSized (s - 1) bn
