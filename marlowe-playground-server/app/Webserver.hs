@@ -20,4 +20,5 @@ run port = do
   appConfig <- initializeContext
   handlers <- Server.mkHandlers appConfig
   let server = handlers :<|> Webghc.server :<|> MS.handlers
+  putStrLn "About to run"
   Warp.run port (serve (Proxy @API) server)
