@@ -35,6 +35,8 @@ type HelperFunctions a
     , mkTimeout :: Int -> Range -> TermWrapper Slot
     , mkClose :: Contract
     , mkPay :: AccountId -> Term Payee -> Term Token -> Term Value -> Term Contract -> Contract
+    , mkMint :: Term Payee -> Term Token -> Term Contract -> Contract
+    , mkBurn :: Term Payee -> Term Token -> Term Contract -> Contract
     , mkWhen :: Array (Term Case) -> (TermWrapper Slot) -> Term Contract -> Contract
     , mkIf :: Term Observation -> Term Contract -> Term Contract -> Contract
     , mkLet :: TermWrapper ValueId -> Term Value -> Term Contract -> Contract
@@ -87,6 +89,8 @@ helperFunctions =
   , mkTimeout: \v pos -> TermWrapper (Slot (BigInteger.fromInt v)) pos
   , mkClose: Close
   , mkPay: Pay
+  , mkMint: Mint
+  , mkBurn: Burn
   , mkWhen: When
   , mkIf: If
   , mkAssert: Assert
@@ -421,13 +425,22 @@ recContract =
       <**> parseTerm (parens token)
       <**> value'
       <**> contract'
-  )
+      )
+    <|> ( Mint <$> (string "Mint" **> (parseTerm $ parens payee))
+      <**> parseTerm (parens token)
+      <**> contract'
+      )
+    <|> ( Burn <$> (string "Burn" **> (parseTerm $ parens payee))
+      <**> parseTerm (parens token)
+      <**> contract')
     <|> (If <$> (string "If" **> observation') <**> contract' <**> contract')
     <|> (When <$> (string "When" **> (array (maybeParens (parseTerm case')))) <**> timeout <**> contract')
     <|> (Let <$> (string "Let" **> termWrapper valueId) <**> value' <**> contract')
     <|> (Assert <$> (string "Assert" **> observation') <**> contract')
     <|> (fail "not a valid Contract")
   where
+  -- payee' = parseTerm $ atomPayee <|> fix \p -> parens recPayee
+
   contract' = parseTerm $ atomContract <|> fix \p -> parens recContract
 
   observation' = parseTerm $ atomObservation <|> fix \p -> parens observation

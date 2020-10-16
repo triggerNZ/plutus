@@ -24,6 +24,8 @@ import Types (ChildSlots)
 
 data ContractZipper
   = PayZip AccountId Payee Token Value ContractZipper
+  | MintZip Payee Token ContractZipper
+  | BurnZip Payee Token ContractZipper
   | IfTrueZip Observation ContractZipper Contract
   | IfFalseZip Observation Contract ContractZipper
   | WhenCaseZip (List Case) S.Action ContractZipper (List Case) Timeout Contract -- First list is stored reversed for efficiency
@@ -47,6 +49,10 @@ foldBreadthContractWithZipperAuxStep :: ContractZipper /\ Contract -> List (Cont
 foldBreadthContractWithZipperAuxStep (_ /\ Close) = Nil
 
 foldBreadthContractWithZipperAuxStep (zipper /\ Pay accId payee tok val cont) = Cons (PayZip accId payee tok val zipper /\ cont) Nil
+
+foldBreadthContractWithZipperAuxStep (zipper /\ Mint payee tok cont) = Cons (MintZip payee tok zipper /\ cont) Nil
+foldBreadthContractWithZipperAuxStep (zipper /\ Burn payee tok cont) = Cons (BurnZip payee tok zipper /\ cont) Nil
+
 
 foldBreadthContractWithZipperAuxStep (zipper /\ If obs cont1 cont2) = Cons (IfTrueZip obs zipper cont2 /\ cont1) (Cons (IfFalseZip obs cont1 zipper /\ cont2) Nil)
 
@@ -76,6 +82,10 @@ foldBreadthContractWithZipper f acc c = foldBreadthContractWithZipperAux f acc (
 closeZipperContract :: ContractZipper -> Contract -> Contract
 closeZipperContract (PayZip accId payee tok val zipper) cont = closeZipperContract zipper (Pay accId payee tok val cont)
 
+closeZipperContract (MintZip payee tok zipper) cont = closeZipperContract zipper (Mint payee tok cont)
+closeZipperContract (BurnZip payee tok zipper) cont = closeZipperContract zipper (Burn payee tok cont)
+
+
 closeZipperContract (IfTrueZip obs zipper cont2) cont1 = closeZipperContract zipper (If obs cont1 cont2)
 
 closeZipperContract (IfFalseZip obs cont1 zipper) cont2 = closeZipperContract zipper (If obs cont1 cont2)
@@ -98,6 +108,10 @@ closeZipperContract HeadZip cont = cont
 
 zipperToContractPathAux :: ContractZipper -> ContractPath -> ContractPath
 zipperToContractPathAux (PayZip _ _ _ _ zipper) p = zipperToContractPathAux zipper (Cons PayContPath p)
+
+zipperToContractPathAux (MintZip _ _ zipper) p = zipperToContractPathAux zipper (Cons MintContPath p)
+
+zipperToContractPathAux (BurnZip _ _ zipper) p = zipperToContractPathAux zipper (Cons BurnContPath p)
 
 zipperToContractPathAux (IfTrueZip _ zipper _) p = zipperToContractPathAux zipper (Cons IfTruePath p)
 
@@ -148,6 +162,9 @@ generateSubproblem acc _ _ = acc
 
 nullifyAsserts :: Contract -> Contract
 nullifyAsserts Close = Close
+
+nullifyAsserts (Mint payee tok cont) = Mint payee tok (nullifyAsserts cont)
+nullifyAsserts (Burn payee tok cont) = Burn payee tok (nullifyAsserts cont)
 
 nullifyAsserts (Pay accId payee tok val cont) = Pay accId payee tok val (nullifyAsserts cont)
 

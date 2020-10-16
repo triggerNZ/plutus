@@ -713,6 +713,8 @@ instance hasArgsCase :: Args Case where
 
 data Contract
   = Close
+  | Mint Payee Token Contract
+  | Burn Payee Token Contract
   | Pay AccountId Payee Token Value Contract
   | If Observation Contract Contract
   | When (Array Case) Timeout Contract
@@ -727,6 +729,18 @@ derive instance ordContract :: Ord Contract
 
 instance encodeJsonContract :: Encode Contract where
   encode Close = encode "close"
+  encode (Mint payee token cont) =
+    encode
+      { token: token
+      , token_to: payee
+      , then: cont
+      }
+  encode (Burn payee token cont) =
+    encode
+        { token: token
+        , token_burn_from: payee
+        , then: cont
+        }    
   encode (Pay accId payee token val cont) =
     encode
       { pay: val
@@ -1352,6 +1366,25 @@ reduceContractStep env state contract = case contract of
       in
         Reduced ReduceNoWarning (ReduceWithPayment (Payment party money)) newState Close
     Nothing -> NotReduced
+  Mint payee tok cont ->
+        let
+          paidAmount = fromInt 1
+
+          (Tuple payment finalAccs) = giveMoney payee tok paidAmount ((unwrap state).accounts)
+
+          newState = wrap ((unwrap state) { accounts = finalAccs })
+        in
+          Reduced ReduceNoWarning payment newState cont
+  Burn payee tok cont ->
+        let
+          paidAmount = fromInt (-1)
+
+          (Tuple payment finalAccs) = giveMoney payee tok paidAmount ((unwrap state).accounts)
+
+          newState = wrap ((unwrap state) { accounts = finalAccs })
+        in
+          Reduced ReduceNoWarning payment newState cont        
+
   Pay accId payee tok val cont ->
     let
       amountToPay = evalValue env state val
@@ -1583,6 +1616,8 @@ class HasTimeout a where
 instance hasTimeoutContract :: HasTimeout Contract where
   timeouts Close = Timeouts { maxTime: zero, minTime: Nothing }
   timeouts (Pay _ _ _ _ contract) = timeouts contract
+  timeouts (Mint _ _ contract) = timeouts contract
+  timeouts (Burn _ _ contract) = timeouts contract
   timeouts (If _ contractTrue contractFalse) = timeouts [ contractTrue, contractFalse ]
   timeouts (When cases timeout contract) =
     timeouts

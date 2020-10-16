@@ -240,6 +240,8 @@ data Case a = Case Action a
 -}
 data Contract = Close
               | Pay AccountId Payee Token (Value Observation) Contract
+              | Mint Payee Token (Value Observation) Contract
+              | Burn Payee Token (Value Observation) Contract
               | If Observation Contract Contract
               | When [Case Contract] Timeout Contract
               | Let ValueId (Value Observation) Contract
@@ -575,6 +577,19 @@ reduceContractStep env state contract = case contract of
             in Reduced ReduceNoWarning (ReduceWithPayment (Payment party money)) newState Close
         Nothing -> NotReduced
 
+    Mint payee tok value cont -> let
+        amountToMint = evalValue env state value
+        (payment, finalAccs) = giveMoney payee tok amountToMint (accounts state)
+        newState = state { accounts = finalAccs }
+        in Reduced ReduceNoWarning payment newState cont
+
+    Burn payee tok value cont -> let
+        amountToBurn = evalValue env state value
+        (payment, finalAccs) = giveMoney payee tok (0 - amountToBurn) (accounts state)
+        newState = state { accounts = finalAccs }
+        in Reduced ReduceNoWarning payment newState cont
+
+
     Pay accId payee tok val cont -> let
         amountToPay = evalValue env state val
         in  if amountToPay <= 0
@@ -770,6 +785,8 @@ computeTransaction tx state contract = let
 contractLifespanUpperBound :: Contract -> Integer
 contractLifespanUpperBound contract = case contract of
     Close -> 0
+    Mint _ _ _ cont -> contractLifespanUpperBound cont
+    Burn _ _ _ cont -> contractLifespanUpperBound cont
     Pay _ _ _ _ cont -> contractLifespanUpperBound cont
     If _ contract1 contract2 ->
         max (contractLifespanUpperBound contract1) (contractLifespanUpperBound contract2)
@@ -1177,12 +1194,21 @@ instance ToJSON a => ToJSON (Case a) where
 
 instance FromJSON Contract where
   parseJSON (String "close") = return Close
+
   parseJSON (Object v) =
         (Pay <$> (v .: "from_account")
              <*> (v .: "to")
              <*> (v .: "token")
              <*> (v .: "pay")
              <*> (v .: "then"))
+    <|> (Mint <$> (v .: "token_to")
+              <*> (v .: "token")
+              <*> (v .: "amount")) 
+              <*> (v .: "then")
+    <|> (Burn <$> (v .: "token_burn_from")
+              <*> (v .: "token")
+              <*> (v .: "amount")
+              <*> (v .: "then"))         
     <|> (If <$> (v .: "if")
             <*> (v .: "then")
             <*> (v .: "else"))
@@ -1201,6 +1227,20 @@ instance FromJSON Contract where
 
 instance ToJSON Contract where
   toJSON Close = JSON.String $ pack "close"
+  toJSON (Mint payee token amount contract) = object
+    [   "token_to" .= payee
+    ,   "token" .= token
+    ,   "then" .= contract
+    ,   "amount" .= amount
+    ]
+
+  toJSON (Burn payee token amount contract) = object
+        [   "token_burn_from" .= payee
+        ,   "token" .= token
+        ,   "then" .= contract
+        ,   "amount" .= amount
+        ]
+
   toJSON (Pay accountId payee token value contract) = object
       [ "from_account" .= accountId
       , "to" .= payee

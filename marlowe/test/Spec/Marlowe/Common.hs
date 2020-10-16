@@ -271,7 +271,9 @@ shrinkCase (Case act cont) = [Case act x | x <- shrinkContract cont]
 contractRelGenSized :: Int -> Integer -> Gen Contract
 contractRelGenSized s bn
   | s > 0 = oneof [ return Close
-                  , Pay <$> partyGen <*> payeeGen <*> tokenGen
+                  , Mint <$> payeeGen <*> tokenGen <*>  valueGen <*> contractRelGenSized (s - 1) bn
+                  , Burn <$> payeeGen <*> tokenGen <*>  valueGen <*> contractRelGenSized (s - 1) bn
+                  , Pay <$> partyGen <*> payeeGen <*> tokenGen 
                         <*> valueGenSized (s `quot` 4)
                         <*> contractRelGenSized (s - 1) bn
                   , If <$> observationGenSized (s `quot` 4)
@@ -305,6 +307,16 @@ shrinkContract cont = case cont of
     Close -> []
     Let vid val cont -> Close : cont : ([Let vid v cont | v <- shrinkValue val]
               ++ [Let vid val c | c <- shrinkContract cont])
+    Mint payee tok val cont ->
+        Close : cont : ([Mint payee tok val c | c <- shrinkContract cont ]
+            ++  [Mint payee t val cont | t <- shrinkToken tok ]   
+            ++  [Mint payee tok v cont | v <- shrinkValue val ]   
+            ++  [Mint p tok val cont | p <- shrinkPayee payee ])  
+    Burn payee tok val cont ->
+        Close : cont : ([Burn payee tok val c | c <- shrinkContract cont ]
+            ++  [Burn payee t val cont | t <- shrinkToken tok ]   
+            ++  [Burn payee tok v cont | v <- shrinkValue val ]   
+            ++  [Burn p tok val cont | p <- shrinkPayee payee ])          
     Pay accId payee tok val cont ->
         Close:cont:([Pay accId payee tok val c | c <- shrinkContract cont]
               ++ [Pay accId payee tok v cont | v <- shrinkValue val]

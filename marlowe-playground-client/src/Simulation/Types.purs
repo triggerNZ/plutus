@@ -37,6 +37,8 @@ type WebData
 
 data ContractPathStep
   = PayContPath
+  | MintContPath
+  | BurnContPath
   | IfTruePath
   | IfFalsePath
   | WhenCasePath Int

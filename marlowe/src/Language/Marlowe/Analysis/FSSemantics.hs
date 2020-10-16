@@ -304,6 +304,14 @@ isValidAndFailsAux oa hasErr Close sState =
   return (hasErr .&& convertToSymbolicTrace ((lowSlot sState, highSlot sState,
                                               symInput sState, whenPos sState)
                                               :traces sState) (paramTrace sState))
+
+-- TODO We need more static analysis than this
+isValidAndFailsAux oa hasErr (Mint payee token amount cont) sState =
+  isValidAndFailsAux oa hasErr cont sState
+isValidAndFailsAux oa hasErr (Burn payee token amount cont) sState =
+  isValidAndFailsAux oa hasErr cont sState
+
+
 isValidAndFailsAux oa hasErr (Pay accId payee token val cont) sState =
   do let concVal = symEvalVal val sState
      let originalMoney = M.findWithDefault 0 (accId, token) (symAccounts sState)
@@ -452,6 +460,8 @@ isValidAndFailsWhen oa hasErr (Case (Notify obs) cont:rest)
 -- has been proven in TransactionBound.thy
 countWhens :: Contract -> Integer
 countWhens Close               = 0
+countWhens (Mint _ _ _ c)      = countWhens c
+countWhens (Burn _ _ _ c)      = countWhens c
 countWhens (Pay uv uw ux uy c) = countWhens c
 countWhens (If uz c c2)        = max (countWhens c) (countWhens c2)
 countWhens (When cl t c)       = 1 + max (countWhensCaseList cl) (countWhens c)
@@ -539,7 +549,7 @@ computeAndContinue :: ([Input] -> TransactionInput) -> [Input] -> State -> Contr
                    -> [([TransactionInput], [TransactionWarning])]
 computeAndContinue transaction inps sta cont t =
   case computeTransaction (transaction inps) sta cont of
-    Error TEUselessTransaction -> executeAndInterpret sta t cont
+    Error _ -> executeAndInterpret sta t cont    -- Super dangerous to ignore all errors but let's continue
     TransactionOutput { txOutWarnings = war
                       , txOutState = newSta
                       , txOutContract = newCont}
