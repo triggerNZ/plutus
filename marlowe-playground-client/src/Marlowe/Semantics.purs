@@ -713,8 +713,8 @@ instance hasArgsCase :: Args Case where
 
 data Contract
   = Close
-  | Mint Payee Token Contract
-  | Burn Payee Token Contract
+  | Mint Payee Token Value Contract
+  | Burn Payee Token Value Contract
   | Pay AccountId Payee Token Value Contract
   | If Observation Contract Contract
   | When (Array Case) Timeout Contract
@@ -729,16 +729,18 @@ derive instance ordContract :: Ord Contract
 
 instance encodeJsonContract :: Encode Contract where
   encode Close = encode "close"
-  encode (Mint payee token cont) =
+  encode (Mint payee token val cont) =
     encode
       { token: token
       , token_to: payee
+      , amount: val
       , then: cont
       }
-  encode (Burn payee token cont) =
+  encode (Burn payee token val cont) =
     encode
         { token: token
-        , token_burn_from: payee
+        , token_burn_from: payee 
+        , amount: val
         , then: cont
         }    
   encode (Pay accId payee token val cont) =
@@ -785,6 +787,16 @@ instance decodeJsonContract :: Decode Contract where
             <*> decodeProp "pay" a
             <*> decodeProp "then" a
         )
+      <|> ( Mint <$> decodeProp "token" a
+            <*> decodeProp "token_to" a
+            <*> decodeProp "amount" a
+            <*> decodeProp "then" a
+        )
+      <|> ( Burn <$> decodeProp "token" a
+            <*> decodeProp "token_burn_from" a
+            <*> decodeProp "amount" a
+            <*> decodeProp "then" a
+        )  
       <|> ( If <$> decodeProp "if" a
             <*> decodeProp "then" a
             <*> decodeProp "else" a
@@ -1366,18 +1378,18 @@ reduceContractStep env state contract = case contract of
       in
         Reduced ReduceNoWarning (ReduceWithPayment (Payment party money)) newState Close
     Nothing -> NotReduced
-  Mint payee tok cont ->
+  Mint payee tok val cont ->
         let
-          paidAmount = fromInt 1
+          paidAmount = evalValue env state val
 
           (Tuple payment finalAccs) = giveMoney payee tok paidAmount ((unwrap state).accounts)
 
           newState = wrap ((unwrap state) { accounts = finalAccs })
         in
           Reduced ReduceNoWarning payment newState cont
-  Burn payee tok cont ->
+  Burn payee tok val cont ->
         let
-          paidAmount = fromInt (-1)
+          paidAmount = evalValue env state (SubValue (Constant $ fromInt 0) val)
 
           (Tuple payment finalAccs) = giveMoney payee tok paidAmount ((unwrap state).accounts)
 
@@ -1616,8 +1628,8 @@ class HasTimeout a where
 instance hasTimeoutContract :: HasTimeout Contract where
   timeouts Close = Timeouts { maxTime: zero, minTime: Nothing }
   timeouts (Pay _ _ _ _ contract) = timeouts contract
-  timeouts (Mint _ _ contract) = timeouts contract
-  timeouts (Burn _ _ contract) = timeouts contract
+  timeouts (Mint _ _ _ contract) = timeouts contract
+  timeouts (Burn _ _ _ contract) = timeouts contract
   timeouts (If _ contractTrue contractFalse) = timeouts [ contractTrue, contractFalse ]
   timeouts (When cases timeout contract) =
     timeouts

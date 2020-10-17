@@ -586,11 +586,12 @@ toDefinition blockType@(ContractType MintContractType) =
   BlockDefinition
     $ merge
         { type: show MintContractType
-        , message0: "Mint %1 payee %2 mints token %3 continue as %4 %5"
+        , message0: "Mint %1 payee %2 mints token %3 value %4 continue as %5 %6"
         , args0:
           [ DummyCentre
           , Value { name: "payee", check: "payee", align: Right }
           , Value { name: "token", check: "token", align: Right }
+          , Value { name: "value", check: "value", align: Right }
           , DummyLeft
           , Statement { name: "contract", check: (show BaseContractType), align: Right }
           ]
@@ -604,11 +605,12 @@ toDefinition blockType@(ContractType BurnContractType) =
   BlockDefinition
     $ merge
         { type: show BurnContractType
-        , message0: "Burn %1 burnee %2 token %3 continue as %4 %5"
+        , message0: "Burn %1 burnee %2 token %3 value %4 continue as %5 %6"
         , args0:
           [ DummyCentre
           , Value { name: "payee", check: "payee", align: Right }
           , Value { name: "token", check: "token", align: Right }
+          , Value { name: "value", check: "value", align: Right }
           , DummyLeft
           , Statement { name: "contract", check: (show BaseContractType), align: Right }
           ]
@@ -1175,13 +1177,15 @@ instance hasBlockDefinitionContract :: HasBlockDefinition ContractType (Term Con
   blockDefinition MintContractType g block = do
     tok <- statementToTerm g block "token" Parser.token
     payee <- statementToTerm g block "payee" Parser.payee
+    amount <- statementToTerm g block "value" ( Parser.value unit )
     contract <- statementToTerm g block "contract" Parser.contract
-    pure $ mkDefaultTerm (Mint payee tok contract)
+    pure $ mkDefaultTerm (Mint payee tok amount contract)
   blockDefinition BurnContractType g block = do
     tok <- statementToTerm g block "token" Parser.token
     payee <- statementToTerm g block "payee" Parser.payee
+    amount <- statementToTerm g block "value" (Parser.value unit)
     contract <- statementToTerm g block "contract" Parser.contract
-    pure $ mkDefaultTerm (Burn payee tok contract)  
+    pure $ mkDefaultTerm (Burn payee tok amount contract)  
   blockDefinition PayContractType g block = do
     accountOwner <- statementToTerm g block "party" Parser.party
     tok <- statementToTerm g block "token" Parser.token
@@ -1473,17 +1477,19 @@ instance toBlocklyContract :: ToBlockly Contract where
   toBlockly newBlock workspace input Close = do
     block <- newBlock workspace (show CloseContractType)
     connectToPrevious block input
-  toBlockly newBlock workspace input (Mint payee tok contract) = do
+  toBlockly newBlock workspace input (Mint payee tok amount contract) = do
     block <- newBlock workspace (show MintContractType)
     connectToPrevious block input
     inputToBlockly newBlock workspace block "token" tok
     inputToBlockly newBlock workspace block "payee" payee
+    inputToBlockly newBlock workspace block "value" amount
     inputToBlockly newBlock workspace block "contract" contract  
-  toBlockly newBlock workspace input (Burn payee tok contract) = do
+  toBlockly newBlock workspace input (Burn payee tok amount contract) = do
     block <- newBlock workspace (show BurnContractType)
     connectToPrevious block input
     inputToBlockly newBlock workspace block "token" tok
     inputToBlockly newBlock workspace block "payee" payee
+    inputToBlockly newBlock workspace block "value" amount
     inputToBlockly newBlock workspace block "contract" contract    
   toBlockly newBlock workspace input (Pay accountOwner payee tok value contract) = do
     block <- newBlock workspace (show PayContractType)

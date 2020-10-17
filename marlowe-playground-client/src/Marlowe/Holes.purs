@@ -180,8 +180,8 @@ getMarloweConstructors ContractType =
   Map.fromFoldable
     [ (Tuple "Close" [])
     , (Tuple "Pay" [ DataArg PartyType, DataArg PayeeType, DataArg TokenType, DataArg ValueType, DataArg ContractType ])
-    , (Tuple "Mint" [ DataArg PayeeType, DataArg TokenType, DataArg ContractType ])
-    , (Tuple "Burn" [ DataArg PayeeType, DataArg TokenType, DataArg ContractType ])
+    , (Tuple "Mint" [ DataArg PayeeType, DataArg TokenType, DataArg ValueType, DataArg ContractType ])
+    , (Tuple "Burn" [ DataArg PayeeType, DataArg TokenType, DataArg ValueType, DataArg ContractType ])
     , (Tuple "If" [ DataArg ObservationType, DataArgIndexed 1 ContractType, DataArgIndexed 2 ContractType ])
     , (Tuple "When" [ EmptyArrayArg, DefaultNumber zero, DataArg ContractType ])
     , (Tuple "Let" [ DefaultString "valueId", DataArg ValueType, DataArg ContractType ])
@@ -830,8 +830,8 @@ instance observationHasContractData :: HasContractData Observation where
 
 data Contract
   = Close
-  | Mint (Term Payee) (Term Token) (Term Contract)
-  | Burn (Term Payee) (Term Token) (Term Contract)
+  | Mint (Term Payee) (Term Token) (Term Value) (Term Contract)
+  | Burn (Term Payee) (Term Token) (Term Value) (Term Contract)
   | Pay AccountId (Term Payee) (Term Token) (Term Value) (Term Contract)
   | If (Term Observation) (Term Contract) (Term Contract)
   | When (Array (Term Case)) (TermWrapper Slot) (Term Contract)
@@ -855,8 +855,8 @@ instance hasArgsContract :: Args Contract where
 instance contractFromTerm :: FromTerm Contract S.Contract where
   fromTerm Close = pure S.Close
   fromTerm (Pay a b c d e) = S.Pay <$> fromTerm a <*> fromTerm b <*> fromTerm c <*> fromTerm d <*> fromTerm e
-  fromTerm (Mint a b c) = S.Mint <$> fromTerm a <*> fromTerm b <*> fromTerm c
-  fromTerm (Burn a b c) = S.Burn <$> fromTerm a <*> fromTerm b <*> fromTerm c
+  fromTerm (Mint a b c d) = S.Mint <$> fromTerm a <*> fromTerm b <*> fromTerm c <*> fromTerm d
+  fromTerm (Burn a b c d) = S.Burn <$> fromTerm a <*> fromTerm b <*> fromTerm c <*> fromTerm d
   fromTerm (If a b c) = S.If <$> fromTerm a <*> fromTerm b <*> fromTerm c
   fromTerm (When as (TermWrapper b _) c) = S.When <$> (traverse fromTerm as) <*> pure b <*> fromTerm c
   fromTerm (Let a b c) = S.Let <$> fromTerm a <*> fromTerm b <*> fromTerm c
@@ -867,8 +867,8 @@ instance contractIsMarloweType :: IsMarloweType Contract where
 
 instance contractHasContractData :: HasContractData Contract where
   gatherContractData Close s = s
-  gatherContractData (Mint a b c) s = gatherContractData a s <> gatherContractData b s <> gatherContractData c s
-  gatherContractData (Burn a b c) s = gatherContractData a s <> gatherContractData b s <> gatherContractData c s
+  gatherContractData (Mint a b c d) s = gatherContractData a s <> gatherContractData b s <> gatherContractData c s <> gatherContractData d s
+  gatherContractData (Burn a b c d) s = gatherContractData a s <> gatherContractData b s <> gatherContractData c s <> gatherContractData d s
   gatherContractData (Pay a b c d e) s = gatherContractData a s <> gatherContractData b s <> gatherContractData c s <> gatherContractData d s <> gatherContractData e s
   gatherContractData (If a b c) s = gatherContractData a s <> gatherContractData b s <> gatherContractData c s
   gatherContractData (When as _ b) s = gatherContractData as s <> gatherContractData b s

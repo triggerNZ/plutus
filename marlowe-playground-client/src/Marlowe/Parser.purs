@@ -35,8 +35,8 @@ type HelperFunctions a
     , mkTimeout :: Int -> Range -> TermWrapper Slot
     , mkClose :: Contract
     , mkPay :: AccountId -> Term Payee -> Term Token -> Term Value -> Term Contract -> Contract
-    , mkMint :: Term Payee -> Term Token -> Term Contract -> Contract
-    , mkBurn :: Term Payee -> Term Token -> Term Contract -> Contract
+    , mkMint :: Term Payee -> Term Token -> Term Value -> Term Contract -> Contract
+    , mkBurn :: Term Payee -> Term Token -> Term Value -> Term Contract -> Contract
     , mkWhen :: Array (Term Case) -> (TermWrapper Slot) -> Term Contract -> Contract
     , mkIf :: Term Observation -> Term Contract -> Term Contract -> Contract
     , mkLet :: TermWrapper ValueId -> Term Value -> Term Contract -> Contract
@@ -428,10 +428,12 @@ recContract =
       )
     <|> ( Mint <$> (string "Mint" **> (parseTerm $ parens payee))
       <**> parseTerm (parens token)
+      <**> value'
       <**> contract'
       )
     <|> ( Burn <$> (string "Burn" **> (parseTerm $ parens payee))
       <**> parseTerm (parens token)
+      <**> value'
       <**> contract')
     <|> (If <$> (string "If" **> observation') <**> contract' <**> contract')
     <|> (When <$> (string "When" **> (array (maybeParens (parseTerm case')))) <**> timeout <**> contract')

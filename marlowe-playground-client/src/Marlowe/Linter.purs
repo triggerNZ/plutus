@@ -373,10 +373,10 @@ lintContract env t@(Term (Pay acc payee token payment cont) pos) = do
     _ -> pure env
   lintContract newEnv cont
 
-lintContract env (Term (Mint payee token cont) _) = do
+lintContract env (Term (Mint payee token val cont) _) = do
   lintContract env cont
 
-lintContract env (Term (Burn payee token cont) _) = do
+lintContract env (Term (Burn payee token val cont) _) = do
   lintContract env cont
 
 

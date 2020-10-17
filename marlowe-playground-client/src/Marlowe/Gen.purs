@@ -290,8 +290,8 @@ genContract' size
       in
         oneOf $ pure Close
           :| [ Pay <$> genTerm (mkArgName PartyType) genParty <*> genTerm (mkArgName PayeeType) genPayee <*> genTerm (mkArgName TokenType) genToken <*> genNewValue <*> genNewContract
-            , Mint <$> genTerm (mkArgName PayeeType) genPayee <*> genTerm (mkArgName TokenType) genToken <*> genNewContract
-            , Burn <$> genTerm (mkArgName PayeeType) genPayee <*> genTerm (mkArgName TokenType) genToken <*> genNewContract
+            , Mint <$> genTerm (mkArgName PayeeType) genPayee <*> genTerm (mkArgName TokenType) genToken <*> genNewValue <*> genNewContract
+            , Burn <$> genTerm (mkArgName PayeeType) genPayee <*> genTerm (mkArgName TokenType) genToken <*> genNewValue <*> genNewContract
             , If <$> genNewObservation <*> genNewContractIndexed 1 <*> genNewContractIndexed 2
             , When <$> genCases newSize <*> genTimeout <*> genNewContract
             , Let <$> genTermWrapper genValueId <*> genNewValue <*> genNewContract
